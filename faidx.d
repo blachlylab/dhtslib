@@ -145,7 +145,7 @@ int faidx_has_seq(const faidx_t *fai, const char *seq);
 /// Return number of sequences in fai index
 int faidx_nseq(const faidx_t *fai);
 
-/// Return name of i-th sequence (zero indexed)
+/// Return name of i-th sequence
 const(char) *faidx_iseq(const faidx_t *fai, int i);
 
 /// Return sequence length, -1 if not present
