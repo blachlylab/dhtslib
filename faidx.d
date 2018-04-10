@@ -1,9 +1,10 @@
-// htslib-1.3 faidx.h as D module
+// htslib-1.7 faidx.h as D module
 
 module faidx;
 
 extern (C):
 
+/// @file htslib/faidx.h
 /// FASTA random access.
 /*
    Copyright (C) 2008, 2009, 2013, 2014, 2016, 2017 Genome Research Ltd.
