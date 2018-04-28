@@ -3,7 +3,7 @@
     "description": "D bindings for htslib",
     "authors": ["James S. Blachly, MD"],
     "homepage": "https://github.com/blachlylab/dhtslib",
-    "license": "LGPL-3.0",
+    "license": "MIT",
     "dependencies": {
     },
     "libs": ["hts", "lzma", "bz2", "curl", "crypto"],
