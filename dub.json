@@ -6,6 +6,6 @@
     "license": "MIT",
     "dependencies": {
     },
-    "libs": ["hts", "lzma", "bz2", "curl", "crypto"],
+    "libs": ["hts"],
     "targetType": "sourceLibrary"
 }
