@@ -11,7 +11,7 @@
 // removed typedefs
 // modified bitfields in struct and aligned(1)
 // removed redundant struct declarations when declaring struct pointers
-// ref is a reserved keyword in D; changed 'ref' to 'reference'
+// ref is a reserved keyword in D; changed 'ref' to '_ref'
 module htslib.sam;
 
 
@@ -296,7 +296,7 @@ auto bam_seqi(byte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);   
     bam_hdr_t *bam_hdr_read(BGZF *fp);
     int bam_hdr_write(BGZF *fp, const bam_hdr_t *h);
     void bam_hdr_destroy(bam_hdr_t *h);
-    int bam_name2id(bam_hdr_t *h, const char *reference);
+    int bam_name2id(bam_hdr_t *h, const char *_ref);
     bam_hdr_t* bam_hdr_dup(const bam_hdr_t *h0);
 
     bam1_t *bam_init1();
@@ -628,6 +628,6 @@ alias bam_mplp_t = __bam_mplp_t*;
  * BAQ calculation and realignment *
  ***********************************/
 
-int sam_cap_mapq(bam1_t *b, const char *reference, int ref_len, int thres);
-int sam_prob_realn(bam1_t *b, const char *reference, int ref_len, int flag);
+int sam_cap_mapq(bam1_t *b, const char *_ref, int ref_len, int thres);
+int sam_prob_realn(bam1_t *b, const char *_ref, int ref_len, int flag);
 
