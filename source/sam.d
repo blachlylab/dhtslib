@@ -12,7 +12,7 @@
 // modified bitfields in struct and aligned(1)
 // removed redundant struct declarations when declaring struct pointers
 // ref is a reserved keyword in D; changed 'ref' to 'reference'
-module sam;
+module htslib.sam;
 
 
 extern (C):

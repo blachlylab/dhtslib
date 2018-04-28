@@ -2,11 +2,11 @@
 // Changes include:
 // In D, const on either LHS or RHS of function declaration applies to the function, not return value, unless parents included:
 // changed ^const <type> <fnname> to ^const(<type>) <fnname>
-module hts;
+module htslib.hts;
 
 import std.bitmanip;
 
-import bgzf;
+import htslib.bgzf;
 
 extern (C):
 /// @file htslib/hts.h
