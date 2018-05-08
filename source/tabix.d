@@ -63,6 +63,7 @@ struct TabixIndexedFile {
     {
         struct Region {
 
+            /** TODO: determine how thread-(un)safe this is */
             private htsFile *fp;
             private tbx_t   *tbx;
 
