@@ -1,6 +1,6 @@
 // htslib-1.7 faidx.h as D module
 
-module htslib.faidx;
+module dhtslib.htslib.faidx;
 
 extern (C):
 

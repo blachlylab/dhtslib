@@ -4,7 +4,7 @@
 // changed ^const <type> <fnname> to ^const(<type>) <fnname>
 /*  *      aliased typedef'd function pointers */
 
-module htslib.hts;
+module dhtslib.htslib.hts;
 
 import std.bitmanip;
 

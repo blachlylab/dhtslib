@@ -9,7 +9,7 @@
 // typedef struct to alias
 // modified bitfields in struct and aligned(1)
 // removed redundant struct declarations when declaring struct pointers
-module htslib.bgzf;
+module dhtslib.htslib.bgzf;
 
 import std.bitmanip;
 
