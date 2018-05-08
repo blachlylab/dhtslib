@@ -9,7 +9,7 @@
  *      In D, const on either LHS or RHS of function declaration applies to the function, not return value, unless parents included:
  *      changed ^const <type> <fnname> to ^const(<type>) <fnname>
  */
-module htslib.tgx;
+module htslib.tbx;
 
 import std.stdint : int32_t;
 
