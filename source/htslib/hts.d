@@ -331,7 +331,7 @@ The input character may be either an IUPAC ambiguity code, '=' for 0, or
 '0'/'1'/'2'/'3' for a result of 1/2/4/8.  The result is encoded as 1/2/4/8
 for A/C/G/T or combinations of these bits for ambiguous bases.
 */
-extern const char seq_nt16_table[256];
+extern const char[256] seq_nt16_table;
 
 /*! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
 ambiguity code letter (or '=' when given 0).
