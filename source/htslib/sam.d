@@ -45,7 +45,7 @@ DEALINGS IN THE SOFTWARE.  */
 
 import core.stdc.stdint;
 /// #include "hts.h"
-import htslib.hts;
+import dhtslib.htslib.hts;
 struct BGZF;
 struct hts_idx_t;
 struct __kstring_t {

@@ -13,8 +13,8 @@ module dhtslib.htslib.tbx;
 
 import std.stdint : int32_t;
 
-import htslib.hts;
-import htslib.bgzf;
+import dhtslib.htslib.hts;
+import dhtslib.htslib.bgzf;
 
 extern (C):
 

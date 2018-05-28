@@ -8,7 +8,7 @@ module dhtslib.htslib.hts;
 
 import std.bitmanip;
 
-import htslib.bgzf;
+import dhtslib.htslib.bgzf;
 
 extern (C):
 /// @file htslib/hts.h

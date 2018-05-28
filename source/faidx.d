@@ -24,19 +24,20 @@ bool buildFastaIndex(string fn, string fnfai = "", string fngzi = "")
     
     if (ret == 0) return true;
     if (ret == -1) return false;
+    assert(0);
 }
 
 struct IndexedFastaFile {
 
-    faidx_t *faix;
+    faidx_t *faidx;
 
     this(string fn, bool create=false)
     {
         if (create) {
-            this.faidx = fai_load3( toStringz(fn), null, null, FAI_CREATE);
+            this.faidx = fai_load3( toStringz(fn), null, null, fai_load_options.FAI_CREATE);
         }
         else {
-            this.faidx = fai_load( toStringz(fn) , null, null, FAI_CREATE);
+            this.faidx = fai_load3( toStringz(fn) , null, null, 0);
         }
     }
     ~this()
@@ -56,7 +57,7 @@ struct IndexedFastaFile {
         // @param  len  Length of the region; -2 if seq not present, -1 general error
         fetchedSeq = fai_fetch(this.faidx, toStringz(region), &fetchedLen);
 
-        string seq = fromStringz(fetchedSeq);
+        string seq = fromStringz(fetchedSeq).idup;
         free(fetchedSeq);
 
         if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
@@ -83,9 +84,9 @@ struct IndexedFastaFile {
         // char *faidx_fetch_seq(const faidx_t *fai, const char *c_name, int p_beg_i, int p_end_i, int *len);
         char *fetchedSeq;
         int fetchedLen;
-        fetchedSeq = fai_fetch(this.faidx, toStringz(contig), start, end, &fetchedLen);
+        fetchedSeq = faidx_fetch_seq(this.faidx, toStringz(contig), start, end, &fetchedLen);
         
-        string seq = fromStringz(fetchedSeq);
+        string seq = fromStringz(fetchedSeq).idup;
         free(fetchedSeq);
 
         if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
@@ -112,7 +113,7 @@ struct IndexedFastaFile {
         // TODO determine if this property is zero indexed or one indexed
         if (i > this.nSeq) throw new Exception("seqName: sequece number not present");
 
-        return fromStringz( faidx_iseq(this.faidx, i) );
+        return fromStringz( faidx_iseq(this.faidx, i) ).idup;
     }
 
     /// Return sequence length, -1 if not present
