@@ -35,10 +35,13 @@ struct IndexedFastaFile {
     {
         if (create) {
             this.faidx = fai_load3( toStringz(fn), null, null, fai_load_options.FAI_CREATE);
+            if (this.faidx is null) throw new Exception("Unable to load or create the FASTA index.");
         }
         else {
             this.faidx = fai_load3( toStringz(fn) , null, null, 0);
+            if (this.faidx is null) throw new Exception("Unable to load the FASTA index.");
         }
+
     }
     ~this()
     {
