@@ -50,7 +50,7 @@ struct TabixIndexedFile {
         while ( hts_getline(this.fp, '\n', &str) >= 0 )
         {
             if ( !str.l || str.s[0] != this.tbx.conf.meta_char ) break;
-            this.header ~= fromStringz(str.s);
+            this.header ~= fromStringz(str.s) ~ '\n';
         }
 
         debug{ writeln("end loadHeader"); }
@@ -63,15 +63,19 @@ struct TabixIndexedFile {
     {
         struct Region {
 
-            /** TODO: determine how thread-(un)safe this is */
+            /** TODO: determine how thread-(un)safe this is (i.e., using a potentially shared *fp and *tbx) */
             private htsFile *fp;
             private tbx_t   *tbx;
 
             private hts_itr_t *itr;
-            private string current;
             private string next;
-            private kstring_t kstr;
-            
+
+            // necessary because the alternative strategy of preloading the first row
+            // leads to problems when Struct inst is blitted ->
+            // re-iterating always returns first row only (since *itr is expended 
+            // but first row was preloaded in this.next)
+            private bool active;
+
             this(htsFile *fp, tbx_t *tbx, string r)
             {
                 this.fp = fp;
@@ -82,7 +86,7 @@ struct TabixIndexedFile {
                 writeln("this.itr: ", this.itr);
                 if (this.itr) {
                     // Load the first record
-                    this.popFront();
+                    //this.popFront(); // correction, do not load the first record
                 }
                 else {
                     // TODO handle error
@@ -97,29 +101,37 @@ struct TabixIndexedFile {
                 //free(this.kstr.s);
             }
 
-            @property bool empty() const {
+            // had to remove "const" property from empty() due to manipulation of this.active
+            @property bool empty() {
+
+                if (!this.active) {
+                    // this is the first call to empty() (and use of the range)
+                    // Let's make it active and attempt to load the first record, if one exists
+                    this.active = true;
+                    this.popFront();
+                }
+
                 if (!this.next) return true;
-                return false;
+                else return false;
             }
 
-            @property string front() {
-                return this.current;
+            @property string front() const {
+                return this.next;
             }
 
             void popFront() {
                 // closure over fp and tbx? (i.e. potentially unsafe?)
 
-                // Move next into current (note that the ctor runs popFront() once automatically)
-                this.current = this.next;
-
                 // Get next entry
-                auto res = tbx_itr_next(this.fp, this.tbx, this.itr, &this.kstr);
+                kstring_t kstr;
+                auto res = tbx_itr_next(this.fp, this.tbx, this.itr, &kstr);
                 if (res < 0) {
                     // we are done
                     this.next = null;
                 } else {
-                // Otherwise load into next
-                this.next = fromStringz(this.kstr.s).idup;
+                    // Otherwise load into next
+                    this.next = fromStringz(kstr.s).idup;
+                    free(kstr.s);
                 }
             }
         }

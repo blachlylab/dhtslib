@@ -7,5 +7,16 @@
     "dependencies": {
     },
     "libs": ["hts"],
-    "targetType": "sourceLibrary"
+    "configurations": [
+        {
+            "name": "source",
+            "targetType": "sourceLibrary"
+        },
+        {
+            "name": "testapp",
+            "targetType": "executable",
+            "targetName": "tabix_gffreader",
+            "sourcePaths": ["test"]
+        }
+    ]
 }

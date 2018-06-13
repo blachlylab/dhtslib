@@ -2,3 +2,6 @@
 *.a
 *.swp
 .dub/*
+
+# binaries
+tabix_gffreader
