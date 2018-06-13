@@ -82,8 +82,7 @@ struct TabixIndexedFile {
                 this.tbx= tbx;
 
                 this.itr = tbx_itr_querys(tbx, toStringz(r) );
-                writeln("Region ctor");
-                writeln("this.itr: ", this.itr);
+                writeln("Region ctor // this.itr: ", this.itr);
                 if (this.itr) {
                     // Load the first record
                     //this.popFront(); // correction, do not load the first record
@@ -95,8 +94,7 @@ struct TabixIndexedFile {
             }
             ~this()
             {
-                writeln("Region dtor");
-                writeln("this.itr: ", this.itr);
+                writeln("Region dtor // this.itr: ", this.itr);
                 //tbx_itr_destroy(itr);
                 //free(this.kstr.s);
             }
