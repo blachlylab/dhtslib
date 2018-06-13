@@ -68,8 +68,9 @@ struct TabixIndexedFile {
             private tbx_t   *tbx;
 
             private hts_itr_t *itr;
+            private string current;
             private string next;
-            private kstring_t str;
+            private kstring_t kstr;
             
             this(htsFile *fp, tbx_t *tbx, string r)
             {
@@ -77,15 +78,23 @@ struct TabixIndexedFile {
                 this.tbx= tbx;
 
                 this.itr = tbx_itr_querys(tbx, toStringz(r) );
+                writeln("Region ctor");
+                writeln("this.itr: ", this.itr);
                 if (this.itr) {
                     // Load the first record
                     this.popFront();
                 }
+                else {
+                    // TODO handle error
+                    throw new Exception("could not allocate this.itr");
+                }
             }
             ~this()
             {
-                tbx_itr_destroy(itr);
-                free(this.str.s);
+                writeln("Region dtor");
+                writeln("this.itr: ", this.itr);
+                //tbx_itr_destroy(itr);
+                //free(this.kstr.s);
             }
 
             @property bool empty() const {
@@ -94,13 +103,24 @@ struct TabixIndexedFile {
             }
 
             @property string front() {
-                return this.next;
+                return this.current;
             }
 
             void popFront() {
-                // closure over fp and tbx?
-                auto res = tbx_itr_next(this.fp, this.tbx, this.itr, &this.str);
-                if (res < 0) { /* we are done */ }
+                // closure over fp and tbx? (i.e. potentially unsafe?)
+
+                // Move next into current (note that the ctor runs popFront() once automatically)
+                this.current = this.next;
+
+                // Get next entry
+                auto res = tbx_itr_next(this.fp, this.tbx, this.itr, &this.kstr);
+                if (res < 0) {
+                    // we are done
+                    this.next = null;
+                } else {
+                // Otherwise load into next
+                this.next = fromStringz(this.kstr.s).idup;
+                }
             }
         }
 
