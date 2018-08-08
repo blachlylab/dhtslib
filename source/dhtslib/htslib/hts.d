@@ -3,6 +3,7 @@
 // In D, const on either LHS or RHS of function declaration applies to the function, not return value, unless parents included:
 // changed ^const <type> <fnname> to ^const(<type>) <fnname>
 /*  *      aliased typedef'd function pointers */
+/*  *       changed C-style arrays (eg line 339, extern const char seq_nt16_str[];) to char[] seq_nt16_str */
 
 module dhtslib.htslib.hts;
 
@@ -336,12 +337,12 @@ extern const char[256] seq_nt16_table;
 /*! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
 ambiguity code letter (or '=' when given 0).
 */
-extern const char seq_nt16_str[];
+extern const char[] seq_nt16_str;
 
 /*! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
 Returns 0/1/2/3 for 1/2/4/8 (i.e., A/C/G/T), or 4 otherwise (0 or ambiguous).
 */
-extern const int seq_nt16_int[];
+extern const int[] seq_nt16_int;
 
 /*!
   @abstract  Get the htslib version number
