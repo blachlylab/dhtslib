@@ -10,14 +10,14 @@ int main()
 
     TabixIndexedFile tf = TabixIndexedFile("/tmp/gencode.v28.basic.annotation.sorted.gff3.gz");
 
-    auto r = tf.region("chr1:1-14409");
+    //auto r = tf.region("chr1:1-14409");
+    auto r = tf.region("chr1:12000-13000");
 
-/+
     foreach(line ; r) {
         writeln(line[0 .. 80]);
-    }+/
+    }
 
-    //writeln(r);
+    writeln(r);
 /*
     writeln("Writing Range r as array:");
     writeln(r);
