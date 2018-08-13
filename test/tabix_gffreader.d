@@ -4,14 +4,15 @@ import std.stdio;
 
 import dhtslib.tabix;
 
-int main()
+int main(string[] args)
 {
     writeln("tabix_gffreader");
 
-    TabixIndexedFile tf = TabixIndexedFile("/tmp/gencode.v28.basic.annotation.sorted.gff3.gz");
+    writeln(args[0], args[1]);
+    TabixIndexedFile tf = TabixIndexedFile(args[1]);
 
     //auto r = tf.region("chr1:1-14409");
-    auto r = tf.region("chr1:12000-13000");
+    auto r = tf.region("chr1:12000-12000");
 
     foreach(line ; r) {
         writeln(line[0 .. 80]);
