@@ -9,13 +9,20 @@ import dhtslib.htslib.hts;
 import dhtslib.htslib.tbx;
 //import dhtslib.htslib.regidx;
 
+/** Encapsulates a position-sorted record-oriented NGS flat file,
+ *  indexed with Tabix, including BED, GFF3, VCF.
+ *
+ *  region(string r) returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
+ */
 struct TabixIndexedFile {
 
-    htsFile *fp;
-    tbx_t   *tbx;
+    htsFile *fp;    /// pointer to htsFile struct
+    tbx_t   *tbx;   /// pointer to tabix handle
 
-    string header;
+    string header;  /// NGS flat file's header (if any; e.g. BED may not have one)
 
+    /// Initialize with a complete file path name to the tabix-indexed file
+    /// The tabix index (.tbi) must already exist alongside
     this(string fn)
     {
         debug{ writeln("TabixIndexedFile ctor"); }
@@ -57,7 +64,7 @@ struct TabixIndexedFile {
     }
 
     /** region(r)
-     *  returns an InputRange that iterates through lines from the input file within the given range
+     *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
      */
     auto region(string r)
     {
@@ -82,7 +89,7 @@ struct TabixIndexedFile {
                 this.tbx= tbx;
 
                 this.itr = tbx_itr_querys(tbx, toStringz(r) );
-                writeln("Region ctor // this.itr: ", this.itr);
+                debug { writeln("Region ctor // this.itr: ", this.itr); }
                 if (this.itr) {
                     // Load the first record
                     //this.popFront(); // correction, do not load the first record
@@ -94,7 +101,7 @@ struct TabixIndexedFile {
             }
             ~this()
             {
-                writeln("Region dtor // this.itr: ", this.itr);
+                debug { writeln("Region dtor // this.itr: ", this.itr); }
                 //tbx_itr_destroy(itr);
                 //free(this.kstr.s);
             }
@@ -122,7 +129,7 @@ struct TabixIndexedFile {
 
                 // Get next entry
                 kstring_t kstr;
-                auto res = tbx_itr_next(this.fp, this.tbx, this.itr, &kstr);
+                immutable res = tbx_itr_next(this.fp, this.tbx, this.itr, &kstr);
                 if (res < 0) {
                     // we are done
                     this.next = null;
