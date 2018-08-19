@@ -11,6 +11,10 @@ int main(string[] args)
     writeln(args[0], args[1]);
     TabixIndexedFile tf = TabixIndexedFile(args[1]);
 
+    string[] seqnames = tf.sequenceNames;
+    writeln("Sequence names: ");
+    writeln(seqnames);
+    
     //auto r = tf.region("chr1:1-14409");
     auto r = tf.region("chr1:12000-12000");
 

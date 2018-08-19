@@ -63,6 +63,23 @@ struct TabixIndexedFile {
         debug{ writeln("end loadHeader"); }
     }
 
+    /// tbx.d: const(char **) tbx_seqnames(tbx_t *tbx, int *n);  // free the array but not the values
+    @property string[] sequenceNames()
+    {
+        // TODO: Check for memory leaks
+        int nseqs;
+
+        string[] sequence_names;
+
+        const(char **) seqnames = tbx_seqnames(this.tbx, &nseqs);
+
+        for(int i; i<nseqs; i++) {
+            sequence_names ~= cast(string) fromStringz(seqnames[i]);
+        }
+
+        return sequence_names;
+    }
+
     /** region(r)
      *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
      */
