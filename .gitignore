@@ -2,6 +2,7 @@
 *.a
 *.swp
 .dub/*
+dub.selections.json
 
 # binaries
 tabix_gffreader
