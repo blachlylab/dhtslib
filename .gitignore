@@ -6,3 +6,4 @@ dub.selections.json
 
 # binaries
 tabix_gffreader
+bgzfreader

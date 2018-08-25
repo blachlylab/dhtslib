@@ -9,14 +9,28 @@
     "libs": ["hts"],
     "configurations": [
         {
-            "name": "source",
-            "targetType": "sourceLibrary"
-        },
-        {
-            "name": "testapp",
+            "name": "tabix_test",
             "targetType": "executable",
             "targetName": "tabix_gffreader",
-            "sourcePaths": ["test"]
+            "sourcePaths": ["test"],
+            "mainSourceFile": "test/tabix_gffreader.d",
+            "excludedSourceFiles": [
+                "test/bgzfreader.d"
+            ]
+        },
+        {
+            "name": "bgzf_test",
+            "targetType": "executable",
+            "targetName": "bgzfreader",
+            "sourcePaths": ["test"],
+            "mainSourceFile": "test/bgzfreader.d",
+            "excludedSourceFiles": [
+                "test/tabix_gffreader.d"
+            ]
+        },
+        {
+            "name": "source",
+            "targetType": "sourceLibrary"
         }
     ]
 }
