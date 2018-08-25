@@ -16,11 +16,11 @@ int main(string[] args)
 
     stderr.writeln("[TEST SUITE] All done.");
 
-/+
-    stderr.writeln("range redux");
+    // Demonstrate that a new copy of the range will be empty
+    stderr.writeln("[TEST SUITE] range redux");
     foreach(line; bgzf) {
         writeln(line);
     }
-+/
+
     return 0;
 }
