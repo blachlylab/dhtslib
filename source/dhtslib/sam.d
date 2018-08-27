@@ -6,6 +6,7 @@ import std.parallelism: totalCPUs;
 import std.stdio: writeln, writefln;
 import std.string: fromStringz, toStringz;
 
+import dhtslib.htslib.hts: htsFile, hts_itr_t;
 import dhtslib.htslib.sam;
 
 /**
@@ -84,35 +85,44 @@ struct SAMFile {
 
     }
 
-    /// InputRange interface
-    @property bool empty()
+    /// InputRange interface; returned by query()
+    struct RecordRange
     {
-        // equivalent to htslib ks_release
-        this.line.l = 0;
-        this.line.m = 0;
-        this.line.s = null;
-        
-        // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
-        //immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
-        //return (res < 0 ? true : false);
-        return true;
-    }
-    /// ditto
-    void popFront()
-    {
+        private kstring_t line;     // shut up the compiler
+        private htsFile *fp;        // this is shared/will point to a copy possibly used by other iterators
+        private hts_itr_t *iter;
 
-        free(this.line.s);
+        private bam1_t *b;          /// This is the alignment object
 
-        // equivalent to htslib ks_release
-        this.line.l = 0;
-        this.line.m = 0;
-        this.line.s = null;
-        
-    }
-    /// ditto
-    string front()
-    {
-        auto ret = fromStringz(this.line.s).idup;
-        return ret;
+        @property bool empty()
+        {
+            // equivalent to htslib ks_release
+            this.line.l = 0;
+            this.line.m = 0;
+            this.line.s = null;
+            
+            // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
+            //immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
+            //return (res < 0 ? true : false);
+            return true;
+        }
+        /// ditto
+        void popFront()
+        {
+
+            free(this.line.s);
+
+            // equivalent to htslib ks_release
+            this.line.l = 0;
+            this.line.m = 0;
+            this.line.s = null;
+            
+        }
+        /// ditto
+        string front()
+        {
+            auto ret = fromStringz(this.line.s).idup;
+            return ret;
+        }
     }
 }
