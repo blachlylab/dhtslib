@@ -191,11 +191,12 @@ struct htsFile {
     kstring_t line;
     char *fn;
     char *fn_aux;
-    union fp {
+    union FP {
         BGZF *bgzf;
         cram_fd *cram;
         hFILE *hfile;
     };
+    FP fp;
     htsFormat format;
 };
 

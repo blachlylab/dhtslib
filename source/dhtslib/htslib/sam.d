@@ -57,7 +57,6 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
 
 import core.stdc.stdint;
-/// #include "hts.h"
 import dhtslib.htslib.hts;
 struct BGZF;
 struct hts_idx_t;
@@ -389,12 +388,15 @@ int sam_index_build2(const char *fn, const char *fnidx, int min_shift);
 int sam_index_build3(const char *fn, const char *fnidx, int min_shift, int nthreads);
 
     ////#define sam_itr_destroy(iter) hts_itr_destroy(iter)
+    alias sam_itr_destroy = hts_itr_destroy;
     hts_itr_t *sam_itr_queryi(const hts_idx_t *idx, int tid, int beg, int end);
     hts_itr_t *sam_itr_querys(const hts_idx_t *idx, bam_hdr_t *hdr, const char *region);
     hts_itr_multi_t *sam_itr_regions(const hts_idx_t *idx, bam_hdr_t *hdr, hts_reglist_t *reglist, uint regcount);
 
     ////#define sam_itr_next(htsfp, itr, r) hts_itr_next((htsfp)->fp.bgzf, (itr), (r), (htsfp))
+    auto sam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, htsfp); }
     ////#define sam_itr_multi_next(htsfp, itr, r) hts_itr_multi_next((htsfp), (itr), (r))
+    //auto sam_itr_multi_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_multi_next(htsfp, itr, r); }
 
     /***************
      *** SAM I/O ***
