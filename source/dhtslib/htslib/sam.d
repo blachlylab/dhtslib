@@ -564,7 +564,7 @@ int bam_aux_update_str(bam1_t *b, const ref char[2] tag, int len, const char *da
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_int(bam1_t *b, const ref char tag[2], int64_t val);
+int bam_aux_update_int(bam1_t *b, const ref char[2] tag, int64_t val);
 
 /// Update or add a floating-point tag
 /* @param b    The bam record to update
@@ -583,7 +583,7 @@ int bam_aux_update_int(bam1_t *b, const ref char tag[2], int64_t val);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_float(bam1_t *b, const ref char tag[2], float val);
+int bam_aux_update_float(bam1_t *b, const ref char[2] tag, float val);
 
 /// Update or add an array tag
 /* @param b     The bam record to update
@@ -621,7 +621,7 @@ int bam_aux_update_float(bam1_t *b, const ref char tag[2], float val);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_array(bam1_t *b, const ref char tag[2],
+int bam_aux_update_array(bam1_t *b, const ref char[2] tag,
                          uint8_t type, uint32_t items, void *data);
 
 /**************************
