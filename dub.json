@@ -15,7 +15,7 @@
             "sourcePaths": ["test"],
             "mainSourceFile": "test/tabix_gffreader.d",
             "excludedSourceFiles": [
-                "test/bgzfreader.d"
+                "test/bgzfreader.d", "test/samreader.d"
             ]
         },
         {
@@ -25,7 +25,17 @@
             "sourcePaths": ["test"],
             "mainSourceFile": "test/bgzfreader.d",
             "excludedSourceFiles": [
-                "test/tabix_gffreader.d"
+                "test/tabix_gffreader.d", "test/samreader.d"
+            ]
+        },
+        {
+            "name": "sam_test",
+            "targetType": "executable",
+            "targetName": "samreader",
+            "sourcePaths": ["test"],
+            "mainSourceFile": "test/samreader.d",
+            "excludedSourceFiles": [
+                "test/tabix_gffreader.d", "test/bgzfreader.d"
             ]
         },
         {

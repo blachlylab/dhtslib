@@ -13,7 +13,21 @@
 // removed redundant struct declarations when declaring struct pointers
 // ref is a reserved keyword in D; changed 'ref' to '_ref'
 // Function prototypes taking fixed size array (e.g. ..., const char tag[2], ) should include ref in the D prototype 
+/*  
+Aliased function pointer typedefs:
+
+    typedef int (*bam_plp_auto_f)(void *data, bam1_t *b);
+    alias bam_plp_auto_f = int *function(void *data, bam1_t *b);
+
+Updated parameter function pointers:
+    int (*func)(void *data, const bam1_t *b, bam_pileup_cd *cd));
+    int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
+
+Functions returning const must be rewritten as const(type)*func_name
+*/
 module dhtslib.htslib.sam;
+
+import std.bitmanip;
 
 extern (C):
 /// @file htslib/sam.h
@@ -610,8 +624,6 @@ int bam_aux_update_float(bam1_t *b, const ref char tag[2], float val);
 int bam_aux_update_array(bam1_t *b, const ref char tag[2],
                          uint8_t type, uint32_t items, void *data);
 
-/+
-
 /**************************
  *** Pileup and Mpileup ***
  **************************/
@@ -625,11 +637,11 @@ int bam_aux_update_array(bam1_t *b, const ref char tag[2],
  a tidy manner during the pileup process.  This union is the cached
  data to be manipulated by the "client" (the caller of pileup).
 */
-typedef union {
-    void *p;
+union bam_pileup_cd {
+    void    *p;
     int64_t i;
-    double f;
-} bam_pileup_cd;
+    double  f;
+};
 
 /*! @typedef
  @abstract Structure for one alignment covering the pileup position.
@@ -650,20 +662,29 @@ typedef union {
  overhead.
  */
 struct bam_pileup1_t {
-    bam1_t *b;
+    bam1_t  *b;
     int32_t qpos;
     int indel, level;
-    uint32_t is_del:1, is_head:1, is_tail:1, is_refskip:1, aux:28;
+    ///uint32_t is_del:1, is_head:1, is_tail:1, is_refskip:1, aux:28;
+    mixin(bitfields!(
+        bool, "is_del",  1,
+        bool, "is_head", 1,
+        bool, "is_tail", 1,
+        bool, "is_refskip", 1,
+        uint, "aux", 28 ));
     bam_pileup_cd cd; // generic per-struct data, owned by caller.
 };
 
-typedef int (*bam_plp_auto_f)(void *data, bam1_t *b);
+///typedef int (*bam_plp_auto_f)(void *data, bam1_t *b);
+alias bam_plp_auto_f = int *function(void *data, bam1_t *b);
 
 struct __bam_plp_t;
+///typedef struct __bam_plp_t *bam_plp_t;
 //alias __bam_plp_t *bam_plp_t;
 alias bam_plp_t = __bam_plp_t*;
 
 struct __bam_mplp_t;
+///typedef struct __bam_mplp_t *bam_mplp_t;
 //alias __bam_mplp_t *bam_mplp_t;
 alias bam_mplp_t = __bam_mplp_t*;
 
@@ -676,8 +697,8 @@ alias bam_mplp_t = __bam_mplp_t*;
     bam_plp_t bam_plp_init(bam_plp_auto_f func, void *data);
     void bam_plp_destroy(bam_plp_t iter);
     int bam_plp_push(bam_plp_t iter, const bam1_t *b);
-    const bam_pileup1_t *bam_plp_next(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp);
-    const bam_pileup1_t *bam_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp);
+    const(bam_pileup1_t)*bam_plp_next(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp);
+    const(bam_pileup1_t)*bam_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp);
     void bam_plp_set_maxcnt(bam_plp_t iter, int maxcnt);
     void bam_plp_reset(bam_plp_t iter);
 
@@ -690,9 +711,9 @@ alias bam_mplp_t = __bam_mplp_t*;
      *              will also be present in each bam_pileup1_t created.
      */
     void bam_plp_constructor(bam_plp_t plp,
-                             int (*func)(void *data, const bam1_t *b, bam_pileup_cd *cd));
+                             int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
     void bam_plp_destructor(bam_plp_t plp,
-                            int (*func)(void *data, const bam1_t *b, bam_pileup_cd *cd));
+                            int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
 
     bam_mplp_t bam_mplp_init(int n, bam_plp_auto_f func, void **data);
     /**
@@ -709,12 +730,11 @@ alias bam_mplp_t = __bam_mplp_t*;
     int bam_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp);
     void bam_mplp_reset(bam_mplp_t iter);
     void bam_mplp_constructor(bam_mplp_t iter,
-                              int (*func)(void *data, const bam1_t *b, bam_pileup_cd *cd));
+                              int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
     void bam_mplp_destructor(bam_mplp_t iter,
-                             int (*func)(void *data, const bam1_t *b, bam_pileup_cd *cd));
+                             int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
 
 
-+/
 /***********************************
  * BAQ calculation and realignment *
  ***********************************/

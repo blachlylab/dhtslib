@@ -38,5 +38,5 @@ Currently implemented fully or partially:
 * faidx
 * hts
 * regidx
-* sam (WIP // pileup is not implemented)
+* sam
 * tbx
