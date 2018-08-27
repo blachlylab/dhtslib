@@ -1,4 +1,4 @@
-// htslib-1.7 bgzf.h as D module
+// htslib-1.9 bgzf.h as D module
 // Changes include:
 // Removed if(n)defs
 // Changed #defines to const/immutable

@@ -1,4 +1,4 @@
-/** htslib-1.7 tbx.h as D module
+/** htslib-1.9 tbx.h as D module
  *
  *  Changes include:
  *      Removed if(n)defs
