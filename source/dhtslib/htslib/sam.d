@@ -662,6 +662,7 @@ union bam_pileup_cd {
  overhead.
  */
 struct bam_pileup1_t {
+    align(1):
     bam1_t  *b;
     int32_t qpos;
     int indel, level;
