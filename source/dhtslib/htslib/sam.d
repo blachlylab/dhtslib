@@ -15,9 +15,7 @@
 // Function prototypes taking fixed size array (e.g. ..., const char tag[2], ) should include ref in the D prototype 
 module dhtslib.htslib.sam;
 
-
 extern (C):
-
 /// @file htslib/sam.h
 /// High-level SAM/BAM/CRAM sequence file operations.
 /*
@@ -73,7 +71,7 @@ auto SAM_FORMAT_VERSION = "1.6"c;
  */
 
 struct bam_hdr_t {
-    int n_targets, ignore_sam_err;
+    int  n_targets, ignore_sam_err;
     uint l_text;
     uint *target_len;
     byte *cigar_tab;
@@ -99,12 +97,12 @@ enum {
     BAM_CBACK       = 9
 }
 
-auto BAM_CIGAR_STR =    "MIDNSHP=XB"c;
+auto BAM_CIGAR_STR       = "MIDNSHP=XB"c;
 enum int BAM_CIGAR_SHIFT = 4;
-enum int BAM_CIGAR_MASK =  0xf;
-enum int BAM_CIGAR_TYPE =  0x3C1A7;
+enum int BAM_CIGAR_MASK  = 0xf;
+enum int BAM_CIGAR_TYPE  = 0x3C1A7;
 
-int bam_cigar_op(uint c) { return ( c & BAM_CIGAR_MASK); }
+int bam_cigar_op(uint c)    { return ( c & BAM_CIGAR_MASK); }
 int bam_cigar_oplen(uint c) { return ( c >> BAM_CIGAR_SHIFT ); }
 // Note that BAM_CIGAR_STR is padded to length 16 bytes below so that
 // the array look-up will not fall off the end.  '?' is chosen as the
@@ -179,19 +177,19 @@ enum int BAM_FSUPPLEMENTARY=2048;
  @field  mpos    0-based leftmost coordinate of next read in template
  */
 struct bam1_core_t {
-    int32_t tid;
-    int32_t pos;
+    int32_t  tid;
+    int32_t  pos;
     uint16_t bin;
-    uint8_t qual;
-    uint8_t l_qname;
+    uint8_t  qual;
+    uint8_t  l_qname;
     uint16_t flag;
-    uint8_t unused1;
-    uint8_t l_extranul;
+    uint8_t  unused1;
+    uint8_t  l_extranul;
     uint32_t n_cigar;
-    int32_t l_qseq;
-    int32_t mtid;
-    int32_t mpos;
-    int32_t isize;
+    int32_t  l_qseq;
+    int32_t  mtid;
+    int32_t  mpos;
+    int32_t  isize;
 };
 
 /*! @typedef
@@ -213,10 +211,10 @@ struct bam1_core_t {
  */
 struct bam1_t {
     bam1_core_t core;
-    int l_data;
-    uint32_t m_data;
-    uint8_t *data;
-    uint64_t id;
+    int         l_data;
+    uint32_t    m_data;
+    uint8_t     *data;
+    uint64_t    id;
 };
 
 /*! @function
