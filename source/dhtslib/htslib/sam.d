@@ -12,6 +12,7 @@
 // modified bitfields in struct and aligned(1)
 // removed redundant struct declarations when declaring struct pointers
 // ref is a reserved keyword in D; changed 'ref' to '_ref'
+// Function prototypes taking fixed size array (e.g. ..., const char tag[2], ) should include ref in the D prototype 
 module dhtslib.htslib.sam;
 
 
@@ -428,7 +429,7 @@ int sam_index_build3(const char *fn, const char *fnidx, int min_shift, int nthre
     invalid type, or the last record is incomplete) then errno is set to
     EINVAL and NULL is returned.
  */
-ubyte *bam_aux_get(const bam1_t *b, const char[2] tag);
+ubyte *bam_aux_get(const bam1_t *b, const ref char[2] tag);
 
 /// Get an integer aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get()
@@ -499,7 +500,7 @@ If there is not enough space to store the additional tag, errno is set to
 ENOMEM.  If the type is invalid, errno may be set to EINVAL.  errno is
 also set to EINVAL if the bam record's aux data is corrupt.
 */
-int bam_aux_append(bam1_t *b, const char[2] tag, char type, int len, const uint8_t *data);
+int bam_aux_append(bam1_t *b, const ref char[2] tag, char type, int len, const uint8_t *data);
 
 /// Delete tag data from a bam record
 /* @param b The bam record to update
@@ -528,7 +529,7 @@ int bam_aux_del(bam1_t *b, uint8_t *s);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_str(bam1_t *b, const char[2] tag, int len, const char *data);
+int bam_aux_update_str(bam1_t *b, const ref char[2] tag, int len, const char *data);
 
 /// Update or add an integer tag
 /* @param b    The bam record to update
@@ -551,7 +552,7 @@ int bam_aux_update_str(bam1_t *b, const char[2] tag, int len, const char *data);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_int(bam1_t *b, const char tag[2], int64_t val);
+int bam_aux_update_int(bam1_t *b, const ref char tag[2], int64_t val);
 
 /// Update or add a floating-point tag
 /* @param b    The bam record to update
@@ -570,7 +571,7 @@ int bam_aux_update_int(bam1_t *b, const char tag[2], int64_t val);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_float(bam1_t *b, const char tag[2], float val);
+int bam_aux_update_float(bam1_t *b, const ref char tag[2], float val);
 
 /// Update or add an array tag
 /* @param b     The bam record to update
@@ -608,7 +609,7 @@ int bam_aux_update_float(bam1_t *b, const char tag[2], float val);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_array(bam1_t *b, const char tag[2],
+int bam_aux_update_array(bam1_t *b, const ref char tag[2],
                          uint8_t type, uint32_t items, void *data);
 
 /+
