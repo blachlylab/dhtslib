@@ -25,7 +25,7 @@ struct TabixIndexedFile {
     /// The tabix index (.tbi) must already exist alongside
     this(string fn)
     {
-        debug{ writeln("TabixIndexedFile ctor"); }
+        debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
         this.fp = hts_open( toStringz(fn), "r");
         if ( !this.fp ) {
             writefln("Could not read %s\n", fn);
@@ -43,7 +43,7 @@ struct TabixIndexedFile {
     }
     ~this()
     {
-        debug{ writeln("TabixIndexedFile dtor"); }
+        debug(dhtslib_debug) { writeln("TabixIndexedFile dtor"); }
         tbx_destroy(this.tbx);
 
         if ( hts_close(this.fp) ) writefln("hts_close returned non-zero status: %s\n", fromStringz(this.fp.fn));
@@ -60,7 +60,7 @@ struct TabixIndexedFile {
             this.header ~= fromStringz(str.s) ~ '\n';
         }
 
-        debug{ writeln("end loadHeader"); }
+        debug(dhtslib_debug) { writeln("end loadHeader"); }
     }
 
     /// tbx.d: const(char **) tbx_seqnames(tbx_t *tbx, int *n);  // free the array but not the values
@@ -106,7 +106,7 @@ struct TabixIndexedFile {
                 this.tbx= tbx;
 
                 this.itr = tbx_itr_querys(tbx, toStringz(r) );
-                debug { writeln("Region ctor // this.itr: ", this.itr); }
+                debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
                 if (this.itr) {
                     // Load the first record
                     //this.popFront(); // correction, do not load the first record
@@ -118,7 +118,7 @@ struct TabixIndexedFile {
             }
             ~this()
             {
-                debug { writeln("Region dtor // this.itr: ", this.itr); }
+                debug(dhtslib_debug) { writeln("Region dtor // this.itr: ", this.itr); }
                 //tbx_itr_destroy(itr);
                 //free(this.kstr.s);
             }
