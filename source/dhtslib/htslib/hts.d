@@ -340,7 +340,7 @@ extern const char[256] seq_nt16_table;
 /*! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
 ambiguity code letter (or '=' when given 0).
 */
-extern const char[] seq_nt16_str;
+extern __gshared const(char)[16] seq_nt16_str;
 
 /*! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
 Returns 0/1/2/3 for 1/2/4/8 (i.e., A/C/G/T), or 4 otherwise (0 or ambiguous).
@@ -396,7 +396,7 @@ char *hts_format_description(const htsFormat *format);
       [rw]z  .. compressed VCF
       [rw]   .. uncompressed VCF
 */
-htsFile *hts_open(const char *fn, const char *mode);
+htsFile *hts_open(const(char) *fn, const(char) *mode);
 
 /*!
   @abstract       Open a SAM/BAM/CRAM/VCF/BCF/etc file

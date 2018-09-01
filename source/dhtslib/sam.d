@@ -6,8 +6,71 @@ import std.parallelism: totalCPUs;
 import std.stdio: writeln, writefln;
 import std.string: fromStringz, toStringz;
 
-import dhtslib.htslib.hts: htsFile, hts_itr_t;
+import dhtslib.htslib.hts: htsFile, hts_open, hts_close;
+import dhtslib.htslib.hts: hts_itr_t;
+import dhtslib.htslib.hts: seq_nt16_str;
 import dhtslib.htslib.sam;
+
+/**
+Encapsulates a SAM/BAM record,
+using the bam1_t type for memory efficiency,
+and the htslib helper functions for speed.
+**/
+class Record {
+    ///
+    bam1_t *b;
+
+    private char[] s;
+    private char[] q;
+
+    ///
+    this()
+    {
+        debug(dhtslib_debug) writeln("Record ctor");
+        this.b = bam_init1();
+    }
+    ~this()
+    {
+        debug(dhtslib_debug) writeln("Record dtor");
+        bam_destroy1(this.b);
+    }
+
+    /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
+    @property bool isReversed() { return bam_is_rev(this.b); }
+    /// bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
+    @property bool mateReversed() { return bam_is_mrev(this.b); }
+    /// auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
+    @property string queryName() { return fromStringz(bam_get_qname(this.b)).idup; }
+    /// query (and quality string) length
+    @property int length() { return this.b.core.l_qseq; }
+    ///
+    @property char[] sequence()
+    {
+        // auto bam_get_seq(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname); }
+        auto seqdata = bam_get_seq(this.b);
+
+        this.s.length = this.length;
+/+        foreach(i; 0 .. this.length) {
+            this.s[i] = seq_nt16_str[ bam_seqi(seqdata, i) ];
+        }+/
+        for(int i; i < this.b.core.l_qseq; i++)
+            this.s[i] = seq_nt16_str[ bam_seqi(seqdata, i) ];
+
+        return this.s;
+    }
+    ///
+    @property char[] qscores()
+    {
+        // auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname + (((*b).core.l_qseq + 1)>>1); }
+        char * qualdata = cast(char *) bam_get_qual(this.b);
+
+        this.q.length = this.length;
+        foreach(i; 0 .. this.length) {
+            this.q[i] = cast(char) (qualdata[i] + 33);
+        }
+        return this.q;
+    }
+}
 
 /**
 Encapsulates a SAM/BAM file.
@@ -18,6 +81,12 @@ struct SAMFile {
     /// filename; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
     private immutable(char)* fn;
 
+    /// htsFile
+    private htsFile *fp;
+
+    /// header struct
+    bam_hdr_t *header = null;
+
     /// SAM/BAM index 
     private hts_idx_t* idx;
 
@@ -26,15 +95,8 @@ struct SAMFile {
 
     private kstring_t line;
 
-    // ref counting to prevent closing file multiple times
-    // (free is instead now in popFront instead of dtor)
-    private int rc = 1;
-
-    // postblit ref counting
-    this(this)
-    {
-        this.rc++;
-    }
+    /// disallow copying
+    @disable this(this);
 
     ///
     this(string fn)
@@ -43,26 +105,52 @@ struct SAMFile {
 
         // open file
         this.fn = toStringz(fn);
-        //this.bgzf = bgzf_open(this.fn, "r");
+        this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
 
-
-        // Do not prime the range with popFront(),
-        // because otherwise attempting to iterate again will yield the first row (only)
+        // read header
+        this.header = sam_hdr_read(this.fp);
 
     }
     ~this()
     {
-        debug(dhtslib_debug) { writefln("SAMFile dtor | rc=%d", this.rc); }
+        debug(dhtslib_debug) { writeln("SAMFile dtor" ); }
 
-        if(!--rc) {
-            debug(dhtslib_debug) { 
-                writefln("SAMFile closing file (rc=%d)", rc);
-            }
-            // free(this.line.s) not necessary as should be taken care of in popFront
-            // (or front() if using pre-primed range and fetching each row in popFront)
-            // on top of this, it should never have been malloc'd in this refcount=0 copy
-            //if (bgzf_close(this.bgzf) != 0) writefln("hts_close returned non-zero status: %s\n", fromStringz(this.fn));
+        bam_hdr_destroy(this.header);
+        const auto ret = hts_close(fp);
+        if (!ret) writeln("There was an error closing %s", this.fn);
+    }
+
+    /// number of reference sequences; from bam_hdr_t
+    @property int n_targets() const { return this.header.n_targets; }
+
+    /// length of specific reference sequence (by number)
+    uint target_len(int target) const
+    {
+        return this.header.target_len[target];
+    }
+
+    /// lengths of the reference sequences
+    @property uint[] target_lens() const
+    {
+        return this.header.target_len[0 .. this.n_targets].dup;
+    }
+
+    /// names of the reference sequences
+    @property string[] target_names() const
+    {
+        string[] names;
+        names.length = this.n_targets;
+        foreach(i; 0 .. this.n_targets) {
+            names[i] = fromStringz(this.header.target_name[i]).idup;
         }
+        return names;
+    }
+
+    /// reference contig name to integer id
+    /// Calls int bam_name2id(bam_hdr_t *h, const char *_ref);
+    int target_id(string name) 
+    {
+        return bam_name2id(this.header, toStringz(name));
     }
 
     /** Query a region and return matching alignments as an InputRange */
@@ -70,7 +158,7 @@ struct SAMFile {
     void query(string chrom, int start, int end)
     {
         string q = format("%s:%d-%d", chrom, start, end);
-        return query(q);
+        //return query(q);
     }
     /// Query by string chr:start-end
     void query(string q)
@@ -85,7 +173,35 @@ struct SAMFile {
 
     }
 
-    /// InputRange interface; returned by query()
+    /// Iterate through all records in the SAM/BAM/CRAM
+    struct AllRecordsRange
+    {
+        private htsFile     *fp;        // belongs to parent; shared
+        private bam_hdr_t   *header;    // belongs to parent; shared
+        private bam1_t      *b;
+
+        /// InputRange
+        @property bool empty()
+        {
+            //    int sam_read1(samFile *fp, bam_hdr_t *h, bam1_t *b);
+            immutable success = sam_read1(this.fp, this.header, this.b);
+            if (success >= 0) return false;
+            else if (success == -1) return true;
+            else {
+                writeln("*** ERROR in sam::SAMFile::AllRecordsRange:empty");
+                return true;
+            }
+        }
+        /// ditto
+        void popFront()
+        {
+            // noop? 
+            // free this.b ?
+            bam_destroy1(this.b);
+        }
+        /// ditto
+
+    }
     struct RecordRange
     {
         private kstring_t line;     // shut up the compiler
@@ -94,6 +210,16 @@ struct SAMFile {
 
         private bam1_t *b;          /// This is the alignment object
 
+        /+this()
+        {
+            debug { writeln("[sam:RecordRange:ctor]"); }
+        }+/
+        ~this()
+        {
+            debug(dhtslib_debug) { writeln("[sam:RecordRange:dtor]"); }
+            sam_itr_destroy(this.iter);
+        }
+        /// InputRange interface; returned by query()
         @property bool empty()
         {
             // equivalent to htslib ks_release
@@ -125,4 +251,5 @@ struct SAMFile {
             return ret;
         }
     }
+
 }

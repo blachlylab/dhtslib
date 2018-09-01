@@ -275,6 +275,8 @@ auto bam_get_seq(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).
  @return    pointer to quality string
  */
 ////#define bam_get_qual(b)  ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname + (((b)->core.l_qseq + 1)>>1))
+auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname + (((*b).core.l_qseq + 1)>>1); }
+
 /*! @function
  @abstract  Get auxiliary data
  @param  b  pointer to an alignment
@@ -294,7 +296,7 @@ auto bam_get_seq(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).
  @return    4-bit integer representing the base.
  */
 ////#define bam_seqi(s, i) ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf)
-auto bam_seqi(byte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);   }
+auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);   }
 
 /**************************
  *** Exported functions ***
@@ -308,7 +310,7 @@ auto bam_seqi(byte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);   
     bam_hdr_t *bam_hdr_read(BGZF *fp);
     int bam_hdr_write(BGZF *fp, const bam_hdr_t *h);
     void bam_hdr_destroy(bam_hdr_t *h);
-    int bam_name2id(bam_hdr_t *h, const char *_ref);
+    int bam_name2id(bam_hdr_t *h, const(char) *_ref);
     bam_hdr_t* bam_hdr_dup(const bam_hdr_t *h0);
 
     bam1_t *bam_init1();
