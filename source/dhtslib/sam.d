@@ -1,6 +1,6 @@
 module dhtslib.sam;
 
-import core.stdc.stdlib: malloc, free;
+import core.stdc.stdlib: calloc, free;
 import std.format;
 import std.parallelism: totalCPUs;
 import std.stdio: writeln, writefln;
@@ -20,9 +20,6 @@ class Record {
     ///
     bam1_t *b;
 
-    private char[] s;
-    private char[] q;
-
     ///
     this()
     {
@@ -40,35 +37,40 @@ class Record {
     /// bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
     @property bool mateReversed() { return bam_is_mrev(this.b); }
     /// auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
-    @property string queryName() { return fromStringz(bam_get_qname(this.b)).idup; }
+    @property char[] queryName() { return fromStringz(bam_get_qname(this.b)); }
     /// query (and quality string) length
     @property int length() { return this.b.core.l_qseq; }
     ///
-    @property char[] sequence()
+    @property char* sequence()
     {
+        // calloc fills with \0; +1 len for Cstring
+        char *s = cast(char *) calloc(1, this.b.core.l_qseq + 1);
+        //char[] s;
+        //s.length = this.b.core.l_qseq;
+
         // auto bam_get_seq(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname); }
         auto seqdata = bam_get_seq(this.b);
 
-        this.s.length = this.length;
-/+        foreach(i; 0 .. this.length) {
-            this.s[i] = seq_nt16_str[ bam_seqi(seqdata, i) ];
-        }+/
         for(int i; i < this.b.core.l_qseq; i++)
-            this.s[i] = seq_nt16_str[ bam_seqi(seqdata, i) ];
+            s[i] = seq_nt16_str[ bam_seqi(seqdata, i) ];
 
-        return this.s;
+        return s;
     }
     ///
-    @property char[] qscores()
+    @property char* qscores()
     {
+        // calloc fills with \0; +1 len for Cstring
+        char *q = cast(char *) calloc(1, this.b.core.l_qseq + 1);
+        //char[] q;
+        //q.length = this.b.core.l_qseq;
+
         // auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname + (((*b).core.l_qseq + 1)>>1); }
         char * qualdata = cast(char *) bam_get_qual(this.b);
 
-        this.q.length = this.length;
-        foreach(i; 0 .. this.length) {
-            this.q[i] = cast(char) (qualdata[i] + 33);
-        }
-        return this.q;
+        for(int i; i < this.b.core.l_qseq; i++)
+            q[i] = cast(char) (qualdata[i] + 33);
+        
+        return q;
     }
 }
 

@@ -4,7 +4,7 @@
 // changed ^const <type> <fnname> to ^const(<type>) <fnname>
 /*  *      aliased typedef'd function pointers */
 /*  *       changed C-style arrays (eg line 339, extern const char seq_nt16_str[];) to char[] seq_nt16_str */
-
+/*  *           as update to above, seq_nt16_str needs to be char[16], as C and D style char[] imply different things */
 module dhtslib.htslib.hts;
 
 import std.bitmanip;
@@ -335,7 +335,7 @@ The input character may be either an IUPAC ambiguity code, '=' for 0, or
 '0'/'1'/'2'/'3' for a result of 1/2/4/8.  The result is encoded as 1/2/4/8
 for A/C/G/T or combinations of these bits for ambiguous bases.
 */
-extern const char[256] seq_nt16_table;
+extern const(char)[256] seq_nt16_table;
 
 /*! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
 ambiguity code letter (or '=' when given 0).
