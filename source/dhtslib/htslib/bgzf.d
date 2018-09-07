@@ -9,6 +9,7 @@
 // typedef struct to alias
 // modified bitfields in struct and aligned(1)
 // removed redundant struct declarations when declaring struct pointers
+// replace local definition with import kstring_t
 module dhtslib.htslib.bgzf;
 
 import std.bitmanip;
@@ -97,12 +98,7 @@ struct BGZF {
     z_stream *gz_stream;// for gzip-compressed files
 };
 
-struct __kstring_t {
-    size_t l, m;
-    char *s;
-};
-
-alias __kstring_t kstring_t;
+import dhtslib.htslib.kstring: __kstring_t, kstring_t;
 
     /******************
      * Basic routines *

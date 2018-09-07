@@ -58,11 +58,7 @@ struct cram_fd;
 struct hFILE;
 struct hts_tpool;
 
-struct __kstring_t {
-    size_t l, m;
-    char *s;
-};
-alias __kstring_t kstring_t;
+import dhtslib.htslib.kstring: __kstring_t, kstring_t;
 
 /+
 #ifndef kroundup32

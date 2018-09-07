@@ -13,6 +13,7 @@
 // removed redundant struct declarations when declaring struct pointers
 // ref is a reserved keyword in D; changed 'ref' to '_ref'
 // Function prototypes taking fixed size array (e.g. ..., const char tag[2], ) should include ref in the D prototype 
+// Replace localal definition with import kstring
 /*  
 Aliased function pointer typedefs:
 
@@ -60,11 +61,7 @@ import core.stdc.stdint;
 import dhtslib.htslib.hts;
 struct BGZF;
 struct hts_idx_t;
-struct __kstring_t {
-    size_t l, m;
-    char *s;
-};
-alias __kstring_t kstring_t;
+import dhtslib.htslib.kstring: __kstring_t, kstring_t;
 
 /// Highest SAM format version supported by this library
 auto SAM_FORMAT_VERSION = "1.6"c;
