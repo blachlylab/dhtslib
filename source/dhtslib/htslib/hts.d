@@ -526,13 +526,12 @@ When REST or NONE is used, idx is also ignored and may be NULL.
 #define HTS_IDX_START  (-3)
 #define HTS_IDX_REST   (-4)
 #define HTS_IDX_NONE   (-5)
-
-#define HTS_FMT_CSI 0
-#define HTS_FMT_BAI 1
-#define HTS_FMT_TBI 2
-#define HTS_FMT_CRAI 3
-
 +/
+
+enum int HTS_FMT_CSI = 0;   /// coordinate-sorted index (new)
+enum int HTS_FMT_BAI = 1;   /// BAM index (old)
+enum int HTS_FMT_TBI = 2;   /// Tabix index
+enum int HTS_FMT_CRAI= 3;   /// CRAM index (not sure if superceded by CSI?)
 
 struct __hts_idx_t;
 alias __hts_idx_t hts_idx_t;
@@ -635,6 +634,7 @@ int hts_idx_save(const hts_idx_t *idx, const char *fn, int fmt) HTS_RESULT_USED;
     @return  0 if successful, or negative if an error occurred.
 */
 int hts_idx_save_as(const hts_idx_t *idx, const char *fn, const char *fnidx, int fmt) HTS_RESULT_USED;
++/
 
 /// Load an index file
 /** @param fn   BAM/BCF/etc filename, to which .bai/.csi/etc will be added or
@@ -642,8 +642,9 @@ int hts_idx_save_as(const hts_idx_t *idx, const char *fn, const char *fnidx, int
     @param fmt  One of the HTS_FMT_* index formats
     @return  The index, or NULL if an error occurred.
 */
-hts_idx_t *hts_idx_load(const char *fn, int fmt);
+hts_idx_t *hts_idx_load(const(char) *fn, int fmt);
 
+/+
 /// Load a specific index file
 /** @param fn     Input BAM/BCF/etc filename
     @param fnidx  The input index filename
@@ -714,7 +715,7 @@ const char *hts_parse_reg(const char *str, int *beg, int *end);
     //typedef int (*hts_name2id_f)(void*, const char*);
     alias hts_name2id_f = int function(void *, const char *);
     //typedef const char *(*hts_id2name_f)(void*, int);
-    alias hts_id2name_f = const char * function(void*, int);
+    alias hts_id2name_f = const(char) * function(void*, int);
     //typedef hts_itr_t *hts_itr_query_func(const hts_idx_t *idx, int tid, int beg, int end, hts_readrec_func *readrec);
     alias hts_itr_query_func = hts_itr_t * function(const hts_idx_t *idx, int tid, int beg, int end, hts_readrec_func readrec);
 

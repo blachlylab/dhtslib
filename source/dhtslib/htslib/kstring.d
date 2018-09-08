@@ -24,6 +24,7 @@ extern (C):
    SOFTWARE.
 */
 
+import core.stdc.stdint;
 /+
 #include <stdlib.h>
 #include <string.h>
