@@ -15,6 +15,11 @@ alias BCFWriter = VCFWriter;
 struct VCFHeader
 {
     bcf_hdr_t *hdr;
+
+    /// Number of samples in the header
+    pragma(inline, true)
+    @property int nsamples() { return bcf_hdr_nsamples(this.hdr); }
+
 }
 
 /** Wrapper around bcf1_t 
@@ -189,10 +194,13 @@ struct VCFWriter
     bcf_hdr_t   *hdr;   /// header
     bcf1_t*[]    rows;   /// individual records
 
-    /// Number of samples in the header
-    pragma(inline, true)
-    @property int nsamples() { return bcf_hdr_nsamples(this.hdr); }
-
+    @disable this();
+    /// open file or network resources for writing
+    this(string fn)
+    {
+        this.fp = vcf_open(toStringz(fn), toStringz("w"c));
+        // TODO: if !fp abort
+    }
     
     /// setup incl header allocation
     /// bcf_hdr_init automatically sets version string (##fileformat=VCFv4.2)
@@ -339,16 +347,23 @@ struct VCFWriter
         return 0;
     }
 
-
     /// as expected
-    int write(string file_name)
+    int writeHeader()
+    {
+        return bcf_hdr_write(this.fp, this.hdr);
+    }
+    /// as expected
+    int writeRecord(VCFRecord r)
+    {
+        return bcf_write(this.fp, this.hdr, r.line);
+    }
+    /// as expected
+    int writeFile()
     {
         assert(this.hdr != null);
 
         int ret;
 
-        this.fp = vcf_open(toStringz(file_name), toStringz("w"c));
-        
         ret = bcf_hdr_write(this.fp, this.hdr);
 
         // for each record in this.records

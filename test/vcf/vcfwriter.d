@@ -9,7 +9,7 @@ int main()
 {
     writeln("dhtslib ⚡ VCFWriter");
 
-    VCFWriter w;
+    VCFWriter w = VCFWriter("output.vcf");
     w.setup();
     w.addHeaderLineRaw("##source=dhtslib-vcfwriterV0.4");
     w.addHeaderLineKV("phasing", "none");
@@ -33,7 +33,7 @@ int main()
 
     w.addRecord(b);
 
-    w.write("output.vcf");
+    w.writeFile();
 
 
 
