@@ -6,7 +6,6 @@
     "license": "MIT",
     "dependencies": {
     },
-    "libs": ["hts"],
     "configurations": [
         {
             "name": "tabix_test",
@@ -47,7 +46,14 @@
         },
         {
             "name": "source",
-            "targetType": "sourceLibrary"
+            "targetType": "sourceLibrary",
+            "libs": ["hts"],
+        },
+        {
+            "name": "source-static",
+            "targetType": "sourceLibrary",
+            "preGenerateCommands-posix":["cd htslib;autoreconf;./configure --disable-bz2 --disable-lzma;make -j8;cd ..;"],
+            "sourceFiles":["./htslib/libhts.a"],
         }
     ]
 }
