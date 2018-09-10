@@ -9,6 +9,7 @@ import std.string: fromStringz, toStringz;
 import dhtslib.htslib.hts: htsFile, hts_open, hts_close;
 import dhtslib.htslib.hts: hts_itr_t;
 import dhtslib.htslib.hts: seq_nt16_str;
+import dhtslib.htslib.kstring;
 import dhtslib.htslib.sam;
 
 /**

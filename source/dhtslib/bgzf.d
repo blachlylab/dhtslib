@@ -6,6 +6,7 @@ import std.stdio: writeln, writefln;
 import std.string: fromStringz, toStringz;
 
 import dhtslib.htslib.bgzf;
+import dhtslib.htslib.kstring;
 
 /**
 Encapsulates a bgzipped (block gzipped) file.

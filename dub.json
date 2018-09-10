@@ -15,7 +15,7 @@
             "sourcePaths": ["test"],
             "mainSourceFile": "test/tabix_gffreader.d",
             "excludedSourceFiles": [
-                "test/bgzfreader.d", "test/samreader.d"
+                "test/bgzfreader.d", "test/samreader.d", "test/vcfwriter.d"
             ]
         },
         {
@@ -25,7 +25,7 @@
             "sourcePaths": ["test"],
             "mainSourceFile": "test/bgzfreader.d",
             "excludedSourceFiles": [
-                "test/tabix_gffreader.d", "test/samreader.d"
+                "test/tabix_gffreader.d", "test/samreader.d", "test/vcfwriter.d"
             ]
         },
         {
@@ -35,8 +35,15 @@
             "sourcePaths": ["test"],
             "mainSourceFile": "test/samreader.d",
             "excludedSourceFiles": [
-                "test/tabix_gffreader.d", "test/bgzfreader.d"
+                "test/tabix_gffreader.d", "test/bgzfreader.d", "test/vcfwriter.d"
             ]
+        },
+        {
+            "name": "vcf_writer_test",
+            "targetType": "executable",
+            "targetName": "vcfwriter",
+            "sourcePaths": ["test/vcf"],
+            "mainSourceFile": "test/vcf/vcfwriter.d"
         },
         {
             "name": "source",

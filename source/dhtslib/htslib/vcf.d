@@ -2,6 +2,8 @@
 /// Copyright 2018 James S Blachly, MD
 /// Changes are MIT licensed
 /// Section numbers refer to VCF Specification v4.2: https://samtools.github.io/hts-specs/VCFv4.2.pdf
+module dhtslib.htslib.vcf;
+
 import std.bitmanip;
 import std.string: toStringz;
 
@@ -55,7 +57,7 @@ enum {
     BCF_HL_FLT  = 0, /// header line: FILTER
     BCF_HL_INFO = 1, /// header line: INFO
     BCF_HL_FMT  = 2, /// header line: FORMAT
-    BCF_HL_CTG  = 3, /// header line: CONTIG
+    BCF_HL_CTG  = 3, /// header line: contig
     BCF_HL_STR  = 4, /// header line: structured header line TAG=<A=..,B=..>
     BCF_HL_GEN  = 5, /// header line: generic header line
 
@@ -87,7 +89,7 @@ enum int BCF_DT_ID     = 0; /// dictionary type: ID
 enum int BCF_DT_CTG    = 1; /// dictionary type: CONTIG
 enum int BCF_DT_SAMPLE = 2; /// dictionary type: SAMPLE
 
-/// Complete textual representation of a header line (§1.2)
+/// Structured representation of a header line (§1.2)
 struct bcf_hrec_t { // @suppress(dscanner.style.phobos_naming_convention)
     int type;       /// One of the BCF_HL_* type
     char *key;      /// The part before '=', i.e. FILTER/INFO/FORMAT/contig/fileformat etc.
@@ -111,7 +113,7 @@ struct bcf_idpair_t { // @suppress(dscanner.style.phobos_naming_convention)
     const bcf_idinfo_t *val;/// header dictionary FILTER/INFO/FORMAT ID entry
 }
 
-/// Structured repreentation of a VCF header line (§1.2)
+/// Structured repreentation of VCF header (§1.2)
 /// Note that bcf_hdr_t structs must always be created via bcf_hdr_init()
 struct bcf_hdr_t { // @suppress(dscanner.style.phobos_naming_convention)
     int32_t[3] n;           /// n:the size of the dictionary block in use, (allocated size, m, is below to preserve ABI)
@@ -176,6 +178,7 @@ struct bcf_fmt_t { // @suppress(dscanner.style.phobos_naming_convention)
 
 /// INFO field data (§1.4.1 Fixed fields, (8) INFO)
 struct bcf_info_t { // @suppress(dscanner.style.phobos_naming_convention)
+    align(1):
     int key;        /// key: numeric tag id, the corresponding string is bcf_hdr_t::id[BCF_DT_ID][$key].key
     int type;       /// type: one of BCF_BT_* types; len: vector length, 1 for scalars
     int len;        /// type: one of BCF_BT_* types; len: vector length, 1 for scalars
@@ -241,6 +244,7 @@ enum int BCF_ERR_TAG_INVALID = 64;  /// BCF error:
     line must be formatted in vcf_format.
  */
 struct bcf1_t { // @suppress(dscanner.style.phobos_naming_convention)
+    align(1):
     int32_t rid;  /// CHROM
     int32_t pos;  /// POS
     int32_t rlen; /// length of REF
@@ -681,9 +685,9 @@ struct bcf1_t { // @suppress(dscanner.style.phobos_naming_convention)
     int bcf_update_format(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(void) *values, int n, int type);
     // TODO: Write D template
     pragma(inline, true) {
-        auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(char) **values, int n) // @suppress(dscanner.style.undocumented_declaration)
+        auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, int *values, int n) // @suppress(dscanner.style.undocumented_declaration)
             { return bcf_update_format(hdr, line, key, values, n, BCF_HT_INT); }
-        auto bcf_update_format_float(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(char) **values, int n) // @suppress(dscanner.style.undocumented_declaration)
+        auto bcf_update_format_float(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, float *values, int n) // @suppress(dscanner.style.undocumented_declaration)
             { return bcf_update_format(hdr, line, key, values, n, BCF_HT_REAL); }
         auto bcf_update_format_char(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(char) **values, int n) // @suppress(dscanner.style.undocumented_declaration)
             { return bcf_update_format(hdr, line, key, values, n, BCF_HT_STR); }

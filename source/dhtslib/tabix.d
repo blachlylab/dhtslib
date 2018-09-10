@@ -5,7 +5,7 @@ import std.string;
 import core.stdc.stdlib : malloc, free;
 
 import dhtslib.htslib.hts;
-//import dhtslib.htslib.kstring;
+import dhtslib.htslib.kstring;
 import dhtslib.htslib.tbx;
 //import dhtslib.htslib.regidx;
 

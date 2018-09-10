@@ -8,3 +8,7 @@ dub.selections.json
 tabix_gffreader
 bgzfreader
 samreader
+vcfwriter
+
+# test output
+output.vcf
