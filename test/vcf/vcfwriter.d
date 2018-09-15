@@ -13,11 +13,18 @@ int main()
 
     w.addHeaderLineRaw("##source=dhtslib-vcfwriterV0.4");
     w.addHeaderLineKV("phasing", "none");
+    w.addHeaderLineKV("contig", "<ID=chr3,length=999999,assembly=hg19>");
     w.addSample("SAMPLE01");
+
+    w.writeHeader();
+    auto vcfhdr = w.getHeader();
 
     //string[] filters = ["TRIALLELIC", "GOATS"];
     string[] filters = ["PASS", "triallelic", "nonex"];
-    w.addRecord("chr3", 333, "rs000", "A,G", 30.0, filters);
+    VCFRecord r = VCFRecord(vcfhdr, "chr3", 999, "", "C", "T", 40, filters);
+    w.writeRecord(r);
+
+/+
     filters = [];
     w.addRecord("chr3", 999, "", "C,T", 40, filters);
     w.addRecord("chr3", 999999, ".", "A,T", 29.5, filters);
@@ -34,7 +41,7 @@ int main()
     w.addRecord(b);
 
     w.writeFile();
-
++/
 
 
     return 0;

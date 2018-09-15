@@ -42,12 +42,13 @@
             "targetType": "executable",
             "targetName": "vcfwriter",
             "sourcePaths": ["test/vcf"],
-            "mainSourceFile": "test/vcf/vcfwriter.d"
+            "mainSourceFile": "test/vcf/vcfwriter.d",
+            "libs": ["hts"]
         },
         {
             "name": "source",
             "targetType": "sourceLibrary",
-            "libs": ["hts"],
+            "libs": ["hts"]
         },
         {
             "name": "source-static",

@@ -1,5 +1,5 @@
 module dhtslib.htslib.hts_log;
-import std.string: to;
+import std.string: toStringz;
 
 /// \file htslib/hts_log.h
 /// Configuration of log levels.
