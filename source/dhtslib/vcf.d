@@ -1,5 +1,6 @@
 module dhtslib.vcf;
 
+import std.conv: to, convException;
 import std.datetime;
 import std.format: format;
 import std.stdio: writeln;
@@ -196,31 +197,34 @@ struct VCFWriter
 
     @disable this();
     /// open file or network resources for writing
+    /// setup incl header allocation
+    /// bcf_hdr_init automatically sets version string (##fileformat=VCFv4.2)
+    /// bcf_hdr_init automatically adds the PASS filter
     this(string fn)
     {
         this.fp = vcf_open(toStringz(fn), toStringz("w"c));
         // TODO: if !fp abort
-    }
-    
-    /// setup incl header allocation
-    /// bcf_hdr_init automatically sets version string (##fileformat=VCFv4.2)
-    /// bcf_hdr_init automatically adds the PASS filter
-    void setup()
-    {
+
         this.hdr = bcf_hdr_init(toStringz("w"c));
         addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
 
         bcf_hdr_append(this.hdr, "##contig=<ID=chr3,length=999999,assembly=hg19>");
-        bcf_hdr_append(this.hdr, "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
+        //bcf_hdr_append(this.hdr, "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
+        // WIll NS be written automatically after bcf_hdr_add_samples are complete?
         bcf_hdr_append(this.hdr, "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">");
         bcf_hdr_append(this.hdr, "##FORMAT=<ID=XF,Number=1,Type=Float,Description=\"Test Float\">");
         bcf_hdr_append(this.hdr, "##FILTER=<ID=triallelic,Description=\"Triallelic site\">");
+
     }
     /// setup and copy a header from another BCF/VCF as template
-    deprecated void setup(bcf_hdr_t *other)
+    this(T)(string fn, T other)
+    if(is(T == VCFHeader*) || is(T == bcf_hdr_t*))
     {
-        if (this.hdr != null) bcf_hdr_destroy(this.hdr);
-        this.hdr = bcf_hdr_dup(other);
+        this.fp = vcf_open(toStringz(fn), toStringz("w"c));
+        // TODO: if !fp abort
+
+        static if(is(T == VCFHeader*)) { this.hdr = bcf_hdr_dup(other.hdr); }
+        else static if(is(T == bcf_hdr_t*)) { this.hdr = bcf_hdr_dup(other); }
     }
 
     /// copy header lines from a template without overwiting existing lines
@@ -260,6 +264,79 @@ struct VCFWriter
         assert(this.hdr != null);
         //    int bcf_hdr_append(bcf_hdr_t *h, const(char) *line);
         return bcf_hdr_append(this.hdr, toStringz(line));
+    }
+    /** Add INFO tag (§1.2.2)
+
+    The first four parameters are required; NUMBER and TYPE have specific allowable values.
+    source and version are optional, but recommended.
+
+    *   id:     ID tag
+    *   number: NUMBER tag; here a string because it can also take special values {A,R,G,.} (see §1.2.2)
+    *   type:   Integer, Float, Flag, Character, and String
+    *   description: Text description; will be double quoted
+    *   source:      Annotation source  (eg dbSNP)
+    *   version:     Annotation version (eg 142)
+    */
+    void addInfoTag(string id, string number, string type, string description, string source="", string _version="")
+    {
+        string info;
+
+        // check ID
+        if (id == "") {
+            writeln("*** ERROR -- no ID");
+            return;
+        }
+
+        // check Number is either a special code {A,R,G,.} or an integer
+        if (number != "A" &&
+            number != "R" &&
+            number != "G" &&
+            number != ".") {
+                // not a special ; check if integer
+                try {
+                    number.to!int;  // don't need to store result, will use format/%s
+                }
+                catch (convException e) {
+                    writeln("*** ERROR -- Number not A/R/G/. nor an integer");
+                    return;
+                }
+        }
+
+        // check Type
+        if (type != "Integer" &&
+            type != "Float" &&
+            type != "Flag" &&
+            type != "Character" &&
+            type != "String") {
+                writeln("*** ERROR -- unrecognized type");
+                return;
+        }
+
+        // check Description
+        if (description == "") writeln("*** ERROR -- no description");
+
+        // check Source and Version
+        if (source == "" && _version != "") writeln("*** ERROR -- version wo source");
+
+        // Format params
+        if (source != "" && _version != "")
+            info = format("##INFO=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\",Version=\"%s\"\0",
+                            id, number, type, description, source, _version);
+        else if (source != "" && _version == "")
+            info = format("##INFO=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\"\0",
+                            id, number, type, description, source);
+        else
+            info = format("##INFO=<ID=%s,Number=%d,Type=%s,Description=\"%s\">\0",
+                            id, number, type, description);
+
+        bcf_hdr_append(this.hdr, info.ptr);
+    }
+
+    /// Add contig record
+    /// example:    "##contig=<ID=chr3,length=999999,assembly=hg19>"
+    void addContig(string id, int length, string assembly, string url)
+    {
+
     }
 
     /** Add a (structured) record */
@@ -355,6 +432,7 @@ struct VCFWriter
     /// as expected
     int writeRecord(VCFRecord r)
     {
+        debug { writeln("hdr, bcf1_t: ", this.hdr, r.line); }
         return bcf_write(this.fp, this.hdr, r.line);
     }
     /// as expected
