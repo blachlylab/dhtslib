@@ -14,14 +14,21 @@ int main()
     w.addHeaderLineRaw("##source=dhtslib-vcfwriterV0.4");
     w.addHeaderLineKV("phasing", "none");
     w.addHeaderLineKV("contig", "<ID=chr3,length=999999,assembly=hg19>");
-    w.addSample("SAMPLE01");
+    //w.addSample("SAMPLE01");
 
+    w.addInfoTag("NS", "1", "Integer", "Number of Samples With Data");
+    w.addInfoTag("XFL", "1", "Float", "Floating point number(s)");
+    w.addInfoTag("XF", "1", "Flag", "Bool something something mumble");
     w.writeHeader();
     auto vcfhdr = w.getHeader();
 
     //string[] filters = ["TRIALLELIC", "GOATS"];
     string[] filters = ["PASS", "triallelic", "nonex"];
-    VCFRecord r = VCFRecord(vcfhdr, "chr3", 999, "", "C", "T", 40, filters);
+    VCFRecord r = VCFRecord(vcfhdr, "chr3", 999, "rs321", "C", "T", 40, filters);
+    r.addInfo("NS", 1);
+    r.addInfo("XS", "Hello");
+    r.addInfo("XFL", 2.1);
+    r.addInfo("XF", true);
     w.writeRecord(r);
 
 /+

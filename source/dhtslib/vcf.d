@@ -5,7 +5,7 @@ import std.datetime;
 import std.format: format;
 import std.stdio: writeln;
 import std.string: fromStringz, toStringz;
-import std.traits: isNumeric, isSomeString;
+import std.traits: isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 
 import dhtslib.htslib.hts_log;
 import dhtslib.htslib.vcf;
@@ -46,6 +46,10 @@ struct VCFHeader
 
 /** Wrapper around bcf1_t 
 
+    Because it uses bcf1_t internally, it must conform to the BCF2 part
+    of the VCFv4.2 specs, rather than the loosey-goosey VCF specs. i.e.,
+    INFO, CONTIG, FILTER records must exist in the header.
+
     TODO: Does this need to be kept in a consistent state?
     Ideally, VCFWriter would reject invalid ones, but we are informed
     that it is invalid (e.g. if contig not found) while building this
@@ -83,18 +87,22 @@ struct VCFRecord
         this.line = b;
     }
     /// ditto
-    this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter)
+    this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
     if (isSomeString!SS || is(SS == string[]))
     {
         this.line = bcf_init1();
         this.vcfheader = vcfhdr;
-        //this.chrom = chrom;
-        //this.pos = pos;
-/+        this.updateID(id);
+        
+        this.chrom = chrom;
+        this.pos = pos;
+        this.updateID(id);
+
         // alleles
+        immutable string alleles = _ref ~ "," ~ alt ~ "\0";
+        bcf_update_alleles_str(this.vcfheader.hdr, this.line, alleles.ptr);
+
         this.qual = qual;
         this.filter = filter;
-        +/
     }
     /// ditto
     /// From VCF line
@@ -122,7 +130,10 @@ struct VCFRecord
     void chrom(string c)
     {
         auto rid = bcf_hdr_name2id(this.vcfheader.hdr, toStringz(c));
-        if (rid == -1) hts_log_error(__FUNCTION__,"contig not found");
+        if (rid == -1) {
+            hts_log_error(__FUNCTION__, format("contig not found: %s", c));
+            throw new Exception("contig not found");
+        }
         else line.rid = rid;
     }
 
@@ -185,11 +196,10 @@ struct VCFRecord
         int[] fids;
         foreach(f; fs) {
             int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
-            if (fid == -1) hts_log_error(__FUNCTION__, format("filter not in header: ", f) );
-            fids ~= fid;
+            if (fid == -1) hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
+            else fids ~= fid;
         }
-        auto ret = bcf_update_filter(this.vcfheader.hdr, this.line, fids.ptr, cast(int)fids.length);
-        if (!ret) hts_log_error(__FUNCTION__, format("error setting filters in @property filter, fids=", fids) );
+        bcf_update_filter(this.vcfheader.hdr, this.line, fids.ptr, cast(int)fids.length);
     }
 
     /// Add a filter; from htslib: 
@@ -213,6 +223,40 @@ struct VCFRecord
     +/
 
     /* INFO */
+    /+
+        int tmpi = 1;
+        bcf_update_info_int32(this.vcfhdr.hdr, line, toStringz("NS"c), &tmpi, 1);
+    +/
+    /// Add a tag:value to the INFO column -- tag must already exist in the header
+    void addInfo(T)(string tag, T data)
+    {
+        int ret = -1;
+
+        static if(isIntegral!T)
+            ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), &data, 1);
+        
+        else static if(isFloatingPoint!T) {
+            auto flt = cast(float) data;    // simply passing "2.0" (or whatever) => data is a double
+            ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, 1);
+        }
+
+        else static if(isSomeString!T)
+            ret = bcf_update_info_string(this.vcfheader.hdr, this.line, toStringz(tag), toStringz(data));
+        
+        else static if(isBoolean!T) {
+            immutable int set = data ? 1 : 0; // if data == true, pass 1 to bcf_update_info_flag(n=); n=0 => clear flag 
+            ret = bcf_update_info_flag(this.vcfheader.hdr, this.line, toStringz(tag), null, set);
+        }
+        
+        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s", data));
+    }
+    /// ditto
+    /// This handles a vector of values for the tag
+    void addInfo(T)(string tag, T[] data)
+    if(!is(T==immutable(char)))             // otherwise string::immutable(char)[] will match the other template
+    {
+
+    }
 
     /* FORMAT (sample info) */
 
@@ -245,8 +289,6 @@ struct VCFWriter
         this.vcfhdr = new VCFHeader( bcf_hdr_init(toStringz("w"c)));
         addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
 
-        //bcf_hdr_append(this.hdr, "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
-        // WIll NS be written automatically after bcf_hdr_add_samples are complete?
         bcf_hdr_append(this.vcfhdr.hdr, "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">");
         bcf_hdr_append(this.vcfhdr.hdr, "##FORMAT=<ID=XF,Number=1,Type=Float,Description=\"Test Float\">");
         bcf_hdr_append(this.vcfhdr.hdr, "##FILTER=<ID=triallelic,Description=\"Triallelic site\">");
@@ -381,7 +423,7 @@ struct VCFWriter
             info = format("##INFO=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\">\0",
                             id, number, type, description, source);
         else
-            info = format("##INFO=<ID=%s,Number=%d,Type=%s,Description=\"%s\">\0",
+            info = format("##INFO=<ID=%s,Number=%s,Type=%s,Description=\"%s\">\0",
                             id, number, type, description);
 
         bcf_hdr_append(this.vcfhdr.hdr, info.ptr);
@@ -390,7 +432,7 @@ struct VCFWriter
     /** Add FILTER tag (§1.2.3) */
     void addFilterTag(string id, string description)
     {
-        string filter = format("##FILTER=<ID=%s,Description=\"%s\">\0");
+        string filter = format("##FILTER=<ID=%s,Description=\"%s\">\0", id, description);
         bcf_hdr_append(this.vcfhdr.hdr, filter.ptr);
     }
     alias addFilter = addFilterTag;
@@ -477,7 +519,6 @@ struct VCFWriter
     /// as expected
     int writeRecord(ref VCFRecord r)
     {
-        debug { hts_log_debug( __FUNCTION__, format("hdr: %s bcf1_t: %s", this.vcfhdr.hdr, r.line) ); }
         const ret = bcf_write(this.fp, this.vcfhdr.hdr, r.line);
         if (ret != 0) hts_log_error(__FUNCTION__,"bcf_write error");
         return ret;
@@ -489,33 +530,6 @@ struct VCFWriter
         const ret = bcf_write(this.fp, hdr, rec);
         hts_log_warning(__FUNCTION__, "post call");
         if (ret != 0) hts_log_error(__FUNCTION__,"bcf_write error");
-        return ret;
-    }
-    /// as expected
-    deprecated
-    int writeFile()
-    {
-        assert(this.vcfhdr.hdr != null);
-
-        int ret;
-
-        ret = bcf_hdr_write(this.fp, this.vcfhdr.hdr);
-
-        // for each record in this.records
-        foreach(r; this.rows) {
-            ret = bcf_write(this.fp, this.vcfhdr.hdr, r);
-            if (ret != 0) hts_log_error(__FUNCTION__,"VCFWriter.writeFile -> bcf_write");
-            // May need bcf_hdr_destroy(&r)
-        }
-
-
-
-        ret = vcf_close(this.fp);
-        if (ret != 0) hts_log_error(__FUNCTION__,"couldn't close VCF after writing");
-
-        // Deallocate header
-        bcf_hdr_destroy(this.vcfhdr.hdr);
-
         return ret;
     }
 }
