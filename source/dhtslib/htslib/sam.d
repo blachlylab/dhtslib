@@ -295,7 +295,7 @@ auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + (*b).
  */
 ////#define bam_seqi(s, i) ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf)
 auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);   }
-auto bam_seqi(char *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf); }
+//auto bam_seqi(char *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf); }
 }
 
 /**************************
