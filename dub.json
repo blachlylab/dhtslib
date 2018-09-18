@@ -52,7 +52,7 @@
         {
             "name": "source",
             "targetType": "sourceLibrary",
-            "libs": ["hts"],
+            "libs": ["hts"]
         },
         {
             "name": "source-static",

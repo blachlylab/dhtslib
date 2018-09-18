@@ -601,6 +601,7 @@ struct bcf1_t { // @suppress(dscanner.style.phobos_naming_convention)
      *  bcf_update_filter() - sets the FILTER column
      *  @flt_ids:  The filter IDs to set, numeric IDs returned by bcf_hdr_id2int(hdr, BCF_DT_ID, "PASS")
      *  @n:        Number of filters. If n==0, all filters are removed
+     *  Returns:    zero
      */
     int bcf_update_filter(const(bcf_hdr_t) *hdr, bcf1_t *line, int *flt_ids, int n);
     /**
