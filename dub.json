@@ -4,6 +4,7 @@
     "authors": ["James S. Blachly, MD"],
     "homepage": "https://github.com/blachlylab/dhtslib",
     "license": "MIT",
+    "lflags":["$LFLAGS"],
     "dependencies": {
     },
     "configurations": [
@@ -13,6 +14,7 @@
             "targetName": "tabix_gffreader",
             "sourcePaths": ["test"],
             "mainSourceFile": "test/tabix_gffreader.d",
+            "libs": ["hts"],
             "excludedSourceFiles": [
                 "test/bgzfreader.d", "test/samreader.d", "test/vcfwriter.d"
             ]
@@ -23,6 +25,7 @@
             "targetName": "bgzfreader",
             "sourcePaths": ["test"],
             "mainSourceFile": "test/bgzfreader.d",
+            "libs": ["hts"],
             "excludedSourceFiles": [
                 "test/tabix_gffreader.d", "test/samreader.d", "test/vcfwriter.d"
             ]
@@ -33,6 +36,7 @@
             "targetName": "samreader",
             "sourcePaths": ["test"],
             "mainSourceFile": "test/samreader.d",
+            "libs": ["hts"],
             "excludedSourceFiles": [
                 "test/tabix_gffreader.d", "test/bgzfreader.d", "test/vcfwriter.d"
             ]
@@ -42,7 +46,8 @@
             "targetType": "executable",
             "targetName": "vcfwriter",
             "sourcePaths": ["test/vcf"],
-            "mainSourceFile": "test/vcf/vcfwriter.d"
+            "mainSourceFile": "test/vcf/vcfwriter.d",
+            "libs": ["hts"]
         },
         {
             "name": "source",
@@ -52,7 +57,7 @@
         {
             "name": "source-static",
             "targetType": "sourceLibrary",
-            "preGenerateCommands-posix":["cd htslib;autoreconf;./configure --disable-bz2 --disable-lzma;make -j8;cd ..;"],
+            "preBuildCommands-posix":["cd $PACKAGE_DIR;make deps"],
             "sourceFiles":["./htslib/libhts.a"],
         }
     ]
