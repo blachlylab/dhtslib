@@ -21,7 +21,7 @@ struct BGZFile {
     private BGZF* bgzf;
 
     private kstring_t line;
-    private int em;
+
     // ref counting to prevent closing file multiple times
     // (free is instead now in popFront instead of dtor)
     private int rc = 1;
@@ -47,7 +47,7 @@ struct BGZFile {
         // n_sub_blks : blocks per thread; 64-256 recommended
         if(totalCPUs > 1) {
             immutable int ret = bgzf_mt(this.bgzf, totalCPUs, 64);
-            debug {
+            debug(dhtslib_debug) {
                 writefln("Total CPUs: %d", totalCPUs);
                 writefln("bgzf_mt() -> %d", ret);
             }
@@ -75,7 +75,14 @@ struct BGZFile {
     /// InputRange interface
     @property bool empty()
     {
-        return (this.em < 0 ? true : false);
+        // equivalent to htslib ks_release
+        this.line.l = 0;
+        this.line.m = 0;
+        this.line.s = null;
+        
+        // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
+        immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
+        return (res < 0 ? true : false);
     }
     /// ditto
     void popFront()
@@ -87,9 +94,6 @@ struct BGZFile {
         this.line.l = 0;
         this.line.m = 0;
         this.line.s = null;
-
-        // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
-        this.em = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
         
     }
     /// ditto
