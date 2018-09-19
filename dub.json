@@ -4,7 +4,6 @@
     "authors": ["James S. Blachly, MD"],
     "homepage": "https://github.com/blachlylab/dhtslib",
     "license": "MIT",
-    "lflags":["$LFLAGS"],
     "dependencies": {
     },
     "configurations": [
@@ -27,7 +26,7 @@
             "mainSourceFile": "test/bgzfreader.d",
             "libs": ["hts"],
             "excludedSourceFiles": [
-                "test/tabix_gffreader.d", "test/samreader.d", "test/vcfwriter.d"
+                "test/tabix_gffreader.d", "test/samreader.d", "test/vcf/vcfwriter.d"
             ]
         },
         {
@@ -38,7 +37,7 @@
             "mainSourceFile": "test/samreader.d",
             "libs": ["hts"],
             "excludedSourceFiles": [
-                "test/tabix_gffreader.d", "test/bgzfreader.d", "test/vcfwriter.d"
+                "test/tabix_gffreader.d", "test/bgzfreader.d", "test/vcf/vcfwriter.d"
             ]
         },
         {
@@ -47,7 +46,10 @@
             "targetName": "vcfwriter",
             "sourcePaths": ["test/vcf"],
             "mainSourceFile": "test/vcf/vcfwriter.d",
-            "libs": ["hts"]
+            "libs": ["hts"],
+            "excludedSourceFiles": [
+                "test/tabix_gffreader.d", "test/bgzfreader.d", "test/samreader.d"
+            ]
         },
         {
             "name": "source",
