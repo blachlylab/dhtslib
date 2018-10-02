@@ -105,11 +105,12 @@ struct VCFRecord
         this.filter = filter;
     }
     /// ditto
-    /// From VCF line
+    /// From VCF line (TODO)
     this(string line)
     {
         assert(0);
     }
+
     /// disable copying to prevent double-free (which should not come up except when writeln'ing)
     @disable this(this);
     /// dtor
@@ -288,10 +289,6 @@ struct VCFWriter
 
         this.vcfhdr = new VCFHeader( bcf_hdr_init(toStringz("w"c)));
         addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
-
-        bcf_hdr_append(this.vcfhdr.hdr, "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">");
-        bcf_hdr_append(this.vcfhdr.hdr, "##FORMAT=<ID=XF,Number=1,Type=Float,Description=\"Test Float\">");
-        bcf_hdr_append(this.vcfhdr.hdr, "##FILTER=<ID=triallelic,Description=\"Triallelic site\">");
 
     }
     /// setup and copy a header from another BCF/VCF as template

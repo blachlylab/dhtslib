@@ -16,9 +16,14 @@ int main()
     w.addHeaderLineKV("contig", "<ID=chr3,length=999999,assembly=hg19>");
     //w.addSample("SAMPLE01");
 
+    bcf_hdr_append(w.vcfhdr.hdr, "##FILTER=<ID=triallelic,Description=\"Triallelic site\">");
+
     w.addInfoTag("NS", "1", "Integer", "Number of Samples With Data");
     w.addInfoTag("XFL", "1", "Float", "Floating point number(s)");
     w.addInfoTag("XF", "1", "Flag", "Bool something something mumble");
+
+    bcf_hdr_append(w.vcfhdr.hdr, "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">");
+
     w.writeHeader();
     auto vcfhdr = w.getHeader();
 

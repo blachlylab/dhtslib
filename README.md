@@ -25,6 +25,7 @@ Object-oriented, idomatic(ish) D wrappers are available for:
 * BGZF (`dhtslib.bgzf`)
 * FASTA indexes (`dhtslib.faidx`)
 * Tabix (`dhtslib.tabix`)
+* VCF (`dhtslib.vcf`)
 
 For example, this provides access to BGZF files by line as a consumable InputRange.
 
@@ -40,3 +41,4 @@ Currently implemented fully or partially:
 * regidx
 * sam
 * tbx
+* vcf
