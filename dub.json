@@ -11,34 +11,22 @@
             "name": "tabix_test",
             "targetType": "executable",
             "targetName": "tabix_gffreader",
-            "sourcePaths": ["test"],
             "mainSourceFile": "test/tabix_gffreader.d",
-            "libs": ["hts"],
-            "excludedSourceFiles": [
-                "test/bgzfreader.d", "test/samreader.d", "test/vcfwriter.d"
-            ]
+            "libs": ["hts"]
         },
         {
             "name": "bgzf_test",
             "targetType": "executable",
             "targetName": "bgzfreader",
-            "sourcePaths": ["test"],
             "mainSourceFile": "test/bgzfreader.d",
-            "libs": ["hts"],
-            "excludedSourceFiles": [
-                "test/tabix_gffreader.d", "test/samreader.d", "test/vcf/vcfwriter.d"
-            ]
+            "libs": ["hts"]
         },
         {
             "name": "sam_test",
             "targetType": "executable",
             "targetName": "samreader",
-            "sourcePaths": ["test"],
             "mainSourceFile": "test/samreader.d",
-            "libs": ["hts"],
-            "excludedSourceFiles": [
-                "test/tabix_gffreader.d", "test/bgzfreader.d", "test/vcf/vcfwriter.d"
-            ]
+            "libs": ["hts"]
         },
         {
             "name": "vcf_writer_test",
@@ -46,10 +34,7 @@
             "targetName": "vcfwriter",
             "sourcePaths": ["test/vcf"],
             "mainSourceFile": "test/vcf/vcfwriter.d",
-            "libs": ["hts"],
-            "excludedSourceFiles": [
-                "test/tabix_gffreader.d", "test/bgzfreader.d", "test/samreader.d"
-            ]
+            "libs": ["hts"]
         },
         {
             "name": "source",
