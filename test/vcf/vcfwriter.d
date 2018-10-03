@@ -16,16 +16,33 @@ int main()
     w.addHeaderLineKV("contig", "<ID=chr3,length=999999,assembly=hg19>");
     //w.addSample("SAMPLE01");
 
+    // These should be equivalent: raw htslib call, templated fn
     bcf_hdr_append(w.vcfhdr.hdr, "##FILTER=<ID=triallelic,Description=\"Triallelic site\">");
+    w.addTag!"FILTER"("noisy", "Noisy region");
 
-    w.addInfoTag("NS", "1", "Integer", "Number of Samples With Data");
-    w.addInfoTag("XFL", "1", "Float", "Floating point number(s)");
-    w.addInfoTag("XF", "1", "Flag", "Bool something something mumble");
+    w.addTag!"INFO"("NS", "1", "Integer", "Number of Samples With Data");
+    w.addTag!"INFO"("XFL", "1", "Float", "Floating point number(s)");
+    w.addTag!"INFO"("XF", "1", "Flag", "Bool something something mumble");
 
+    // These should be equivalent: raw htslib call, templated fn with string 2nd param, templated fn with int 2nd param
     bcf_hdr_append(w.vcfhdr.hdr, "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">");
+    w.addTag!"FORMAT"("DDP", "1", "Integer", "De-Duplicated Read Depth (Diamond Dallas Page)");
+    w.addTag!"FORMAT"("XDP", 1, "Integer", "X depth");  // pass integer as second param instead of string
+
+    // Test vector valued tags
+    w.addTag!"FORMAT"("XXX", 2, "Integer", "Array test");
+
+    w.addSample("Sample1");
+    w.addSample("Sample2");
 
     w.writeHeader();
     auto vcfhdr = w.getHeader();
+
+    // for genotype/format tag value arrays
+    int x = 100;
+    int y = 200;
+    int z = 300;
+    int zz= 400;
 
     //string[] filters = ["TRIALLELIC", "GOATS"];
     string[] filters = ["PASS", "triallelic", "nonex"];
@@ -33,7 +50,23 @@ int main()
     r.addInfo("NS", 1);
     r.addInfo("XS", "Hello");
     r.addInfo("XFL", 2.1);
+    r.addFormat("DP", [x,x] );
+    w.writeRecord(r);
+
+    r = VCFRecord(vcfhdr, "chr3", 1001, "", "", "", 30, "");
+    r.setAlleles("A", "G");
     r.addInfo("XF", true);
+    r.addFormat("DP", [x,x] );
+    w.writeRecord(r);
+
+    r = VCFRecord(vcfhdr, "chr3", 1002, "", "", "", 30, "PASS");
+    r.setAlleles("A", "T", "TCGA");
+    r.addFormat("DP", [x,x] );
+    r.addFormat("XDP", [x,y]);
+    w.writeRecord(r);
+
+    r = VCFRecord(vcfhdr, "chr3", 1003, "", "A", "G", 30, "PASS");
+    r.addFormat("XXX", [x, y, z, zz]);
     w.writeRecord(r);
 
 /+

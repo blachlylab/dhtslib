@@ -1,5 +1,7 @@
 module dhtslib.vcf;
 
+import core.vararg;
+
 import std.conv: to, ConvException;
 import std.datetime;
 import std.format: format;
@@ -97,9 +99,7 @@ struct VCFRecord
         this.pos = pos;
         this.updateID(id);
 
-        // alleles
-        immutable string alleles = _ref ~ "," ~ alt ~ "\0";
-        bcf_update_alleles_str(this.vcfheader.hdr, this.line, alleles.ptr);
+        this.setAlleles(_ref, alt);
 
         this.qual = qual;
         this.filter = filter;
@@ -166,7 +166,31 @@ struct VCFRecord
 
 
     /* Alleles (REF, ALT) */
+    /// Set alleles; comma-separated list
+    @property void alleles(string a)
+    {
+        bcf_update_alleles_str(this.vcfheader.hdr, this.line, toStringz(a));
+    }
+    /// Set alleles; alt can be comma separated
+    void setAlleles(string _ref, string alt)
+    {
+        immutable string alleles = _ref ~ "," ~ alt ~ "\0";
+        bcf_update_alleles_str(this.vcfheader.hdr, this.line, alleles.ptr);
+    }
+    /// Set alleles; min. 2 alleles (ref, alt1); unlimited alts may be specified
+    void setAlleles(string r, string a, ...)
+    {
+        string alleles = r ~ "," ~ a;
 
+        for (int i = 0; i < _arguments.length; i++)
+        {
+            alleles ~= "," ~ va_arg!string(_argptr);
+        }
+
+        alleles ~= "\0";
+
+        bcf_update_alleles_str(this.vcfheader.hdr, this.line, alleles.ptr);
+    }
 
     /* Quality (QUAL) */
     @property float qual()      { return this.line.qual; }
@@ -192,17 +216,18 @@ struct VCFRecord
         this.filter([f]);
     }
     /// Set the FILTER column to f0,f1,f2...
+    /// TODO: determine definitiely whether "." is replaced with "PASS"
     @property void filter(string[] fs)
     {
         int[] fids;
         foreach(f; fs) {
+            if(f == "") continue;
             int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
             if (fid == -1) hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
             else fids ~= fid;
         }
         bcf_update_filter(this.vcfheader.hdr, this.line, fids.ptr, cast(int)fids.length);
     }
-
     /// Add a filter; from htslib: 
     /// "If flt_id is PASS, all existing filters are removed first. If other than PASS, existing PASS is removed."
     int addFilter(string f)
@@ -210,13 +235,18 @@ struct VCFRecord
         return bcf_add_filter(this.vcfheader.hdr, this.line, 
             bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f)));
     }
+    /// Remove a filter by name
+    int removeFilter(string f)
+    {
+        int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
+        return removeFilter(fid);
+    }
+    /// Remove a filter by numeric id
+    int removeFilter(int fid)
+    {
+        return bcf_remove_filter(this.vcfheader.hdr, this.line, fid, 0);
+    }
     /+
-    /**
-     *  bcf_remove_filter() - removes from the FILTER column
-     *  @flt_id:   filter ID to remove, numeric ID returned by bcf_hdr_id2int(hdr, BCF_DT_ID, "PASS")
-     *  @pass:     when set to 1 and no filters are present, set to PASS
-     */
-    int bcf_remove_filter(const bcf_hdr_t *hdr, bcf1_t *line, int flt_id, int pass);
     /**
      *  Returns 1 if present, 0 if absent, or -1 if filter does not exist. "PASS" and "." can be used interchangeably.
      */
@@ -233,8 +263,10 @@ struct VCFRecord
     {
         int ret = -1;
 
-        static if(isIntegral!T)
-            ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), &data, 1);
+        static if(isIntegral!T) {
+            auto integer = cast(int) data;
+            ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), &integer, 1);
+        }
         
         else static if(isFloatingPoint!T) {
             auto flt = cast(float) data;    // simply passing "2.0" (or whatever) => data is a double
@@ -256,12 +288,32 @@ struct VCFRecord
     void addInfo(T)(string tag, T[] data)
     if(!is(T==immutable(char)))             // otherwise string::immutable(char)[] will match the other template
     {
-
+        // TODO
     }
 
     /* FORMAT (sample info) */
+    void addFormat(T)(string tag, T data)
+    if(isIntegral!T)
+    {
+        int ret = -1;
 
-    string toString()
+        static if(isIntegral!T) {
+            auto integer = cast(int) data;
+            ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), &data, 1);
+        }
+        
+    }
+    /// auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, int *values, int n) // @suppress(dscanner.style.undocumented_declaration)
+    void addFormat(T)(string tag, T[] data)
+    if(is(T == int))
+    {
+        int ret = -1;
+
+        static if(is(T == int))
+            ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), data.ptr, cast(int)data.length);
+    }
+
+    string toString() const
     {
         return "[VCFRecord]";
     }
@@ -359,10 +411,16 @@ struct VCFWriter
         //    int bcf_hdr_append(bcf_hdr_t *h, const(char) *line);
         return bcf_hdr_append(this.vcfhdr.hdr, toStringz(line));
     }
-    /** Add INFO tag (§1.2.2)
+    
+    /** Add INFO (§1.2.2) or FORMAT (§1.2.4) tag
+
+    The INFO tag describes row-specific keys used in the INFO column;
+    The FORMAT tag describes sample-specific keys used in the last, and optional, genotype column.
+
+    Template parameter: string; must be INFO or FORMAT
 
     The first four parameters are required; NUMBER and TYPE have specific allowable values.
-    source and version are optional, but recommended.
+    source and version are optional, but recommended (for INFO only).
 
     *   id:     ID tag
     *   number: NUMBER tag; here a string because it can also take special values {A,R,G,.} (see §1.2.2)
@@ -371,9 +429,10 @@ struct VCFWriter
     *   source:      Annotation source  (eg dbSNP)
     *   version:     Annotation version (eg 142)
     */
-    void addInfoTag(string id, string number, string type, string description, string source="", string _version="")
+    void addTag(string tagType, T)(string id, T number, string type, string description, string source="", string _version="")
+    if((tagType == "INFO" || tagType == "FORMAT") && (isIntegral!T || isSomeString!T))
     {
-        string info;
+        string line;    //  we'll suffix with \0, don't worry
 
         // check ID
         if (id == "") {
@@ -382,6 +441,7 @@ struct VCFWriter
         }
 
         // check Number is either a special code {A,R,G,.} or an integer
+        static if(isSomeString!T) {
         if (number != "A" &&
             number != "R" &&
             number != "G" &&
@@ -394,6 +454,7 @@ struct VCFWriter
                     hts_log_error(__FUNCTION__,"Number not A/R/G/. nor an integer");
                     return;
                 }
+        }
         }
 
         // check Type
@@ -414,25 +475,40 @@ struct VCFWriter
 
         // Format params
         if (source != "" && _version != "")
-            info = format("##INFO=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\",Version=\"%s\">\0",
-                            id, number, type, description, source, _version);
+            line = format("##%s=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\",Version=\"%s\">\0",
+                            tagType, id, number, type, description, source, _version);
         else if (source != "" && _version == "")
-            info = format("##INFO=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\">\0",
-                            id, number, type, description, source);
+            line = format("##%s=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\">\0",
+                            tagType, id, number, type, description, source);
         else
-            info = format("##INFO=<ID=%s,Number=%s,Type=%s,Description=\"%s\">\0",
-                            id, number, type, description);
+            line = format("##%s=<ID=%s,Number=%s,Type=%s,Description=\"%s\">\0",
+                            tagType, id, number, type, description);
 
-        bcf_hdr_append(this.vcfhdr.hdr, info.ptr);
+        bcf_hdr_append(this.vcfhdr.hdr, line.ptr);
     }
 
     /** Add FILTER tag (§1.2.3) */
-    void addFilterTag(string id, string description)
+    void addTag(string tagType)(string id, string description)
+    if(tagType == "FILTER")
+    {
+        // check ID
+        if (id == "") {
+            hts_log_error(__FUNCTION__,"no ID");
+            return;
+        }
+        // check Description
+        if (description == "") hts_log_error(__FUNCTION__,"no description");
+
+        string line = format("##FILTER=<ID=%s,Description=\"%s\">\0", id, description);
+        bcf_hdr_append(this.vcfhdr.hdr, line.ptr);
+    }
+
+    /** Add FILTER tag (§1.2.3) */
+    deprecated void addFilterTag(string id, string description)
     {
         string filter = format("##FILTER=<ID=%s,Description=\"%s\">\0", id, description);
         bcf_hdr_append(this.vcfhdr.hdr, filter.ptr);
     }
-    alias addFilter = addFilterTag;
 
     
     /**
