@@ -941,7 +941,8 @@ pragma(inline, true) {
     
     /// Generate an iterator for a string-based range query
     auto bcf_itr_querys(const(hts_idx_t) *idx, const(bcf_hdr_t) *hdr, const(char) *s)
-        { return hts_itr_querys(idx, s, cast(hts_name2id_f) &bcf_hdr_name2id, cast(void *) hdr, &hts_itr_query, &bcf_readrec); }
+        { return hts_itr_querys(idx, s, cast(hts_name2id_f) &bcf_hdr_name2id, cast(void *) hdr,
+                                &hts_itr_query, &bcf_readrec); }
 
     /// Iterate through the range
     /// r should (probably) point to your VCF (BCF) row structure

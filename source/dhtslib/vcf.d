@@ -5,9 +5,10 @@ import core.vararg;
 import std.conv: to, ConvException;
 import std.datetime;
 import std.format: format;
+import std.range: ElementType;
 import std.stdio: writeln;
 import std.string: fromStringz, toStringz;
-import std.traits: isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
+import std.traits: isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 
 import dhtslib.htslib.hts_log;
 import dhtslib.htslib.vcf;
@@ -301,7 +302,7 @@ struct VCFRecord
             auto integer = cast(int) data;
             ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), &data, 1);
         }
-        
+
     }
     /// auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, int *values, int n) // @suppress(dscanner.style.undocumented_declaration)
     void addFormat(T)(string tag, T[] data)
@@ -311,6 +312,69 @@ struct VCFRecord
 
         static if(is(T == int))
             ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), data.ptr, cast(int)data.length);
+    }
+
+    /// add INFO or FORMAT key:value pairs to a record
+    /// add a single datapoint OR vector of values, OR, values to each sample (if tagType == FORMAT)
+    void add(string tagType, T)(string tag, T data)
+    if((tagType == "INFO" || tagType == "FORMAT") &&
+        (isIntegral!T || isIntegral!(ElementType!T) ||
+        isFloatingPoint!T || isFloatingPoint!(ElementType!T) ||
+        isSomeString!T || isSomeString!(ElementType!T) ||
+        isBoolean!T || isBoolean!(ElementType!T)))
+    {
+        int ret = -1;
+        int len;
+
+        static if (!isDynamicArray!T) {
+            len = 1;
+            static if (isIntegral!T) auto d = data.to!int;
+            else static if (isFloatingPoint!T) auto d = data.to!float;
+            else static if (isSomeString!T) auto d = toStringz(data);
+            else static if (isBoolean!T) immutable int d = data ? 1 : 0; // if data == true, pass 1 to bcf_update_info_flag(n=); n=0 => clear flag
+            else static assert(0);
+
+            auto ptr = &d;
+        }
+        else static if (isDynamicArray!T) {
+            len = cast(int) data.length;
+            static if (isIntegral!(ElementType!T)) auto d = data.to!(int[]);
+            else static if (isFloatingPoint!(ElementType!T)) auto d = data.to!(float[]);
+            else static if (isSomeString!(ElementType!T)) {
+                char[] d;
+                foreach(s; data) {
+                    d ~= s ~ "\0";
+                }
+                if(d.length == 0) d ~= "\0";    // TODO replace with asserts on data length earlier
+            }
+            else static if (isBoolean!(ElementType!T)) {
+                int[] d;
+                foreach(b; data) {
+                    d ~= (b ? 1 : 0);
+                }
+            }
+
+            auto ptr = d.ptr;
+        }
+        else static assert(0);
+
+        static if (tagType == "INFO") {
+            static if (is(T == int) || is(ElementType!T == int))
+                ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
+            else static if (is(T == float) || is(ElementType!T == float))
+                ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
+            else static if (isSomeString!T || isSomeString!(ElementType!T))
+                ret = bcf_update_info_string(this.vcfheader.hdr, this.line, toStringz(tag), ptr);
+            else static if (is(T == bool) || is(ElementType!T == bool))
+                ret = bcf_update_info_flag(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
+            else static assert(0);
+        }
+        else static if (tagType == "FORMAT") {
+
+        }
+        else static assert(0);
+
+        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s", data));
     }
 
     string toString() const

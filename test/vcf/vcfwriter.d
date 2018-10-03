@@ -69,6 +69,10 @@ int main()
     r.addFormat("XXX", [x, y, z, zz]);
     w.writeRecord(r);
 
+    r = VCFRecord(vcfhdr, "chr3", 1004, "", "G", "A", 20, "PASS");
+    r.add!"FORMAT"("DP", [x,y]);
+    //r.addValue!("FORMAT", int)("DP", [x,y]);
+    w.writeRecord(r);
 /+
     filters = [];
     w.addRecord("chr3", 999, "", "C,T", 40, filters);
