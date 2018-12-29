@@ -196,7 +196,6 @@ struct htsFile {
     htsFormat format;
 };
 
-/+
 // A combined thread pool and queue allocation size.
 // The pool should already be defined, but qsize may be zero to
 // indicate an appropriate queue size is taken from the pool.
@@ -204,11 +203,10 @@ struct htsFile {
 // Reasons for explicitly setting it could be where many more file
 // descriptors are in use than threads, so keeping memory low is
 // important.
-typedef struct {
-    struct hts_tpool *pool; // The shared thread pool itself
+struct htsThreadPool {
+    hts_tpool *pool; // The shared thread pool itself
     int qsize;    // Size of I/O queue to use for this fp
-} htsThreadPool;
-+/
+};
 
 // REQUIRED_FIELDS
 enum sam_fields {
@@ -459,7 +457,6 @@ char **hts_readlines(const char *fn, int *_n);
 */
 char **hts_readlist(const char *fn, int is_file, int *_n);
 
-/+
 /*!
   @abstract  Create extra threads to aid compress/decompression for this file
   @param fp  The file handle
@@ -493,7 +490,7 @@ void hts_set_cache_size(htsFile *fp, int n);
       Called before *_hdr_read(), this provides the name of a .fai file
       used to provide a reference list if the htsFile contains no @SQ headers.
 */
-int hts_set_fai_filename(htsFile *fp, const char *fn_aux);
+int hts_set_fai_filename(htsFile *fp, const(char) *fn_aux);
 
 
 /*!
@@ -508,6 +505,7 @@ int hts_set_fai_filename(htsFile *fp, const char *fn_aux);
 */
 int hts_check_EOF(htsFile *fp);
 
+/+
 /************
  * Indexing *
  ************/
