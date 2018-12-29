@@ -41,7 +41,7 @@ class Record {
     @property char[] queryName() { return fromStringz(bam_get_qname(this.b)); }
     /// query (and quality string) length
     @property int length() { return this.b.core.l_qseq; }
-    ///
+    /// see samtools/sam_view.c: get_read
     @property char* sequence()
     {
         // calloc fills with \0; +1 len for Cstring
@@ -52,12 +52,14 @@ class Record {
         // auto bam_get_seq(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname); }
         auto seqdata = bam_get_seq(this.b);
 
-        for(int i; i < this.b.core.l_qseq; i++)
-            s[i] = seq_nt16_str[ bam_seqi(seqdata, i) ];
-
+        for(int i; i < this.b.core.l_qseq; i++) {
+            if (this.b.core.flag & BAM_FREVERSE)    s[i] = seq_nt16_str[seq_comp_table[bam_seqi(seqdata, i)]];
+            else                                    s[i] = seq_nt16_str[bam_seqi(seqdata, i)];
+        }
+        if (this.b.core.flag & BAM_FREVERSE) reverse(s);
         return s;
     }
-    ///
+    /// see samtools/sam_view.c: get_quality
     @property char* qscores()
     {
         // calloc fills with \0; +1 len for Cstring
@@ -70,7 +72,8 @@ class Record {
 
         for(int i; i < this.b.core.l_qseq; i++)
             q[i] = cast(char) (qualdata[i] + 33);
-        
+        if (this.b.core.flag & BAM_FREVERSE) reverse(q);
+
         return q;
     }
 }
@@ -255,4 +258,25 @@ struct SAMFile {
         }
     }
 
+}
+
+/// Nucleotide complement table; from samtools/sam_view.c
+private const(char)[16] seq_comp_table = [ 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15 ];
+
+/// Reverse a string in place; from samtools/sam_view.c
+//  Could be sped up, and potentially made safer? by passing strlen since already known
+private char *reverse(char *str)
+{
+    import core.stdc.string: strlen;
+
+    ulong i = strlen(str)-1,j=0;
+    char ch;
+    while (i>j) {
+        ch = str[i];
+        str[i]= str[j];
+        str[j] = ch;
+        i--;
+        j++;
+    }
+    return str;
 }
