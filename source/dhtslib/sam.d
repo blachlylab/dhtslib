@@ -9,6 +9,7 @@ import std.string: fromStringz, toStringz;
 import dhtslib.htslib.hts: htsFile, hts_open, hts_close;
 import dhtslib.htslib.hts: hts_itr_t;
 import dhtslib.htslib.hts: seq_nt16_str;
+import dhtslib.htslib.hts: hts_set_threads;
 import dhtslib.htslib.kstring;
 import dhtslib.htslib.sam;
 
@@ -107,11 +108,20 @@ struct SAMFile {
     ///
     this(string fn)
     {
+        import std.parallelism: totalCPUs;
+
         debug(dhtslib_debug) { writeln("SAMFile ctor"); }
 
         // open file
         this.fn = toStringz(fn);
         this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
+
+        if (totalCPUs > 1) {
+            stderr.writefln("dhtslib: %d CPU cores detected; enabling multithreading.", totalCPUs);
+            // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
+            // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
+            hts_set_threads(this.fp, totalCPUs );
+        }
 
         // read header
         this.header = sam_hdr_read(this.fp);
