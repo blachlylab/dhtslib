@@ -13,6 +13,7 @@
 // removed redundant struct declarations when declaring struct pointers
 // ref is a reserved keyword in D; changed 'ref' to '_ref'
 // Function prototypes taking fixed size array (e.g. ..., const char tag[2], ) should include ref in the D prototype 
+// const char *p -> const(char) *p
 // Replace localal definition with import kstring
 /*  
 Aliased function pointer typedefs:
@@ -336,7 +337,7 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
     */
     int32_t bam_endpos(const bam1_t *b);
 
-    int   bam_str2flag(const char *str);    /** returns negative value on error */
+    int   bam_str2flag(const(char) *str);    /** returns negative value on error */
     char *bam_flag2str(int flag);   /** The string must be freed by the user */
 
     /*************************
@@ -360,7 +361,7 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
     @param fn  BAM/CRAM/etc filename to search alongside for the index file
     @return  The index, or NULL if an error occurred.
 */
-hts_idx_t *sam_index_load(htsFile *fp, const char *fn);
+hts_idx_t *sam_index_load(htsFile *fp, const(char) *fn);
 
 /// Load a specific BAM (.csi or .bai) or CRAM (.crai) index file
 /** @param fp     File handle of the data file whose index is being opened
@@ -368,7 +369,7 @@ hts_idx_t *sam_index_load(htsFile *fp, const char *fn);
     @param fnidx  Index filename, or NULL to search alongside @a fn
     @return  The index, or NULL if an error occurred.
 */
-hts_idx_t *sam_index_load2(htsFile *fp, const char *fn, const char *fnidx);
+hts_idx_t *sam_index_load2(htsFile *fp, const(char) *fn, const(char) *fnidx);
 
 /// Generate and save an index file
 /** @param fn        Input BAM/etc filename, to which .csi/etc will be added
@@ -377,7 +378,7 @@ hts_idx_t *sam_index_load2(htsFile *fp, const char *fn, const char *fnidx);
              -2: opening fn failed; -3: format not indexable; -4:
              failed to create and/or save the index)
 */
-int sam_index_build(const char *fn, int min_shift);
+int sam_index_build(const(char) *fn, int min_shift);
 
 /// Generate and save an index to a specific file
 /** @param fn        Input BAM/CRAM/etc filename
@@ -386,13 +387,13 @@ int sam_index_build(const char *fn, int min_shift);
     @return  0 if successful, or negative if an error occurred (see
              sam_index_build for error codes)
 */
-int sam_index_build2(const char *fn, const char *fnidx, int min_shift);
-int sam_index_build3(const char *fn, const char *fnidx, int min_shift, int nthreads);
+int sam_index_build2(const(char) *fn, const(char) *fnidx, int min_shift);
+int sam_index_build3(const(char) *fn, const(char) *fnidx, int min_shift, int nthreads);
 
     ////#define sam_itr_destroy(iter) hts_itr_destroy(iter)
     alias sam_itr_destroy = hts_itr_destroy;
     hts_itr_t *sam_itr_queryi(const hts_idx_t *idx, int tid, int beg, int end);
-    hts_itr_t *sam_itr_querys(const hts_idx_t *idx, bam_hdr_t *hdr, const char *region);
+    hts_itr_t *sam_itr_querys(const hts_idx_t *idx, bam_hdr_t *hdr, const(char) *region);
     hts_itr_multi_t *sam_itr_regions(const hts_idx_t *idx, bam_hdr_t *hdr, hts_reglist_t *reglist, uint regcount);
 
     ////#define sam_itr_next(htsfp, itr, r) hts_itr_next((htsfp)->fp.bgzf, (itr), (r), (htsfp))
@@ -408,20 +409,20 @@ int sam_index_build3(const char *fn, const char *fnidx, int min_shift, int nthre
     ////#define sam_open_format(fn, mode, fmt) (hts_open_format((fn), (mode), (fmt)))
     ////#define sam_close(fp) hts_close(fp)
 
-    int sam_open_mode(char *mode, const char *fn, const char *format);
+    int sam_open_mode(char *mode, const(char) *fn, const(char) *format);
 
     // A version of sam_open_mode that can handle ,key=value options.
     // The format string is allocated and returned, to be freed by the caller.
     // Prefix should be "r" or "w",
-    char *sam_open_mode_opts(const char *fn,
-                             const char *mode,
-                             const char *format);
+    char *sam_open_mode_opts(const(char) *fn,
+                             const(char) *mode,
+                             const(char) *format);
 
     alias htsFile samFile;
-    bam_hdr_t *sam_hdr_parse(int l_text, const char *text);
+    bam_hdr_t *sam_hdr_parse(int l_text, const(char) *text);
     bam_hdr_t *sam_hdr_read(samFile *fp);
     int sam_hdr_write(samFile *fp, const bam_hdr_t *h);
-    int sam_hdr_change_HD(bam_hdr_t *h, const char *key, const char *val);
+    int sam_hdr_change_HD(bam_hdr_t *h, const(char) *key, const(char) *val);
 
     int sam_parse1(kstring_t *s, bam_hdr_t *h, bam1_t *b);
     int sam_format1(const bam_hdr_t *h, const bam1_t *b, kstring_t *str);
@@ -545,7 +546,7 @@ int bam_aux_del(bam1_t *b, uint8_t *s);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_str(bam1_t *b, const ref char[2] tag, int len, const char *data);
+int bam_aux_update_str(bam1_t *b, const ref char[2] tag, int len, const(char) *data);
 
 /// Update or add an integer tag
 /* @param b    The bam record to update
@@ -744,7 +745,7 @@ alias bam_mplp_t = __bam_mplp_t*;
  * BAQ calculation and realignment *
  ***********************************/
 
-int sam_cap_mapq(bam1_t *b, const char *_ref, int ref_len, int thres);
+int sam_cap_mapq(bam1_t *b, const(char) *_ref, int ref_len, int thres);
 
 /// Calculate BAQ scores
 /** @param b   BAM record
@@ -786,5 +787,5 @@ Depending on what previous processing happened, this may or may not be the
 correct thing to do.  It would be wise to avoid this situation if possible.
 */
 
-int sam_prob_realn(bam1_t *b, const char *_ref, int ref_len, int flag);
+int sam_prob_realn(bam1_t *b, const(char) *_ref, int ref_len, int flag);
 
