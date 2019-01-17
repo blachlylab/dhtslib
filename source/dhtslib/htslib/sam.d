@@ -354,6 +354,8 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
 
     // These BAM iterator functions work only on BAM files.  To work with either
     // BAM or CRAM files use the sam_index_load() & sam_itr_*() functions.
+    deprecated("These BAM iterator functions work only on BAM files.  To work with either BAM or CRAM files use the sam_index_load() & sam_itr_*() functions.")
+    {
     ////#define bam_itr_destroy(iter) hts_itr_destroy(iter)
     alias bam_itr_destroy = hts_itr_destroy;
     ////#define bam_itr_queryi(idx, tid, beg, end) sam_itr_queryi(idx, tid, beg, end)
@@ -362,6 +364,7 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
     alias bam_itr_querys = sam_itr_querys;
     ////#define bam_itr_next(htsfp, itr, r) hts_itr_next((htsfp)->fp.bgzf, (itr), (r), 0)
     pragma(inline, true) auto bam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, 0); }
+    }
 
 // Load/build .csi or .bai BAM index file.  Does not work with CRAM.
 // It is recommended to use the sam_index_* functions below instead.
