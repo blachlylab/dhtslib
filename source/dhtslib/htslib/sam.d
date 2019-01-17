@@ -113,15 +113,19 @@ enum int BAM_CIGAR_SHIFT = 4;
 enum int BAM_CIGAR_MASK  = 0xf;
 enum int BAM_CIGAR_TYPE  = 0x3C1A7;
 
-int bam_cigar_op(uint c)    { return ( c & BAM_CIGAR_MASK); }
-int bam_cigar_oplen(uint c) { return ( c >> BAM_CIGAR_SHIFT ); }
+pragma(inline, true)
+{
+auto bam_cigar_op(uint c)    { return ( c & BAM_CIGAR_MASK); }
+auto bam_cigar_oplen(uint c) { return ( c >> BAM_CIGAR_SHIFT ); }
 // Note that BAM_CIGAR_STR is padded to length 16 bytes below so that
 // the array look-up will not fall off the end.  '?' is chosen as the
 // padding character so it's easy to spot if one is emitted, and will
 // result in a parsing failure (in sam_parse1(), at least) if read.
 
 ////#define bam_cigar_opchr(c) (BAM_CIGAR_STR "??????" [bam_cigar_op(c)])
+auto bam_cigar_opchr(uint c)    { return (BAM_CIGAR_STR ~ "??????"[bam_cigar_op(c)]); }
 ////#define bam_cigar_gen(l, o) ((l)<<BAM_CIGAR_SHIFT|(o))
+auto bam_cigar_gen(uint l, uint o) { return (l << BAM_CIGAR_SHIFT | o); } // TODO: Check operator precedence C vs D
 
 /* bam_cigar_type returns a bit flag with:
  *   bit 1 set if the cigar operation consumes the query
@@ -143,6 +147,8 @@ int bam_cigar_oplen(uint c) { return ( c >> BAM_CIGAR_SHIFT ); }
  * --------------------------------
  */
 ////#define bam_cigar_type(o) (BAM_CIGAR_TYPE>>((o)<<1)&3) // bit 1: consume query; bit 2: consume reference
+auto bam_cigar_type(uint o) { return (BAM_CIGAR_TYPE >> (o << 1) & 3); }
+}
 
 /*! @abstract the read is paired in sequencing, no matter whether it is mapped in a pair */
 enum int BAM_FPAIRED       = 1;
