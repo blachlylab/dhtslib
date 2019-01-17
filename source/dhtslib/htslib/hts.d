@@ -266,10 +266,11 @@ alias cram_option = hts_fmt_option;
 struct hts_opt {
     char *arg;                // string form, strdup()ed
     hts_fmt_option opt;  // tokenised key
-    union val {                   // ... and value
+    union VAL {                   // ... and value
         int i;
         char *s;
     };
+    VAL val;
     hts_opt *next;
 };
 
