@@ -288,12 +288,14 @@ auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + (*b).
  @return    pointer to the concatenated auxiliary data
  */
 ////#define bam_get_aux(b)   ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname + (((b)->core.l_qseq + 1)>>1) + (b)->core.l_qseq)
+auto bam_get_aux(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname + (((*b).core.l_qseq + 1)>>1) + (*b).core.l_qseq); }
 /*! @function
  @abstract  Get length of auxiliary data
  @param  b  pointer to an alignment
  @return    length of the concatenated auxiliary data
  */
 ////#define bam_get_l_aux(b) ((b)->l_data - ((b)->core.n_cigar<<2) - (b)->core.l_qname - (b)->core.l_qseq - (((b)->core.l_qseq + 1)>>1))
+auto bam_get_l_aux(bam1_t *b) { return ((*b).l_data - ((*b).core.n_cigar<<2) - (*b).core.l_qname - (*b).core.l_qseq - (((*b).core.l_qseq + 1)>>1)); }
 /*! @function
  @abstract  Get a base on read
  @param  s  Query sequence returned by bam_get_seq()
