@@ -155,9 +155,9 @@ struct SAMFile {
         debug(dhtslib_debug) { writeln("SAMFile dtor" ); }
 
         bam_hdr_destroy(this.header);
-
-        const auto ret = hts_close(fp);
-        if (ret < 0) writefln("There was an error closing %s", fromStringz(this.fn));
+        //TODO:hts_close segfaults
+        //const auto ret = hts_close(fp);
+        //if (ret < 0) writefln("There was an error closing %s", fromStringz(this.fn));
     }
 
     /// number of reference sequences; from bam_hdr_t
