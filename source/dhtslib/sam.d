@@ -10,28 +10,36 @@ import dhtslib.htslib.hts: htsFile, hts_open, hts_close;
 import dhtslib.htslib.hts: hts_itr_t;
 import dhtslib.htslib.hts: seq_nt16_str;
 import dhtslib.htslib.hts: hts_set_threads;
+
+import dhtslib.htslib.hts_log;
 import dhtslib.htslib.kstring;
 import dhtslib.htslib.sam;
 
 /**
-Encapsulates a SAM/BAM record,
+Encapsulates a SAM/BAM/CRAM record,
 using the bam1_t type for memory efficiency,
 and the htslib helper functions for speed.
 **/
-class Record {
+class SAMRecord {
     ///
     bam1_t *b;
 
     ///
     this()
     {
-        debug(dhtslib_debug) writeln("Record ctor");
+        debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "ctor()");
         this.b = bam_init1();
+    }
+    ///
+    this(bam1_t *b)
+    {
+        debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "ctor(bam1_t *b)");
+        this.b = b;
     }
     ~this()
     {
-        debug(dhtslib_debug) writeln("Record dtor");
-        bam_destroy1(this.b);
+        debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
+        //bam_destroy1(this.b); // we don't own it!
     }
 
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
@@ -117,7 +125,10 @@ struct SAMFile {
         this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
 
         if (totalCPUs > 1) {
-            stderr.writefln("dhtslib: %d CPU cores detected; enabling multithreading.", totalCPUs);
+            // TODO: make optional
+            // TODO hts_log
+            hts_log_info(__FUNCTION__, format("%d CPU cores detected; enabling multithreading", totalCPUs));
+            //stderr.writefln("dhtslib: %d CPU cores detected; enabling multithreading.", totalCPUs);
             // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
             // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
             hts_set_threads(this.fp, totalCPUs );
@@ -132,8 +143,9 @@ struct SAMFile {
         debug(dhtslib_debug) { writeln("SAMFile dtor" ); }
 
         bam_hdr_destroy(this.header);
+
         const auto ret = hts_close(fp);
-        if (!ret) writeln("There was an error closing %s", this.fn);
+        if (ret < 0) writefln("There was an error closing %s", fromStringz(this.fn));
     }
 
     /// number of reference sequences; from bam_hdr_t
@@ -189,12 +201,37 @@ struct SAMFile {
 
     }
 
+    AllRecordsRange all_records()
+    {
+        return AllRecordsRange(this.fp, this.header, bam_init1());
+    }
+
     /// Iterate through all records in the SAM/BAM/CRAM
     struct AllRecordsRange
     {
         private htsFile     *fp;        // belongs to parent; shared
         private bam_hdr_t   *header;    // belongs to parent; shared
         private bam1_t      *b;
+
+        /// Ref counting to prevent multiple bam_destroy1() calls
+        private int rc = 1;
+        // postblit ref counting
+        this(this)
+        {
+            this.rc++;
+            debug(dhtslib_debug) hts_log_debug(__FUNCTION__, format("postblit ctor, rc=%d", this.rc));
+        }
+
+        ~this()
+        {
+            debug(dhtslib_debug) hts_log_debug(__FUNCTION__, format("dtor, rc=%d", rc));
+            /+
+            if(!--rc) {
+                debug(dhtslib_debug) hts_log_debug(__FUNCTION__, format("freeing bam1_t (rc=%d)", rc));
+                bam_destroy1(this.b);
+            }
++/
+        }
 
         /// InputRange
         @property bool empty()
@@ -205,6 +242,7 @@ struct SAMFile {
             else if (success == -1) return true;
             else {
                 writeln("*** ERROR in sam::SAMFile::AllRecordsRange:empty");
+                hts_log_error(__FUNCTION__, "*** ERROR in sam::SAMFile::AllRecordsRange:empty, sam_read1 < -1");
                 return true;
             }
         }
@@ -213,9 +251,14 @@ struct SAMFile {
         {
             // noop? 
             // free this.b ?
-            bam_destroy1(this.b);
+            
+            //bam_destroy1(this.b);
         }
         /// ditto
+        SAMRecord front()
+        {
+            return new SAMRecord(this.b);
+        }
 
     }
     struct RecordRange

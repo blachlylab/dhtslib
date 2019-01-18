@@ -26,7 +26,8 @@
             "targetType": "executable",
             "targetName": "samreader",
             "mainSourceFile": "test/samreader.d",
-            "libs": ["hts"]
+            "libs": ["hts"],
+            "debugVersions": ["dhtslib_debug"]
         },
         {
             "name": "vcf_writer_test",
