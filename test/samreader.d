@@ -15,7 +15,8 @@ int main()
         hts_set_log_level(htsLogLevel.HTS_LOG_DEBUG);
     }
 
-    auto sf = SAMFile("/Users/james/Documents/Development/blachlylab/funmap/wgEncodeUwRepliSeqBg02esG1bAlnRep1.bam");
+    //auto sf = SAMFile("/Users/james/Documents/Development/blachlylab/funmap/wgEncodeUwRepliSeqBg02esG1bAlnRep1.bam");
+    auto sf = SAMFile("/Users/james/Documents/Development/blachlylab/funmap/ENCFF399AWI.bam");
 
     writeln("Basic SAM/BAM/CRAM data");
     writefln("N targets: %d", sf.n_targets);
@@ -29,9 +30,9 @@ int main()
     foreach(r; x) {
         i++;
         writeln(i);
-        writeln(fromStringz(r.sequence));
+        //writeln(fromStringz(r.sequence));
     }
-
+    writeln("SAMFile going out of scope?");
  
 
     return 0;
