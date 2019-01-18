@@ -9,8 +9,6 @@ module dhtslib.htslib.hts;
 
 import std.bitmanip;
 
-import dhtslib.htslib.bgzf;
-
 extern (C):
 /// @file htslib/hts.h
 /// Format-neutral I/O, indexing, and iterator API functions.
@@ -39,21 +37,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
 
+//#include <stddef.h>
+import core.stdc.stdint;
 /+
-#ifndef HTSLIB_HTS_H
-#define HTSLIB_HTS_H
-
-#include <stddef.h>
-#include <stdint.h>
-
 #include "hts_defs.h"
 #include "hts_log.h"
-
-#ifndef HTS_BGZF_TYPEDEF
-typedef struct BGZF BGZF;
-#define HTS_BGZF_TYPEDEF
-#endif
 +/
+import dhtslib.htslib.bgzf;
+
 struct cram_fd;
 struct hFILE;
 struct hts_tpool;
@@ -643,13 +634,12 @@ int hts_idx_save_as(const hts_idx_t *idx, const char *fn, const char *fnidx, int
 */
 hts_idx_t *hts_idx_load(const(char) *fn, int fmt);
 
-/+
 /// Load a specific index file
 /** @param fn     Input BAM/BCF/etc filename
     @param fnidx  The input index filename
     @return  The index, or NULL if an error occurred.
 */
-hts_idx_t *hts_idx_load2(const char *fn, const char *fnidx);
+hts_idx_t *hts_idx_load2(const(char) *fn, const(char) *fnidx);
 
 
 /// Get extra index meta-data
@@ -679,11 +669,11 @@ uint8_t *hts_idx_get_meta(hts_idx_t *idx, uint32_t *l_meta);
 */
 int hts_idx_set_meta(hts_idx_t *idx, uint32_t l_meta, uint8_t *meta, int is_copy);
 
-    int hts_idx_get_stat(const hts_idx_t* idx, int tid, uint64_t* mapped, uint64_t* unmapped);
-    uint64_t hts_idx_get_n_no_coor(const hts_idx_t* idx);
+    int hts_idx_get_stat(const(hts_idx_t)* idx, int tid, uint64_t* mapped, uint64_t* unmapped);
+    uint64_t hts_idx_get_n_no_coor(const(hts_idx_t)* idx);
 
 
-#define HTS_PARSE_THOUSANDS_SEP 1  ///< Ignore ',' separators within numbers
+enum HTS_PARSE_THOUSANDS_SEP = 1;  ///< Ignore ',' separators within numbers
 
 /// Parse a numeric string
 /** The number may be expressed in scientific notation, and optionally may
@@ -697,7 +687,7 @@ int hts_idx_set_meta(hts_idx_t *idx, uint32_t l_meta, uint8_t *meta, int is_copy
     When @a strend is NULL, a warning will be printed (if hts_verbose is HTS_LOG_WARNING
     or more) if there are any trailing characters after the number.
 */
-long long hts_parse_decimal(const char *str, char **strend, int flags);
+long hts_parse_decimal(const(char) *str, char **strend, int flags);
 
 /// Parse a "CHR:START-END"-style region string
 /** @param str  String to be parsed
@@ -706,8 +696,8 @@ long long hts_parse_decimal(const char *str, char **strend, int flags);
     @return  Pointer to the colon or '\0' after the reference sequence name,
              or NULL if @a str could not be parsed.
 */
-const char *hts_parse_reg(const char *str, int *beg, int *end);
-+/
+const(char) *hts_parse_reg(const(char) *str, int *beg, int *end);
+
     hts_itr_t *hts_itr_query(const(hts_idx_t) *idx, int tid, int beg, int end, hts_readrec_func *readrec);
     void hts_itr_destroy(hts_itr_t *iter);
 
