@@ -735,22 +735,22 @@ int hts_itr_multi_next(htsFile *fd, hts_itr_multi_t *iter, void *r);
 void hts_reglist_free(hts_reglist_t *reglist, int count);
 void hts_itr_multi_destroy(hts_itr_multi_t *iter);
 
-/+
+
     /**
      * hts_file_type() - Convenience function to determine file type
      * DEPRECATED:  This function has been replaced by hts_detect_format().
      * It and these FT_* macros will be removed in a future HTSlib release.
      */
-    #define FT_UNKN   0
-    #define FT_GZ     1
-    #define FT_VCF    2
-    #define FT_VCF_GZ (FT_GZ|FT_VCF)
-    #define FT_BCF    (1<<2)
-    #define FT_BCF_GZ (FT_GZ|FT_BCF)
-    #define FT_STDIN  (1<<3)
-    int hts_file_type(const char *fname);
+    enum FT_UNKN   = 0;
+    enum FT_GZ     = 1;
+    enum FT_VCF    = 2;
+    enum FT_VCF_GZ = (FT_GZ|FT_VCF);
+    enum FT_BCF    = (1<<2);
+    enum FT_BCF_GZ = (FT_GZ|FT_BCF);
+    enum FT_STDIN  = (1<<3);
+    deprecated("This function has been replaced by hts_detect_format(). It and these FT_* macros will be removed in a future HTSlib release.") int hts_file_type(const(char) *fname);
 
-
+/+
 /***************************
  * Revised MAQ error model *
  ***************************/
