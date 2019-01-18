@@ -60,7 +60,8 @@ DEALINGS IN THE SOFTWARE.  */
 
 import core.stdc.stdint;
 import dhtslib.htslib.hts;
-struct BGZF;
+import dhtslib.htslib.bgzf:BGZF;
+//struct BGZF;
 struct hts_idx_t;
 import dhtslib.htslib.kstring: __kstring_t, kstring_t;
 
