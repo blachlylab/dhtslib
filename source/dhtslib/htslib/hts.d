@@ -278,7 +278,7 @@ struct hts_opt {
  * Returns 0 on success;
  *        -1 on failure.
  */
-int hts_opt_add(hts_opt **opts, const char *c_arg);
+int hts_opt_add(hts_opt **opts, const(char) *c_arg);
 
 /*
  * Applies an hts_opt option list to a given htsFile.
@@ -301,7 +301,7 @@ void hts_opt_free(hts_opt *opts);
  * Returns 0 on success
  *        -1 on failure.
  */
-int hts_parse_format(htsFormat *opt, const char *str);
+int hts_parse_format(htsFormat *opt, const(char) *str);
 
 /*
  * Tokenise options as (key(=value)?,)*(key(=value)?)?
@@ -314,7 +314,7 @@ int hts_parse_format(htsFormat *opt, const char *str);
  * Returns 0 on success
  *        -1 on failure.
  */
-int hts_parse_opt_list(htsFormat *opt, const char *str);
+int hts_parse_opt_list(htsFormat *opt, const(char) *str);
 
 /*! @abstract Table for converting a nucleotide character to 4-bit encoding.
 The input character may be either an IUPAC ambiguity code, '=' for 0, or
@@ -398,14 +398,14 @@ htsFile *hts_open(const(char) *fn, const(char) *mode);
       like pointers to the reference or information on compression levels,
       block sizes, etc.
 */
-htsFile *hts_open_format(const char *fn, const char *mode, const htsFormat *fmt);
+htsFile *hts_open_format(const(char) *fn, const(char) *mode, const htsFormat *fmt);
 
 /*!
   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file
   @param fn       The already-open file handle
   @param mode     Open mode, as per hts_open()
 */
-htsFile *hts_hopen(hFILE *fp, const char *fn, const char *mode);
+htsFile *hts_hopen(hFILE *fp, const(char) *fn, const(char) *mode);
 
 /*!
   @abstract  Close a file handle, flushing buffered data for output streams
@@ -438,7 +438,7 @@ const(char *) hts_format_file_extension(const htsFormat *format);
 int hts_set_opt(htsFile *fp, hts_fmt_option opt, ...);
 
 int hts_getline(htsFile *fp, int delimiter, kstring_t *str);
-char **hts_readlines(const char *fn, int *_n);
+char **hts_readlines(const(char) *fn, int *_n);
 /*!
     @abstract       Parse comma-separated list or read list from a file
     @param list     File name or comma-separated list
@@ -447,7 +447,7 @@ char **hts_readlines(const char *fn, int *_n);
     @return         NULL on failure or pointer to newly allocated array of
                     strings
 */
-char **hts_readlist(const char *fn, int is_file, int *_n);
+char **hts_readlist(const(char) *fn, int is_file, int *_n);
 
 /*!
   @abstract  Create extra threads to aid compress/decompression for this file
@@ -540,7 +540,7 @@ struct hts_pair64_max_t {
 };
 
 struct hts_reglist_t {
-    const char *reg;
+    const(char) *reg;
     int tid;
     hts_pair32_t *intervals;
     uint count;
