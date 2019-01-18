@@ -150,6 +150,22 @@ struct SAMFile {
         this.idx=sam_index_load(this.fp,this.fn);
         debug(dhtslib_debug) { writeln("SAM index",this.idx); }
     }
+    this(string fn,int cpus)
+    {
+        import std.parallelism: totalCPUs;
+
+        debug(dhtslib_debug) { writeln("SAMFile ctor"); }
+
+        // open file
+        this.fn = toStringz(fn);
+        this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
+        hts_set_threads(this.fp, cpus);
+
+        // read header
+        this.header = sam_hdr_read(this.fp);
+        this.idx=sam_index_load(this.fp,this.fn);
+        debug(dhtslib_debug) { writeln("SAM index",this.idx); }
+    }
     ~this()
     {
         debug(dhtslib_debug) { writeln("SAMFile dtor" ); }
