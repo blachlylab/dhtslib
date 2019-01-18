@@ -15,6 +15,12 @@ import dhtslib.htslib.hts_log;
 import dhtslib.htslib.kstring;
 import dhtslib.htslib.sam;
 
+void test_log(string ctx, string msg)
+{
+    import std.stdio;
+    stderr.writeln(ctx, msg);
+}
+
 /**
 Encapsulates a SAM/BAM/CRAM record,
 using the bam1_t type for memory efficiency,
@@ -27,7 +33,8 @@ class SAMRecord {
     ///
     this()
     {
-        debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "ctor()"); /// This line triggers memory error when __FUNCTION__, but not when "Other string"
+        //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "ctor()"); /// This line triggers memory error when __FUNCTION__, but not when "Other string"
+        test_log(__FUNCTION__, "ctor()");   /// This line will also trigger the memory error when __FUNCTION__, but not other strings
         //writeln(__FUNCTION__);    // this will not trigger the memory error
         this.b = bam_init1();
         //assert(0);                // This will elide(?) the memory error

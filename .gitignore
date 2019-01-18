@@ -9,6 +9,7 @@ tabix_gffreader
 bgzfreader
 samreader
 vcfwriter
+bug_minimal
 
 # test output
 output.vcf

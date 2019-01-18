@@ -25,6 +25,14 @@ int main()
     writefln("Target names array: %s", sf.target_names);
     writefln("Lookup by name: \"chr5\" is the %d'th target (0-indexed).", sf.target_id("chr5"));
 
+    writeln("Now testing default class constructor");
+    for(int j; j<100_000; j++)
+    {
+        auto x = new SAMRecord();
+    }
+
+    writeln("Now testing range");
+
     int i;
     auto x = sf.all_records;
     foreach(r; x) {
