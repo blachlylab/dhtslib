@@ -363,13 +363,18 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
     ////#define bam_itr_querys(idx, hdr, region) sam_itr_querys(idx, hdr, region)
     alias bam_itr_querys = sam_itr_querys;
     ////#define bam_itr_next(htsfp, itr, r) hts_itr_next((htsfp)->fp.bgzf, (itr), (r), 0)
-    pragma(inline, true) auto bam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, 0); }
+    pragma(inline, true) auto bam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, null); }
     }
 
 // Load/build .csi or .bai BAM index file.  Does not work with CRAM.
 // It is recommended to use the sam_index_* functions below instead.
+deprecated("Load/build .csi or .bai BAM index file.  Does not work with CRAM. It is recommended to use the sam_index_* functions below instead.")
+{
 ////#define bam_index_load(fn) hts_idx_load((fn), HTS_FMT_BAI)
+pragma(inline, true) auto bam_index_load(const(char) *fn) { return hts_idx_load(fn, HTS_FMT_BAI); }
 ////#define bam_index_build(fn, min_shift) (sam_index_build((fn), (min_shift)))
+alias bam_index_build = sam_index_build;
+}
 
 /// Load a BAM (.csi or .bai) or CRAM (.crai) index file
 /** @param fp  File handle of the data file whose index is being opened
@@ -412,9 +417,10 @@ int sam_index_build3(const(char) *fn, const(char) *fnidx, int min_shift, int nth
     hts_itr_multi_t *sam_itr_regions(const hts_idx_t *idx, bam_hdr_t *hdr, hts_reglist_t *reglist, uint regcount);
 
     ////#define sam_itr_next(htsfp, itr, r) hts_itr_next((htsfp)->fp.bgzf, (itr), (r), (htsfp))
-    auto sam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, htsfp); }
+    pragma(inline, true) auto sam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, htsfp); }
     ////#define sam_itr_multi_next(htsfp, itr, r) hts_itr_multi_next((htsfp), (itr), (r))
     //auto sam_itr_multi_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_multi_next(htsfp, itr, r); }
+    alias sam_itr_multi_next = hts_itr_multi_next;
 
     /***************
      *** SAM I/O ***
