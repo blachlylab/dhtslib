@@ -27,8 +27,11 @@ class SAMRecord {
     ///
     this()
     {
-        debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "ctor()");
+        debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "ctor()"); /// This line triggers memory error when __FUNCTION__, but not when "Other string"
+        //writeln(__FUNCTION__);    // this will not trigger the memory error
         this.b = bam_init1();
+        //assert(0);                // This will elide(?) the memory error
+        //assert(1 == 2);           // This will elide(?) the memory error
     }
     ///
     this(bam1_t *b)
@@ -38,6 +41,7 @@ class SAMRecord {
     }
     ~this()
     {
+        writeln("Record dtor");
         debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
         //bam_destroy1(this.b); // we don't own it!
     }
@@ -213,29 +217,16 @@ struct SAMFile {
         private bam_hdr_t   *header;    // belongs to parent; shared
         private bam1_t      *b;
 
-        /// Ref counting to prevent multiple bam_destroy1() calls
-        private int rc = 1;
-        // postblit ref counting
-        this(this)
-        {
-            this.rc++;
-            debug(dhtslib_debug) hts_log_debug(__FUNCTION__, format("postblit ctor, rc=%d", this.rc));
-        }
-
         ~this()
         {
-            debug(dhtslib_debug) hts_log_debug(__FUNCTION__, format("dtor, rc=%d", rc));
-            /+
-            if(!--rc) {
-                debug(dhtslib_debug) hts_log_debug(__FUNCTION__, format("freeing bam1_t (rc=%d)", rc));
-                bam_destroy1(this.b);
-            }
-+/
+            debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
         }
 
         /// InputRange
         @property bool empty()
         {
+            hts_log_debug(__FUNCTION__, "Top of function");
+
             //    int sam_read1(samFile *fp, bam_hdr_t *h, bam1_t *b);
             immutable success = sam_read1(this.fp, this.header, this.b);
             if (success >= 0) return false;
@@ -257,7 +248,7 @@ struct SAMFile {
         /// ditto
         SAMRecord front()
         {
-            return new SAMRecord(this.b);
+            return new SAMRecord(bam_dup1(this.b));
         }
 
     }
