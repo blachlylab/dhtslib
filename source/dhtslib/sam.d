@@ -156,8 +156,8 @@ struct SAMFile {
 
         bam_hdr_destroy(this.header);
         //TODO:hts_close segfaults
-        //const auto ret = hts_close(fp);
-        //if (ret < 0) writefln("There was an error closing %s", fromStringz(this.fn));
+        const auto ret = hts_close(fp);
+        if (ret < 0) writefln("There was an error closing %s", fromStringz(this.fn));
     }
 
     /// number of reference sequences; from bam_hdr_t
@@ -203,14 +203,14 @@ struct SAMFile {
     /// Query by string chr:start-end
     auto query(string q)
     {
-        return RecordRange(this.fp,this.fn,this.idx,this.header,q);
+        auto itr=sam_itr_querys(this.idx,this.header,toStringz(q));
+        return RecordRange(this.fp,this.fn,itr);
     }
     /// Query by contig id, start, end
     auto query(int tid, int start, int end)
     {
-        return RecordRange(this.fp,this.fn,this.idx,tid,start,end);
-         // *sam_itr_queryi(const hts_idx_t *idx, int tid, int beg, int end);
-        //hts_itr_t* qiter = sam_itr_queryi(this.idx, tid, beg, end);
+        auto itr=sam_itr_queryi(this.idx,tid,start,end);
+        return RecordRange(this.fp,this.fn,itr);
     }
 
     AllRecordsRange all_records()
@@ -262,42 +262,47 @@ struct SAMFile {
     }
     struct RecordRange
     {
+        import dhtslib.htslib.bgzf:bgzf_open,bgzf_close,BGZF;
         htsFile * fp;
         hts_itr_t * itr;
         bam1_t * b;
+        BGZF * bg;
         int r;
         immutable(char)* q;
-        this(htsFile * fp,immutable(char)* fn, hts_idx_t* idx, int tid, int start, int end){
-            this.itr=sam_itr_queryi(idx,tid,start,end);
-            import dhtslib.htslib.bgzf:bgzf_open;
+        this(htsFile * fp,immutable(char)* fn, hts_itr_t * itr)
+        {
+            this.itr=itr;
             ////For whatever reason hts_open doesn't initialize the BGZF pointer
             ////in the the htsFile so we do it ourselves
             //TODO: this shouldn't be required
-            fp.fp.bgzf=bgzf_open(fn,cast(immutable(char)*)"r");
+            ////For now we store the BGZF pointer with this struct as storing it
+            ////in the htsFile fp.bgzf causes seqfaults when calling hts_close
+            this.bg=bgzf_open(fn,cast(immutable(char)*)"r");
+
             this.fp=fp;
             b=bam_init1();
             debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
             popFront();
         }
-        this(htsFile * fp,immutable(char)* fn, hts_idx_t* idx, bam_hdr_t* header, string query){
-            this.itr=sam_itr_querys(idx,header,toStringz(query));
-            import dhtslib.htslib.bgzf:bgzf_open;
-            ////For whatever reason hts_open doesn't initialize the BGZF pointer
-            ////in the the htsFile so we do it ourselves
-            //TODO: this shouldn't be required
-            fp.fp.bgzf=bgzf_open(fn,cast(immutable(char)*)"r");
-            this.fp=fp;
-            b=bam_init1();
-            debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
-            popFront();
+        ~this()
+        {
+            ////Using bgzf_close segfaults with the complaint of freeing an invalid pointer
+            ////Related to above issue with hts_open not also creating the BGZF pointer
+            //if(fp.fp.bgzf!=null){
+            //    bgzf_close(fp);
+            //}
         }
-        SAMRecord front(){
+        SAMRecord front()
+        {
             return new SAMRecord(bam_dup1(b));
         }
-        void popFront(){
-            r=sam_itr_next(fp,itr,b);
+        void popFront()
+        {
+            r=hts_itr_next(bg,itr,b,fp);
+            //r=sam_itr_next(fp,itr,b);
         }
-        @property bool empty(){
+        @property bool empty()
+        {
             return (r <=0 && itr.finished) ? true:false;
         }
     }
