@@ -700,7 +700,7 @@ long hts_parse_decimal(const(char) *str, char **strend, int flags);
 */
 const(char) *hts_parse_reg(const(char) *str, int *beg, int *end);
 
-    hts_itr_t *hts_itr_query(const(hts_idx_t) *idx, int tid, int beg, int end, hts_readrec_func *readrec);
+    hts_itr_t *hts_itr_query(const(hts_idx_t) *idx, int tid, int beg, int end, hts_readrec_func readrec);
     void hts_itr_destroy(hts_itr_t *iter);
 
     //typedef int (*hts_name2id_f)(void*, const char*);
@@ -708,9 +708,9 @@ const(char) *hts_parse_reg(const(char) *str, int *beg, int *end);
     //typedef const char *(*hts_id2name_f)(void*, int);
     alias hts_id2name_f = const(char) * function(void*, int);
     //typedef hts_itr_t *hts_itr_query_func(const hts_idx_t *idx, int tid, int beg, int end, hts_readrec_func *readrec);
-    alias hts_itr_query_func = hts_itr_t * function(const(hts_idx_t) *idx, int tid, int beg, int end, hts_readrec_func *readrec);
+    alias hts_itr_query_func = hts_itr_t * function(const(hts_idx_t) *idx, int tid, int beg, int end, hts_readrec_func readrec);
 
-    hts_itr_t *hts_itr_querys(const(hts_idx_t) *idx, const(char) *reg, hts_name2id_f getid, void *hdr, hts_itr_query_func *itr_query, hts_readrec_func *readrec);
+    hts_itr_t *hts_itr_querys(const(hts_idx_t) *idx, const(char) *reg, hts_name2id_f getid, void *hdr, hts_itr_query_func itr_query, hts_readrec_func readrec);
     int hts_itr_next(BGZF *fp, hts_itr_t *iter, void *r, void *data);
     const(char **) hts_idx_seqnames(const(hts_idx_t) *idx, int *n, hts_id2name_f getid, void *hdr); // free only the array, not the values
 
