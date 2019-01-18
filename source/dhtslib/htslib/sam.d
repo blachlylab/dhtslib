@@ -317,17 +317,17 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
 
     bam_hdr_t *bam_hdr_init();
     bam_hdr_t *bam_hdr_read(BGZF *fp);
-    int bam_hdr_write(BGZF *fp, const bam_hdr_t *h);
+    int bam_hdr_write(BGZF *fp, const(bam_hdr_t) *h);
     void bam_hdr_destroy(bam_hdr_t *h);
     int bam_name2id(bam_hdr_t *h, const(char) *_ref);
-    bam_hdr_t* bam_hdr_dup(const bam_hdr_t *h0);
+    bam_hdr_t* bam_hdr_dup(const(bam_hdr_t) *h0);
 
     bam1_t *bam_init1();
     void bam_destroy1(bam1_t *b);
     int bam_read1(BGZF *fp, bam1_t *b);
-    int bam_write1(BGZF *fp, const bam1_t *b);
-    bam1_t *bam_copy1(bam1_t *bdst, const bam1_t *bsrc);
-    bam1_t *bam_dup1(const bam1_t *bsrc);
+    int bam_write1(BGZF *fp, const(bam1_t) *b);
+    bam1_t *bam_copy1(bam1_t *bdst, const(bam1_t) *bsrc);
+    bam1_t *bam_dup1(const(bam1_t) *bsrc);
 
     int bam_cigar2qlen(int n_cigar, const uint32_t *cigar);
     int bam_cigar2rlen(int n_cigar, const uint32_t *cigar);
@@ -343,7 +343,7 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
       For an unmapped read (either according to its flags or if it has no cigar
       string), we return b->core.pos + 1 by convention.
     */
-    int32_t bam_endpos(const bam1_t *b);
+    int32_t bam_endpos(const(bam1_t) *b);
 
     int   bam_str2flag(const(char) *str);    /** returns negative value on error */
     char *bam_flag2str(int flag);   /** The string must be freed by the user */
@@ -412,9 +412,9 @@ int sam_index_build3(const(char) *fn, const(char) *fnidx, int min_shift, int nth
 
     ////#define sam_itr_destroy(iter) hts_itr_destroy(iter)
     alias sam_itr_destroy = hts_itr_destroy;
-    hts_itr_t *sam_itr_queryi(const hts_idx_t *idx, int tid, int beg, int end);
-    hts_itr_t *sam_itr_querys(const hts_idx_t *idx, bam_hdr_t *hdr, const(char) *region);
-    hts_itr_multi_t *sam_itr_regions(const hts_idx_t *idx, bam_hdr_t *hdr, hts_reglist_t *reglist, uint regcount);
+    hts_itr_t *sam_itr_queryi(const(hts_idx_t) *idx, int tid, int beg, int end);
+    hts_itr_t *sam_itr_querys(const(hts_idx_t) *idx, bam_hdr_t *hdr, const(char) *region);
+    hts_itr_multi_t *sam_itr_regions(const(hts_idx_t) *idx, bam_hdr_t *hdr, hts_reglist_t *reglist, uint regcount);
 
     ////#define sam_itr_next(htsfp, itr, r) hts_itr_next((htsfp)->fp.bgzf, (itr), (r), (htsfp))
     pragma(inline, true) auto sam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, htsfp); }
@@ -442,17 +442,17 @@ int sam_index_build3(const(char) *fn, const(char) *fnidx, int min_shift, int nth
     alias htsFile samFile;
     bam_hdr_t *sam_hdr_parse(int l_text, const(char) *text);
     bam_hdr_t *sam_hdr_read(samFile *fp);
-    int sam_hdr_write(samFile *fp, const bam_hdr_t *h);
+    int sam_hdr_write(samFile *fp, const(bam_hdr_t) *h);
     int sam_hdr_change_HD(bam_hdr_t *h, const(char) *key, const(char) *val);
 
     int sam_parse1(kstring_t *s, bam_hdr_t *h, bam1_t *b);
-    int sam_format1(const bam_hdr_t *h, const bam1_t *b, kstring_t *str);
+    int sam_format1(const(bam_hdr_t) *h, const(bam1_t) *b, kstring_t *str);
 
     /*!
      *  @return >= 0 on successfully reading a new record, -1 on end of stream, < -1 on error
      **/
     int sam_read1(samFile *fp, bam_hdr_t *h, bam1_t *b);
-    int sam_write1(samFile *fp, const bam_hdr_t *h, const bam1_t *b);
+    int sam_write1(samFile *fp, const(bam_hdr_t) *h, const(bam1_t) *b);
 
     /*************************************
      *** Manipulating auxiliary fields ***
@@ -467,7 +467,7 @@ int sam_index_build3(const(char) *fn, const(char) *fnidx, int min_shift, int nth
     invalid type, or the last record is incomplete) then errno is set to
     EINVAL and NULL is returned.
  */
-ubyte *bam_aux_get(const bam1_t *b, const ref char[2] tag);
+uint8_t *bam_aux_get(const(bam1_t) *b, const ref char[2] tag);
 
 /// Get an integer aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get()
@@ -475,7 +475,7 @@ ubyte *bam_aux_get(const bam1_t *b, const ref char[2] tag);
     If the tag is not an integer type, errno is set to EINVAL.  This function
     will not return the value of floating-point tags.
 */
-ulong bam_aux2i(const uint8_t *s);
+int64_t bam_aux2i(const uint8_t *s);
 
 /// Get an integer aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get()
@@ -723,7 +723,7 @@ alias bam_mplp_t = __bam_mplp_t*;
      */
     bam_plp_t bam_plp_init(bam_plp_auto_f func, void *data);
     void bam_plp_destroy(bam_plp_t iter);
-    int bam_plp_push(bam_plp_t iter, const bam1_t *b);
+    int bam_plp_push(bam_plp_t iter, const(bam1_t) *b);
     const(bam_pileup1_t)*bam_plp_next(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp);
     const(bam_pileup1_t)*bam_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp);
     void bam_plp_set_maxcnt(bam_plp_t iter, int maxcnt);
@@ -738,9 +738,9 @@ alias bam_mplp_t = __bam_mplp_t*;
      *              will also be present in each bam_pileup1_t created.
      */
     void bam_plp_constructor(bam_plp_t plp,
-                             int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
+                             int function(void *data, const(bam1_t) *b, bam_pileup_cd *cd) func);
     void bam_plp_destructor(bam_plp_t plp,
-                            int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
+                            int function(void *data, const(bam1_t) *b, bam_pileup_cd *cd) func);
 
     bam_mplp_t bam_mplp_init(int n, bam_plp_auto_f func, void **data);
     /**
@@ -757,9 +757,9 @@ alias bam_mplp_t = __bam_mplp_t*;
     int bam_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp);
     void bam_mplp_reset(bam_mplp_t iter);
     void bam_mplp_constructor(bam_mplp_t iter,
-                              int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
+                              int function(void *data, const(bam1_t) *b, bam_pileup_cd *cd) func);
     void bam_mplp_destructor(bam_mplp_t iter,
-                             int function(void *data, const bam1_t *b, bam_pileup_cd *cd) func);
+                             int function(void *data, const(bam1_t) *b, bam_pileup_cd *cd) func);
 
 
 /***********************************
