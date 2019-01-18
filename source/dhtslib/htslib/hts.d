@@ -353,7 +353,7 @@ int hts_detect_format(hFILE *fp, htsFormat *fmt);
   @param fmt   Format structure holding type, version, compression, etc.
   @return      Description string, to be freed by the caller after use.
 */
-char *hts_format_description(const htsFormat *format);
+char *hts_format_description(const(htsFormat) *format);
 
 /*!
   @abstract       Open a SAM/BAM/CRAM/VCF/BCF/etc file
@@ -398,7 +398,7 @@ htsFile *hts_open(const(char) *fn, const(char) *mode);
       like pointers to the reference or information on compression levels,
       block sizes, etc.
 */
-htsFile *hts_open_format(const(char) *fn, const(char) *mode, const htsFormat *fmt);
+htsFile *hts_open_format(const(char) *fn, const(char) *mode, const(htsFormat) *fmt);
 
 /*!
   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file
@@ -426,7 +426,7 @@ const(htsFormat *) hts_get_format(htsFile *fp);
   @ param format  Format structure containing the file type.
   @ return        A string ("sam", "bam", etc) or "?" for unknown formats.
  */
-const(char *) hts_format_file_extension(const htsFormat *format);
+const(char *) hts_format_file_extension(const(htsFormat) *format);
 
 /*!
   @abstract  Sets a specified CRAM option on the open file handle.
@@ -599,9 +599,11 @@ struct hts_itr_multi_t {
     hts_tell_func *tell;
 };
 
-/+
-    #define hts_bin_first(l) (((1<<(((l)<<1) + (l))) - 1) / 7)
-    #define hts_bin_parent(l) (((l) - 1) >> 3)
+    pragma(inline, true)
+    {
+        auto hts_bin_first(T)(T l) { return (((1<<(((l)<<1) + (l))) - 1) / 7); }    //     #define hts_bin_first(l) (((1<<(((l)<<1) + (l))) - 1) / 7)
+        auto hts_bin_parent(T)(T l){ return (((l) - 1) >> 3); }                     //     #define hts_bin_parent(l) (((l) - 1) >> 3)
+    }
 
     hts_idx_t *hts_idx_init(int n, int fmt, uint64_t offset0, int min_shift, int n_lvls);
     void hts_idx_destroy(hts_idx_t *idx);
@@ -614,7 +616,7 @@ struct hts_itr_multi_t {
     @param fmt  One of the HTS_FMT_* index formats
     @return  0 if successful, or negative if an error occurred.
 */
-int hts_idx_save(const hts_idx_t *idx, const char *fn, int fmt) HTS_RESULT_USED;
+int hts_idx_save(const(hts_idx_t) *idx, const(char) *fn, int fmt);
 
 /// Save an index to a specific file
 /** @param idx    Index to be written
@@ -623,8 +625,8 @@ int hts_idx_save(const hts_idx_t *idx, const char *fn, int fmt) HTS_RESULT_USED;
     @param fmt    One of the HTS_FMT_* index formats
     @return  0 if successful, or negative if an error occurred.
 */
-int hts_idx_save_as(const hts_idx_t *idx, const char *fn, const char *fnidx, int fmt) HTS_RESULT_USED;
-+/
+int hts_idx_save_as(const(hts_idx_t) *idx, const(char) *fn, const(char) *fnidx, int fmt);
+
 
 /// Load an index file
 /** @param fn   BAM/BCF/etc filename, to which .bai/.csi/etc will be added or
