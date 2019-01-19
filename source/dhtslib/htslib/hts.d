@@ -497,7 +497,6 @@ int hts_set_fai_filename(htsFile *fp, const(char) *fn_aux);
 */
 int hts_check_EOF(htsFile *fp);
 
-/+
 /************
  * Indexing *
  ************/
@@ -512,11 +511,10 @@ producing iterators operating as follows:
 When one of these special tid values is used, beg and end are ignored.
 When REST or NONE is used, idx is also ignored and may be NULL.
 */
-#define HTS_IDX_NOCOOR (-2)
-#define HTS_IDX_START  (-3)
-#define HTS_IDX_REST   (-4)
-#define HTS_IDX_NONE   (-5)
-+/
+enum HTS_IDX_NOCOOR = (-2); /// iterates over unmapped reads sorted at the end of the file
+enum HTS_IDX_START  = (-3); /// iterates over the entire file
+enum HTS_IDX_REST   = (-4); /// iterates from the current position to the end of the file
+enum HTS_IDX_NONE   = (-5); /// always returns "no more alignment records"
 
 enum int HTS_FMT_CSI = 0;   /// coordinate-sorted index (new)
 enum int HTS_FMT_BAI = 1;   /// BAM index (old)
