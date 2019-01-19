@@ -151,6 +151,7 @@ struct htsFormat {
     htsFormatCategory category;
     htsExactFormat format;
     struct vers { short major, minor; };
+    vers v;
     htsCompression compression;
     short compression_level;  // currently unused
     void *specific;  // format specific options; see struct hts_opt.
@@ -165,7 +166,6 @@ struct htsFormat {
 //  - fp is used directly in samtools (up to and including current develop)
 //  - line is used directly in bcftools (up to and including current develop)
 struct htsFile {
-    align(1):
     //uint32_t is_bin:1, is_write:1, is_be:1, is_cram:1, is_bgzf:1, dummy:27;
     mixin(bitfields!(
         bool, "is_bin", 1,
@@ -174,7 +174,7 @@ struct htsFile {
         bool, "is_cram", 1,
         bool, "is_bgzf", 1,
         uint, "padding27", 27 ));
-    long lineno;
+    int64_t lineno;
     kstring_t line;
     char *fn;
     char *fn_aux;
@@ -555,7 +555,6 @@ alias hts_seek_func = int function(void *fp, ulong offset, int where);
 alias hts_tell_func = long function(void *fp);
 
 struct hts_itr_t {
-    align(1):
     // uint32_t read_rest:1, finished:1, is_cram:1, dummy:29;
     mixin(bitfields!(
         bool, "read_rest", 1,

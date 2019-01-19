@@ -70,7 +70,6 @@ alias __bgzidx_t bgzidx_t;
 struct bgzf_cache_t;
 
 struct BGZF {
-    align(1):
     // Reserved bits should be written as 0; read as "don't care"
     //unsigned errcode:16, reserved:1, is_write:1, no_eof_block:1, is_be:1;
     //signed compress_level:9;

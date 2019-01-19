@@ -162,7 +162,6 @@ struct variant_t { // @suppress(dscanner.style.phobos_naming_convention)
 
 /// FORMAT field data (§1.4.2 Genotype fields)
 struct bcf_fmt_t { // @suppress(dscanner.style.phobos_naming_convention)
-    align(1):
     int id;         /// id: numeric tag id, the corresponding string is bcf_hdr_t::id[BCF_DT_ID][$id].key
     int n;          /// n: number of values per-sample; size: number of bytes per-sample; type: one of BCF_BT_* types
     int size;       /// size: number of bytes per-sample; type: one of BCF_BT_* types
@@ -178,7 +177,6 @@ struct bcf_fmt_t { // @suppress(dscanner.style.phobos_naming_convention)
 
 /// INFO field data (§1.4.1 Fixed fields, (8) INFO)
 struct bcf_info_t { // @suppress(dscanner.style.phobos_naming_convention)
-    align(1):
     int key;        /// key: numeric tag id, the corresponding string is bcf_hdr_t::id[BCF_DT_ID][$key].key
     int type;       /// type: one of BCF_BT_* types; len: vector length, 1 for scalars
     int len;        /// type: one of BCF_BT_* types; len: vector length, 1 for scalars
@@ -244,7 +242,6 @@ enum int BCF_ERR_TAG_INVALID = 64;  /// BCF error:
     line must be formatted in vcf_format.
  */
 struct bcf1_t { // @suppress(dscanner.style.phobos_naming_convention)
-    align(1):
     int32_t rid;  /// CHROM
     int32_t pos;  /// POS
     int32_t rlen; /// length of REF
