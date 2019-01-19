@@ -43,7 +43,7 @@ class SAMRecord {
     ~this()
     {
         //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
-        //bam_destroy1(this.b); // we don't own it!
+        bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
     }
 
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
