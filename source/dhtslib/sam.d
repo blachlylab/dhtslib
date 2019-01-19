@@ -93,7 +93,7 @@ class SAMRecord {
 
 /**
 Encapsulates a SAM/BAM file.
-Implements InputRange interface using htslib calls to ().
+Implements InputRange interface using htslib calls.
 */
 struct SAMFile {
 
@@ -117,7 +117,7 @@ struct SAMFile {
     /// disallow copying
     @disable this(this);
 
-    ///
+    /// Create a representation of SAM/BAM/CRAM file from given filename
     this(string fn)
     {
         import std.parallelism: totalCPUs;
@@ -130,7 +130,6 @@ struct SAMFile {
 
         if (totalCPUs > 1) {
             // TODO: make optional
-            // TODO hts_log
             hts_log_info(__FUNCTION__, format("%d CPU cores detected; enabling multithreading", totalCPUs));
             //stderr.writefln("dhtslib: %d CPU cores detected; enabling multithreading.", totalCPUs);
             // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
@@ -140,10 +139,12 @@ struct SAMFile {
 
         // read header
         this.header = sam_hdr_read(this.fp);
-        this.idx=sam_index_load(this.fp,this.fn);
-        debug(dhtslib_debug) { writeln("SAM index",this.idx); }
+        this.idx = sam_index_load(this.fp, this.fn);
+        hts_log_debug( __FUNCTION__, format("SAM index: %s", this.idx));
     }
-    this(string fn,int cpus)
+    /// Create a representation of SAM/BAM/CRAM file from given filename
+    /// and optionally add N additional CPU threads for decompression
+    this(string fn, int cpus)
     {
         import std.parallelism: totalCPUs;
 
@@ -152,18 +153,21 @@ struct SAMFile {
         // open file
         this.fn = toStringz(fn);
         this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
+
+        hts_log_info(__FUNCTION__, format("%d extra CPU threads enabled for decompression", cpus));
         hts_set_threads(this.fp, cpus);
 
         // read header
         this.header = sam_hdr_read(this.fp);
-        this.idx=sam_index_load(this.fp,this.fn);
-        debug(dhtslib_debug) { writeln("SAM index",this.idx); }
+        this.idx = sam_index_load(this.fp, this.fn);
+        hts_log_debug( __FUNCTION__, format("SAM index: %s", this.idx));
     }
     ~this()
     {
         debug(dhtslib_debug) { writeln("SAMFile dtor" ); }
 
         bam_hdr_destroy(this.header);
+
         //TODO:hts_close segfaults
         const auto ret = hts_close(fp);
         if (ret < 0) writefln("There was an error closing %s", fromStringz(this.fn));
@@ -212,16 +216,17 @@ struct SAMFile {
     /// Query by string chr:start-end
     auto query(string q)
     {
-        auto itr=sam_itr_querys(this.idx,this.header,toStringz(q));
-        return RecordRange(this.fp,this.fn,itr);
+        auto itr = sam_itr_querys(this.idx, this.header, toStringz(q));
+        return RecordRange(this.fp, this.fn, itr);
     }
     /// Query by contig id, start, end
     auto query(int tid, int start, int end)
     {
-        auto itr=sam_itr_queryi(this.idx,tid,start,end);
-        return RecordRange(this.fp,this.fn,itr);
+        auto itr = sam_itr_queryi(this.idx, tid, start, end);
+        return RecordRange(this.fp, this.fn, itr);
     }
 
+    /// Return an InputRange representing all recods in the SAM/BAM/CRAM
     AllRecordsRange all_records()
     {
         return AllRecordsRange(this.fp, this.header, bam_init1());
@@ -236,10 +241,10 @@ struct SAMFile {
 
         ~this()
         {
-            debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
+            //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
         }
 
-        /// InputRange
+        /// InputRange interface
         @property bool empty()
         {
             //    int sam_read1(samFile *fp, bam_hdr_t *h, bam1_t *b);
@@ -267,28 +272,35 @@ struct SAMFile {
         }
 
     }
+
+    /// Iterate over records falling within a queried region (TODO: itr_multi_query)
     struct RecordRange
     {
-        import dhtslib.htslib.bgzf:bgzf_open,bgzf_close,BGZF;
-        htsFile * fp;
-        hts_itr_t * itr;
-        bam1_t * b;
-        BGZF * bg;
-        int r;
-        immutable(char)* q;
-        this(htsFile * fp,immutable(char)* fn, hts_itr_t * itr)
+        import dhtslib.htslib.bgzf: bgzf_open, bgzf_close, BGZF;
+
+        private htsFile     *fp;
+        private hts_itr_t   *itr;
+        private bam1_t      *b;
+
+        BGZF *bg;
+
+        private int r;
+
+        ///
+        this(htsFile * fp, immutable(char)* fn, hts_itr_t *itr)
         {
-            this.itr=itr;
+            this.itr = itr;
             ////For whatever reason hts_open doesn't initialize the BGZF pointer
             ////in the the htsFile so we do it ourselves
             //TODO: this shouldn't be required
             ////For now we store the BGZF pointer with this struct as storing it
             ////in the htsFile fp.bgzf causes seqfaults when calling hts_close
-            this.bg=bgzf_open(fn,cast(immutable(char)*)"r");
+            this.bg = bgzf_open(fn, cast(immutable(char)*)"r");
 
-            this.fp=fp;
-            b=bam_init1();
-            debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
+            this.fp = fp;
+            b = bam_init1();
+            //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
+            hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int)itr == 0));
             popFront();
         }
         ~this()
@@ -299,18 +311,22 @@ struct SAMFile {
             //    bgzf_close(fp);
             //}
         }
+
+        /// InputRange interface
+        @property bool empty()
+        {
+            return (r <= 0 && itr.finished) ? true : false;
+        }
+        /// ditto
+        void popFront()
+        {
+            r = hts_itr_next(bg, itr, b, fp);
+            //r=sam_itr_next(fp,itr,b);
+        }
+        /// ditto
         SAMRecord front()
         {
             return new SAMRecord(bam_dup1(b));
-        }
-        void popFront()
-        {
-            r=hts_itr_next(bg,itr,b,fp);
-            //r=sam_itr_next(fp,itr,b);
-        }
-        @property bool empty()
-        {
-            return (r <=0 && itr.finished) ? true:false;
         }
     }
 
