@@ -1,5 +1,6 @@
 module dhtslib.htslib.thread_pool;
 
+extern(C):
 // @file htslib/thread_pool.h
 // Thread pool for multi-threading applications.
 /*
