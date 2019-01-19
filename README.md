@@ -48,6 +48,7 @@ Currently implemented fully or partially:
 * regidx
 * sam
 * tbx
+* thread_pool (untested)
 * vcf
 
 Missing (so far):
@@ -56,7 +57,6 @@ Missing (so far):
 * hfile
 * kbitset, kfunc, khash, klist, knetfile, kseq, ksort (mostly used internally anyway)
 * synced_bcf_reader
-* thread_pool
 * vcf_sweep
 * vcfutils
 
