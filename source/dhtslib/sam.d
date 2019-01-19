@@ -120,8 +120,15 @@ struct SAMFile {
     /// disallow copying
     @disable this(this);
 
-    /// Create a representation of SAM/BAM/CRAM file from given filename
-    this(string fn)
+    /** Create a representation of SAM/BAM/CRAM file from given filename
+
+        fn:             string filename (complete path passed to htslib; may support S3:// https:// etc.)
+        extra_threads:  extra threads for compression/decompression
+            -1 use all available cores
+            0  use no extra threads
+            >1 add indicated number of threads (to a default of 1)
+    */
+    this(string fn, int extra_threads = -1)
     {
         import std.parallelism: totalCPUs;
 
@@ -132,35 +139,20 @@ struct SAMFile {
         this.fn = toStringz(fn);
         this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
 
-        if (totalCPUs > 1) {
-            // TODO: make optional
+        if (extra_threads == -1 && totalCPUs > 1) {
             hts_log_info(__FUNCTION__, format("%d CPU cores detected; enabling multithreading", totalCPUs));
-            //stderr.writefln("dhtslib: %d CPU cores detected; enabling multithreading.", totalCPUs);
             // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
             // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
             hts_set_threads(this.fp, totalCPUs );
+        } else if (extra_threads > 0 ) {
+            if ((extra_threads+1) > totalCPUs)
+                hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
+            hts_set_threads(this.fp, extra_threads);
+        } else if (extra_threads == 0) {
+            hts_log_debug(__FUNCTION__, "Zero extra threads requested");
+        } else {
+            hts_log_warning(__FUNCTION__, "Invalid negative number of extra threads requested");
         }
-
-        // read header
-        this.header = sam_hdr_read(this.fp);
-        this.idx = sam_index_load(this.fp, this.fn);
-        hts_log_debug( __FUNCTION__, format("SAM index: %s", this.idx));
-    }
-    /// Create a representation of SAM/BAM/CRAM file from given filename
-    /// and optionally add N additional CPU threads for decompression
-    this(string fn, int cpus)
-    {
-        import std.parallelism: totalCPUs;
-
-        debug(dhtslib_debug) { writeln("SAMFile ctor"); }
-
-        // open file
-        this.filename = fn;
-        this.fn = toStringz(fn);
-        this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
-
-        hts_log_info(__FUNCTION__, format("%d extra CPU threads enabled for decompression", cpus));
-        hts_set_threads(this.fp, cpus);
 
         // read header
         this.header = sam_hdr_read(this.fp);
