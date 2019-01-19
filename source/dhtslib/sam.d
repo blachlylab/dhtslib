@@ -6,7 +6,7 @@ import std.parallelism: totalCPUs;
 import std.stdio: writeln, writefln,stderr;
 import std.string: fromStringz, toStringz;
 
-import dhtslib.htslib.hts: htsFile, hts_open, hts_close,hts_itr_next;
+import dhtslib.htslib.hts: htsFile, hts_open, hts_close, hts_itr_next;
 import dhtslib.htslib.hts: hts_itr_t;
 import dhtslib.htslib.hts: seq_nt16_str;
 import dhtslib.htslib.hts: hts_set_threads;
@@ -109,7 +109,7 @@ struct SAMFile {
     /// header struct
     bam_hdr_t *header = null;
 
-    /// SAM/BAM index 
+    /// SAM/BAM/CRAM index 
     private hts_idx_t* idx;
 
     /// htslib data structure representing the BGZF compressed file/stream fp
@@ -157,6 +157,11 @@ struct SAMFile {
         // read header
         this.header = sam_hdr_read(this.fp);
         this.idx = sam_index_load(this.fp, this.fn);
+        if (this.idx == null) {
+            hts_log_info(__FUNCTION__, "SAM index not found");
+            // TODO: attempt to build
+            // TODO: edit range to return empty immediately if no idx
+        }
         hts_log_debug( __FUNCTION__, format("SAM index: %s", this.idx));
     }
     ~this()
@@ -317,8 +322,8 @@ struct SAMFile {
         /// ditto
         void popFront()
         {
-            r = hts_itr_next(bg, itr, b, fp);
-            //r=sam_itr_next(fp,itr,b);
+            r = hts_itr_next(this.bg, this.itr, this.b, this.fp);
+            //r = sam_itr_next(this.fp, this.itr, this.b);
         }
         /// ditto
         SAMRecord front()

@@ -32,10 +32,45 @@ int main()
         auto x = new SAMRecord();
     }
 
-    writeln("Now testing query");
+    writeln("Query c raw htslib");
+    {
+        int j = 0;
+        auto fn = toStringz("/Users/james/Documents/Development/blachlylab/funmap/ENCFF399AWI.bam");
+        import dhtslib.htslib.hts;
+        auto fp = hts_open(fn, cast(immutable(char)*)"r".ptr);
+        auto idx= sam_index_load(fp, fn);
+        bam1_t *b = bam_init1();
+        hts_itr_t *iter;
+        int r;
+        if ((iter = sam_itr_queryi(idx, 0, 1_000_000, 2_000_000)) == null) {
+            hts_log_error(__FUNCTION__, "Failed to parse region");
+            return 1;
+        }
+        writefln("iter == %x", iter);
+        
+        while ((r = sam_itr_next(fp, iter, b)) >= 0) {
+            j++;
+        }
+
+        writefln("Processed %d records with raw iter", j);
+
+        hts_itr_destroy(iter);
+        bam_destroy1(b);
+        hts_close(fp);
+    }
+
+    writeln("Testing query with D wrapper");
     int j;
     //auto qr = sf.query("chr1:1000000-2000000");
     auto qr = sf.query(0, 1_000_000, 2_000_000);
+    foreach(r; qr) {
+        j++;
+    }
+    writefln("%d records", j);
+
+    writeln("Testing query with expected no results");
+    j = 0;
+    qr = sf.query(0, 1, 2);
     foreach(r; qr) {
         j++;
     }
