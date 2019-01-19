@@ -10,6 +10,11 @@ bgzfreader
 samreader
 vcfwriter
 bug_minimal
+sam_iter
+csam_iter
+
+# debugging
+*.dSYM/
 
 # test output
 output.vcf
