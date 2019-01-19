@@ -18,7 +18,8 @@ int main()
     //auto sf = SAMFile("/Users/james/Documents/Development/blachlylab/funmap/wgEncodeUwRepliSeqBg02esG1bAlnRep1.bam");
     auto sf = SAMFile("/Users/james/Documents/Development/blachlylab/funmap/ENCFF399AWI.bam");
 
-    writeln("Basic SAM/BAM/CRAM data");
+    writeln("Basic SAM/BAM/CRAM data\n-----------------------");
+    writefln("Input file: %s", sf.filename);
     writefln("N targets: %d", sf.n_targets);
     writefln("Length of contig 0: %d", sf.target_len(0));
     writefln("Length of all targets: %s", sf.target_lens);
@@ -31,8 +32,16 @@ int main()
         auto x = new SAMRecord();
     }
 
-    writeln("Now testing range");
+    writeln("Now testing query");
+    int j;
+    //auto qr = sf.query("chr1:1000000-2000000");
+    auto qr = sf.query(0, 1_000_000, 2_000_000);
+    foreach(r; qr) {
+        j++;
+    }
+    writefln("%d records", j);
 
+    writeln("Now testing AllRecordsRange");
     int i;
     auto x = sf.all_records;
     foreach(r; x) {
@@ -41,8 +50,8 @@ int main()
         //writeln(fromStringz(r.sequence));
     }
     writefln("%d records", i);
+
     writeln("SAMFile going out of scope?");
  
-
     return 0;
 }

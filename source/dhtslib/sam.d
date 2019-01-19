@@ -97,7 +97,10 @@ Implements InputRange interface using htslib calls.
 */
 struct SAMFile {
 
-    /// filename; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
+    /// filename; as usable from D
+    string filename;
+
+    /// filename \0-terminated C string; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
     private immutable(char)* fn;
 
     /// htsFile
@@ -125,6 +128,7 @@ struct SAMFile {
         debug(dhtslib_debug) { writeln("SAMFile ctor"); }
 
         // open file
+        this.filename = fn;
         this.fn = toStringz(fn);
         this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
 
@@ -151,6 +155,7 @@ struct SAMFile {
         debug(dhtslib_debug) { writeln("SAMFile ctor"); }
 
         // open file
+        this.filename = fn;
         this.fn = toStringz(fn);
         this.fp = hts_open(this.fn, cast(immutable(char)*)"r");
 
