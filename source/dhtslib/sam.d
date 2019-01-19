@@ -112,9 +112,6 @@ struct SAMFile {
     /// SAM/BAM/CRAM index 
     private hts_idx_t* idx;
 
-    /// htslib data structure representing the BGZF compressed file/stream fp
-    //private BGZF* bgzf;
-
     private kstring_t line;
 
     /// disallow copying
@@ -278,13 +275,9 @@ struct SAMFile {
     /// Iterate over records falling within a queried region (TODO: itr_multi_query)
     struct RecordRange
     {
-        import dhtslib.htslib.bgzf: bgzf_open, bgzf_close, BGZF;
-
         private htsFile     *fp;
         private hts_itr_t   *itr;
         private bam1_t      *b;
-
-        BGZF *bg;
 
         private int r;
 
@@ -292,26 +285,11 @@ struct SAMFile {
         this(htsFile * fp, immutable(char)* fn, hts_itr_t *itr)
         {
             this.itr = itr;
-            ////For whatever reason hts_open doesn't initialize the BGZF pointer
-            ////in the the htsFile so we do it ourselves
-            //TODO: this shouldn't be required
-            ////For now we store the BGZF pointer with this struct as storing it
-            ////in the htsFile fp.bgzf causes seqfaults when calling hts_close
-            this.bg = bgzf_open(fn, cast(immutable(char)*)"r");
-
             this.fp = fp;
             b = bam_init1();
             //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
             hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int)itr == 0));
             popFront();
-        }
-        ~this()
-        {
-            ////Using bgzf_close segfaults with the complaint of freeing an invalid pointer
-            ////Related to above issue with hts_open not also creating the BGZF pointer
-            //if(fp.fp.bgzf!=null){
-            //    bgzf_close(fp);
-            //}
         }
 
         /// InputRange interface
@@ -322,8 +300,7 @@ struct SAMFile {
         /// ditto
         void popFront()
         {
-            r = hts_itr_next(this.bg, this.itr, this.b, this.fp);
-            //r = sam_itr_next(this.fp, this.itr, this.b);
+            r = sam_itr_next(this.fp, this.itr, this.b);
         }
         /// ditto
         SAMRecord front()
