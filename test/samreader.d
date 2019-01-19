@@ -37,9 +37,10 @@ int main()
     auto x = sf.all_records;
     foreach(r; x) {
         i++;
-        writeln(i);
+        //writeln(i);
         //writeln(fromStringz(r.sequence));
     }
+    writefln("%d records", i);
     writeln("SAMFile going out of scope?");
  
 
