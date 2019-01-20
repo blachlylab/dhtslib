@@ -12,8 +12,18 @@ int main()
     debug(dhtslib_debug)
     {
         writeln("enabling debug logging");
+        hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+
+        // Test log levels
+        hts_log_info(__FUNCTION__, "Testing log levels: expect I(nfo) D(ebug) W(arning) E(rror) T(race)");
+        hts_log_debug(__FUNCTION__, "Test debug");
+        hts_log_warning(__FUNCTION__, "Test warning");
+        hts_log_error(__FUNCTION__, "Test error");
+        hts_log_trace(__FUNCTION__, "Test trace (after which will reset to Debug level)");
+
         hts_set_log_level(htsLogLevel.HTS_LOG_DEBUG);
     }
+
 
     //auto sf = SAMFile("/Users/james/Documents/Development/blachlylab/funmap/wgEncodeUwRepliSeqBg02esG1bAlnRep1.bam");
     auto sf = SAMFile("/Users/james/Documents/Development/blachlylab/funmap/ENCFF399AWI.bam");
