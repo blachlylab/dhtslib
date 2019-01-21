@@ -677,6 +677,6 @@ debug
     static this()
     {
         // TRACE is highest log levle (above DEBUG)
-        hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+        //hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     }
 }
