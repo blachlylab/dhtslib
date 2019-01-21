@@ -66,7 +66,7 @@ struct TabixIndexedFile {
     /// tbx.d: const(char **) tbx_seqnames(tbx_t *tbx, int *n);  // free the array but not the values
     @property string[] sequenceNames()
     {
-        // TODO: Check for memory leaks
+        // TODO: Check for memory leaks (free the array after copy into sequence_names)
         int nseqs;
 
         string[] sequence_names;
