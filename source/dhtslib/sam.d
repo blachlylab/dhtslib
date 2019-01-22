@@ -217,14 +217,14 @@ struct SAMFile {
     auto query(string q)
     {
         auto itr = sam_itr_querys(this.idx, this.header, toStringz(q));
-        return RecordRange(this.fp, this.fn, itr);
+        return RecordRange(this.fp, itr);
     }
 
     /// Query by contig id, start, end
     auto query(int tid, int start, int end)
     {
         auto itr = sam_itr_queryi(this.idx, tid, start, end);
-        return RecordRange(this.fp, this.fn, itr);
+        return RecordRange(this.fp, itr);
     }
 
     /// bam["chr1:1-2"]
@@ -327,7 +327,7 @@ struct SAMFile {
         private int r;
 
         ///
-        this(htsFile * fp, immutable(char)* fn, hts_itr_t *itr)
+        this(htsFile * fp, hts_itr_t *itr)
         {
             this.itr = itr;
             this.fp = fp;
