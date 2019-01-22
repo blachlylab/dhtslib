@@ -212,17 +212,62 @@ struct SAMFile {
         string q = format("%s:%d-%d", chrom, start, end);
         return query(q);
     }
+
     /// Query by string chr:start-end
     auto query(string q)
     {
         auto itr = sam_itr_querys(this.idx, this.header, toStringz(q));
         return RecordRange(this.fp, this.fn, itr);
     }
+
     /// Query by contig id, start, end
     auto query(int tid, int start, int end)
     {
         auto itr = sam_itr_queryi(this.idx, tid, start, end);
         return RecordRange(this.fp, this.fn, itr);
+    }
+
+    /// bam["chr1:1-2"]
+    auto opIndex(string q)
+    {
+        return query(q);
+    }
+
+    /// bam["chr1",1..2]
+    auto opIndex(string chr, int[2] pos)
+    {
+        return query(chr,pos[0],pos[1]);
+    }
+
+    /// bam["chr1",1]
+    auto opIndex(string chr, int pos)
+    {
+        return query(chr,pos,pos+1);
+    }
+
+    /// bam["chr1",1,2]
+    auto opIndex(string chr, int pos1, int pos2)
+    {
+        return query(chr,pos1,pos2);
+    }
+
+    /// Integer-based chr below
+    /// bam[0,1..2]
+    auto opIndex(int chr, int[2] pos)
+    {
+        return query(chr,pos[0],pos[1]);
+    }
+
+    /// bam[0,1]
+    auto opIndex(int chr, int pos)
+    {
+        return query(chr,pos,pos+1);
+    }
+
+    /// bam[0,1,2]
+    auto opIndex(int chr, int pos1, int pos2)
+    {
+        return query(chr,pos1,pos2);
     }
 
     /// Return an InputRange representing all recods in the SAM/BAM/CRAM
