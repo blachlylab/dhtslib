@@ -15,6 +15,7 @@ import dhtslib.htslib.hts_log;
 import dhtslib.htslib.kstring;
 import dhtslib.htslib.sam;
 import dhtslib.cigar;
+import dhtslib.tagvalue;
 
 /**
 Encapsulates a SAM/BAM/CRAM record,
@@ -94,6 +95,17 @@ class SAMRecord {
     @property Cigar cigar()
     {
         return Cigar(bam_get_cigar(b),(*b).core.n_cigar);
+    }
+    /// Get aux tag from bam record and return TagValue
+    TagValue opIndex(string val)
+    {
+        char[2] arr;
+        TagValue t;
+        if(val.length==2){
+            arr=val.dup[0..2];
+            t=TagValue(b,arr);
+        }
+        return t;
     }
 }
 
