@@ -23,10 +23,38 @@ struct Cigar
         hts_log_debug(__FUNCTION__,"Cigar Length:"~length.to!string);
         cigar[0..length].each!(x=>ops~=CigarOp(x));
     }
+    this(CigarOp[] ops){
+        this.ops=ops;
+    }
 
     string toString()
     {
         return ops.map!(x=>x.length.to!string~CIGAR_STR[x.op]).array.join;
+    }
+    int alignedLength()
+    {
+        int length = 0;
+        foreach (op; ops)
+        {
+            switch (op.op)
+            {
+                default:
+                {
+                    break;
+                }
+
+                case Ops.MATCH:
+                case Ops.EQUAL:
+                case Ops.DIFF:
+                case Ops.DEL:
+                case Ops.INS:
+                {
+                    length += op.length;
+                    break;
+                }
+            }
+        }
+        return length;
     }
 }
 
@@ -47,6 +75,11 @@ union CigarOp
     this(uint raw)
     {
         this.raw=raw;
+    }
+    this(uint len,Ops op)
+    {
+        this.op=op;
+        this.length=len;
     }
 }
 /**
@@ -80,6 +113,7 @@ enum Ops {
 
 
 unittest{
+    writeln();
     import dhtslib.sam;
     import dhtslib.htslib.hts_log;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
@@ -94,4 +128,28 @@ unittest{
     assert(read.cigar.toString()=="78M1D22M");
 }
 
+Cigar cigarFromString(string cigar) {
+    import std.regex;
+    return Cigar(match(cigar, regex(`(\d+)([A-Z=])`, "g"))
+    .map!(m => CigarOp(m[1].to!uint, m[2].to!char.charToOp))
+    .array);
+}
 
+Ops charToOp(char c){
+    foreach(i,o;CIGAR_STR){
+        if(c==o){
+            return cast(Ops)i;
+        }
+    }
+    return cast(Ops)9;
+}
+
+unittest{
+    writeln();
+    hts_log_info(__FUNCTION__,"Testing string2cigar");
+    hts_log_info(__FUNCTION__,"Loading test file");
+    string c="130M2D40M";
+    auto cig=cigarFromString(c);
+    hts_log_info(__FUNCTION__,"Cigar:"~cig.toString());
+    assert(cig.toString()==c);
+}
