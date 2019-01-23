@@ -14,6 +14,7 @@ import dhtslib.htslib.hts: hts_set_threads;
 import dhtslib.htslib.hts_log;
 import dhtslib.htslib.kstring;
 import dhtslib.htslib.sam;
+import dhtslib.cigar;
 
 /**
 Encapsulates a SAM/BAM/CRAM record,
@@ -88,6 +89,11 @@ class SAMRecord {
         if (this.b.core.flag & BAM_FREVERSE) reverse(q);
 
         return q;
+    }
+    /// Create cigar from bam read data
+    @property Cigar cigar()
+    {
+        return Cigar(bam_get_cigar(b),(*b).core.n_cigar);
     }
 }
 
