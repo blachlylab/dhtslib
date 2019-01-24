@@ -188,7 +188,7 @@ class VCFRecord
     @property string id()
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
-        return fromStringz(this.line.d.id);
+        return fromStringz(this.line.d.id).idup;
     }
     /// Sets new ID string; comma-separated list allowed but no dup checking performed
     int updateID(string id)
@@ -209,7 +209,7 @@ class VCFRecord
     @property string refAllele()
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
-        return fromStringz(this.line.d.als;)
+        return fromStringz(this.line.d.als).idup;
     }
     // NB WIP: there could be zero, or multiple alt alleles
     /+@property string altAlleles()
@@ -772,7 +772,7 @@ struct VCFReader
     }
     
     /** VCF version, e.g. VCFv4.2 */
-    @property string vcfVersion() { return cast(string) fromStringz( bcf_hdr_get_version(this.vcfhdr.hdr) ); }
+    @property string vcfVersion() { return cast(string) fromStringz( bcf_hdr_get_version(this.vcfhdr.hdr) ).idup; }
 
     /++
         bcf_hrec_t *bcf_hdr_get_hrec(const(bcf_hdr_t) *hdr, int type, const(char) *key, const(char) *value,
