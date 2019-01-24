@@ -120,8 +120,8 @@ struct bcf_hdr_t { // @suppress(dscanner.style.phobos_naming_convention)
     bcf_idpair_t *[3] id;   /// ?
     void *[3] dict;         /// ID dictionary, contig dict and sample dict
     char **samples;         /// ?list of samples
-    bcf_hrec_t **hrec;      /// Textual representation of this header line
-    int nhrec;              /// ?
+    bcf_hrec_t **hrec;      /// Structured representation of this header line
+    int nhrec;              /// # of header records
     int dirty;              /// ?
     int ntransl;            /// for bcf_translate()
     int *[2] transl;        /// for bcf_translate()

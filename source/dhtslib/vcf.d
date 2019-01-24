@@ -11,6 +11,7 @@ import std.string: fromStringz, toStringz;
 import std.traits: isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 
 import dhtslib.htslib.hts_log;
+import dhtslib.htslib.kstring;
 import dhtslib.htslib.vcf;
 
 alias BCFRecord = VCFRecord;
@@ -18,12 +19,19 @@ alias BCFWriter = VCFWriter;
 
 /** Wrapper around bcf_hdr_t
 
+    Q: Why do we have VCFHeader, but not SAMHeader?
+    A: Most (all)? of the SAM (bam1_t) manipulation functions do not require a ptr to the header,
+    whereas almost all of the VCF (bcf1_t) manipulation functions do. Therefore, we track bcf_hdr_t*
+    inside each VCFRecord; this is wrapped by VCFHeader for future convenience (for example,
+    now we have @property nsamples; may move the tag reader and writer functions here?)
+
     In order to avoid double free()'ing an instance bcf_hdr_t,
     this wrapper will be the authoritative holder of of bcf_hdr_t ptrs,
     it shall be passed around by reference, and copies are disabled.
 */
 struct VCFHeader
 {
+    /// Pointer to htslib BCF/VCF header struct; will be freed from VCFHeader dtor 
     bcf_hdr_t *hdr;
 
     // Copies have to be disabled to avoid double free()
@@ -60,10 +68,14 @@ struct VCFHeader
     to avoid expensive validate() calls for every record before writing
     if possible, which means keeping this consistent. However, not
     sure what to do if error occurs when using the setters herein?
+
+    2019-01-23 struct->class to mirror SAMRecord -- faster if reference type?
+
+    2019-01-23 WIP: getters for chrom, pos, id, ref,  complete (untested)
 */
-struct VCFRecord
+class VCFRecord
 {
-    bcf1_t* line;   /// htslib structured record
+    bcf1_t* line;   /// htslib structured record TODO: change to 'b' for better internal consistency
 
     VCFHeader *vcfheader;   /// corresponding header (required);
                             /// is ptr to avoid copying struct containing ptr to bcf_hdr_t (leads to double free())
@@ -75,7 +87,11 @@ struct VCFRecord
     Internal backing by bcf1_t means it must conform to the BCF2 rules -- i.e., header must contain
     appropriate INFO, CONTIG, and FILTER lines.
 
+    Protip: instantiating ctor with alternate MAX_UNPACK (template value param) can speed it tremendously
+        as it will not unpack all fields, only up to those requested (see htslib.vcf)
+        For example, BCF_UN_STR is up to ALT inclusive, and BCF_UN_STR is up to FILTER
     */
+    /+
     this(bcf_hdr_t *h, bcf1_t *b)
     {
         this.vcfheader = new VCFHeader(h);  // this looks like it will also lead to a double free() bug if we don't own bcf_hdr_t ...
@@ -88,6 +104,20 @@ struct VCFRecord
         this.vcfheader = h;
 
         this.line = b;
+    }+/
+    /// ditto
+    this(int MAX_UNPACK = BCF_UN_ALL, T)(T *h, bcf1_t *b)
+    if(is(T == VCFHeader) || is(T == bcf_hdr_t))
+    {
+        static if (is(T == VCFHeader)) this.vcfheader = h;
+        else static if (is(T == bcf_hdr_t)) this.vcfheader = new VCFFHeader(h); // double free() bug if we don't own bcf_hdr_t h
+        else assert(0);
+
+        this.line = b;
+
+        // Now it must be unpacked
+        // Protip: instantiating with alternate MAX_UNPACK can speed it tremendously
+        int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure about return value
     }
     /// ditto
     this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
@@ -113,7 +143,7 @@ struct VCFRecord
     }
 
     /// disable copying to prevent double-free (which should not come up except when writeln'ing)
-    @disable this(this);
+    //@disable this(this);  // commented out as class has no postblit ctor
     /// dtor
     ~this()
     {
@@ -126,6 +156,7 @@ struct VCFRecord
     @property
     const(char)[] chrom()
     {
+        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
         return fromStringz(bcf_hdr_id2name(this.vcfheader.hdr, this.line.rid));
     }
     @property
@@ -140,9 +171,11 @@ struct VCFRecord
     }
 
     /* POS */
+    // TODO: internally BCF is uzing 0 based coordinates; we may want to return +1 ?
     @property
     int pos()
     {
+        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
         return this.line.pos;
     }
     @property
@@ -152,6 +185,11 @@ struct VCFRecord
     }
 
     /* ID */
+    @property string id()
+    {
+        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        return fromStringz(this.line.d.id);
+    }
     /// Sets new ID string; comma-separated list allowed but no dup checking performed
     int updateID(string id)
     {
@@ -168,6 +206,17 @@ struct VCFRecord
 
     /* Alleles (REF, ALT) */
     /// Set alleles; comma-separated list
+    @property string refAllele()
+    {
+        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        return fromStringz(this.line.d.als;)
+    }
+    // NB WIP: there could be zero, or multiple alt alleles
+    /+@property string altAlleles()
+    {
+        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        return fromStringz(this.line.d.als)
+    }+/
     @property void alleles(string a)
     {
         bcf_update_alleles_str(this.vcfheader.hdr, this.line, toStringz(a));
@@ -377,12 +426,20 @@ struct VCFRecord
         if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s", data));
     }
 
-    string toString() const
+    override string toString() const
     {
-        return "[VCFRecord]";
+        kstring_t s;
+
+        const int ret = vcf_format(this.vcfheader.hdr, this.line, &s);
+        if (!ret)
+        {
+            hts_log_error(__FUNCTION__, "vcf_format returned nonzero (likely EINVAL, invalid bcf1_t struct?)");
+            return "[VCFRecord:parse_error]";
+        }
+
+        return cast(string) s.s[0 .. s.l];
     }
 }
-
 
 /** Basic support for writing VCF, BCF files */
 struct VCFWriter
@@ -671,12 +728,118 @@ struct VCFWriter
     }
 }
 
-debug
+/** Basic support for reading VCF, BCF files */
+struct VCFReader
 {
-    // module constructor
-    static this()
+    // htslib data structures
+    vcfFile     *fp;    /// htsFile
+    //bcf_hdr_t   *hdr;   /// header
+    VCFHeader   *vcfhdr;    /// header wrapper -- no copies
+    bcf1_t*[]    rows;   /// individual records
+    bcf1_t* b;          /// record for use in iterator, will be recycled
+
+    @disable this();
+    /// read existing VCF file
+    this(string fn)
     {
-        // TRACE is highest log levle (above DEBUG)
-        //hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+        this.fp = bcf_open(toStringz(fn), toStringz("r"c));
+        // TODO: if !fp abort
+
+        this.vcfhdr = new VCFHeader( bcf_hdr_read(this.fp));
+
+        this.b = bcf_init1();
+    }
+    /// dtor
+    ~this()
+    {
+        const ret = vcf_close(this.fp);
+        if (ret != 0) hts_log_error(__FUNCTION__,"couldn't close VCF after reading");
+
+        // Deallocate header
+        //bcf_hdr_destroy(this.hdr);
+        // 2018-09-15: Do not deallocate header; will be free'd by VCFHeader dtor
+
+        bcf_destroy1(this.b);
+    }
+    invariant
+    {
+        assert(this.vcfhdr != null);
+    }
+
+    VCFHeader* getHeader()
+    {
+        return this.vcfhdr;
+    }
+    
+    /** VCF version, e.g. VCFv4.2 */
+    @property string vcfVersion() { return cast(string) fromStringz( bcf_hdr_get_version(this.vcfhdr.hdr) ); }
+
+    /++
+        bcf_hrec_t *bcf_hdr_get_hrec(const(bcf_hdr_t) *hdr, int type, const(char) *key, const(char) *value,
+                                                                                    const(char) *str_class);
+    +/
+    // TODO: check key for "", fail if empty
+    // TODO: check value, str_class for "" and replace with NULL
+    // TODO: Memory leak. We are never freeing the bcf_hrec_t, but, it escapes as pointer inside key/value string
+    // TODO: handle structured and general lines
+    string[string] getTagByKV(string tagType, T)(string key, string value, string str_class)
+    if((tagType == "FILTER" || tagType == "INFO" || tagType == "FORMAT" && tagType == "contig") &&
+        (isIntegral!T || isSomeString!T))
+    {
+        // hlt : header line type
+        static if (tagType == "FILTER")     int hlt = BCF_HL_FLT;
+        else static if (tagType == "INFO")  int hlt = BCF_HL_INFO;
+        else static if (tagType == "FORMAT") int hlt= BCF_HL_FMT;
+        else static if (tagType == "contig") int hlt= BCF_HL_CTG;
+        else assert(0);
+
+        bcf_hrec_t *hrec = bcf_hdr_get_hrec(this.vcfhdr.hdr, hlt, toStringz(key), toStringz(value), toStringz(str_class));
+
+        const int nkeys = hrec.nkeys;
+        string[string] kv;
+
+        foreach(int i; 0 .. nkeys) {
+            string k = cast(string) fromStringz(hrec.keys[i]);
+            string v = cast(string) fromStringz(hrec.vals[i]); 
+            kv[k] = v;
+        }
+
+        return kv;
+    }
+
+    /// InputRange interface: iterate over all records
+    @property bool empty()
+    {
+        //     int bcf_read(htsFile *fp, const(bcf_hdr_t) *h, bcf1_t *v);
+        // documentation claims returns -1 on critical errors, 0 otherwise
+        // however it looks like -1 is EOF and -2 is critical errors?
+        immutable success = bcf_read(this.fp, this.vcfhdr.hdr, this.b);
+        if (success >= 0) return false;
+        else if (success == -1) {
+            hts_log_warning(__FUNCTION__, "bcf_read returned -1; EOF? TODO: check b->errcode");
+            return true;
+        }
+        else {
+            hts_log_error(__FUNCTION__, "*** CRITICAL ERROR bcf_read < -1");
+            return true;
+        }
+    }
+    /// ditto
+    void popFront()
+    {
+        // noop? 
+        // free this.b ?
+        //bam_destroy1(this.b);
+
+        // TODO: clear (not destroy) the bcf1_t for reuse?
+    }
+    /// ditto
+    VCFRecord front()
+    {
+        // note that VCFRecord's constructor will be responsible for
+        // * unpacking and
+        // * destroying
+        // its copy
+        return new VCFRecord(this.vcfhdr, bcf_dup(this.b));
     }
 }
