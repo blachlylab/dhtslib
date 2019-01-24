@@ -6,14 +6,16 @@ import std.parallelism: totalCPUs;
 import std.stdio: writeln, writefln,stderr;
 import std.string: fromStringz, toStringz;
 
-import dhtslib.htslib.hts: htsFile, hts_open, hts_close, hts_itr_next;
-import dhtslib.htslib.hts: hts_itr_t;
+import dhtslib.htslib.hts: htsFile, hts_open, hts_close;
+import dhtslib.htslib.hts: hts_itr_t,hts_itr_multi_t,hts_reglist_t,hts_pair32_t;
 import dhtslib.htslib.hts: seq_nt16_str;
 import dhtslib.htslib.hts: hts_set_threads;
 
 import dhtslib.htslib.hts_log;
 import dhtslib.htslib.kstring;
 import dhtslib.htslib.sam;
+import dhtslib.cigar;
+import dhtslib.tagvalue;
 
 /**
 Encapsulates a SAM/BAM/CRAM record,
@@ -88,6 +90,22 @@ class SAMRecord {
         if (this.b.core.flag & BAM_FREVERSE) reverse(q);
 
         return q;
+    }
+    /// Create cigar from bam read data
+    @property Cigar cigar()
+    {
+        return Cigar(bam_get_cigar(b),(*b).core.n_cigar);
+    }
+    /// Get aux tag from bam record and return TagValue
+    TagValue opIndex(string val)
+    {
+        char[2] arr;
+        TagValue t;
+        if(val.length==2){
+            arr=val.dup[0..2];
+            t=TagValue(b,arr);
+        }
+        return t;
     }
 }
 
@@ -212,18 +230,78 @@ struct SAMFile {
         string q = format("%s:%d-%d", chrom, start, end);
         return query(q);
     }
+
     /// Query by string chr:start-end
     auto query(string q)
     {
         auto itr = sam_itr_querys(this.idx, this.header, toStringz(q));
-        return RecordRange(this.fp, this.fn, itr);
+        return RecordRange(this.fp, itr);
     }
+
     /// Query by contig id, start, end
     auto query(int tid, int start, int end)
     {
         auto itr = sam_itr_queryi(this.idx, tid, start, end);
-        return RecordRange(this.fp, this.fn, itr);
+        return RecordRange(this.fp, itr);
     }
+
+    /// Query by ["chr1:1-2","chr1:1000-1001"]
+    auto query(string[] regions)
+    {
+        return RecordRangeMulti(this.fp,this.idx,this.header,&(this),regions);
+    }
+
+    /// bam["chr1:1-2"]
+    auto opIndex(string q)
+    {
+        return query(q);
+    }
+
+    /// bam["chr1",1..2]
+    auto opIndex(string tid, int[2] pos)
+    {
+        return query(tid,pos[0],pos[1]);
+    }
+
+    /// bam["chr1",1]
+    auto opIndex(string tid, int pos)
+    {
+        return query(tid,pos,pos+1);
+    }
+
+    /// bam["chr1",1,2]
+    deprecated
+    auto opIndex(string tid, int pos1, int pos2)
+    {
+        return query(tid,pos1,pos2);
+    }
+
+    /// Integer-based chr below
+    /// bam[0,1..2]
+    auto opIndex(int tid, int[2] pos)
+    {
+        return query(tid,pos[0],pos[1]);
+    }
+
+    /// bam[0,1]
+    auto opIndex(int tid, int pos)
+    {
+        return query(tid,pos,pos+1);
+    }
+
+    /// bam[0,1,2]
+    deprecated
+    auto opIndex(int tid, int pos1, int pos2)
+    {
+        return query(tid,pos1,pos2);
+    }
+
+    int[2] opSlice(size_t dim)(int start,int end)
+        if(dim>=0 && dim<2)
+    {
+        return [start,end];
+    }
+
 
     /// Return an InputRange representing all recods in the SAM/BAM/CRAM
     AllRecordsRange all_records()
@@ -282,7 +360,7 @@ struct SAMFile {
         private int r;
 
         ///
-        this(htsFile * fp, immutable(char)* fn, hts_itr_t *itr)
+        this(htsFile * fp, hts_itr_t *itr)
         {
             this.itr = itr;
             this.fp = fp;
@@ -309,6 +387,124 @@ struct SAMFile {
         }
     }
 
+    /// Iterate over records falling within queried regions using a RegionList
+    struct RecordRangeMulti
+    {
+        private htsFile             *fp;
+        private hts_itr_multi_t     *itr;
+        private bam1_t              *b;
+        private hts_reglist_t[] rlist;
+        private int r;
+
+        ///
+        this(htsFile * fp,hts_idx_t *idx, bam_hdr_t *header,SAMFile * sam,string[] regions)
+        {
+            rlist=RegionList(sam,regions).getRegList();
+            this.fp = fp;
+            b = bam_init1();
+            itr =sam_itr_regions(idx,header,rlist.ptr,cast(uint) rlist.length);
+            //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
+            hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int)itr == 0));
+            popFront();
+        }
+
+        /// InputRange interface
+        @property bool empty()
+        {
+            return (r <= 0 && itr.finished) ? true : false;
+        }
+        /// ditto
+        void popFront()
+        {
+            r = sam_itr_multi_next(this.fp, this.itr, this.b);
+        }
+        /// ditto
+        SAMRecord front()
+        {
+            return new SAMRecord(bam_dup1(b));
+        }
+    }
+
+    /// List of regions based on sam/bam
+    struct RegionList
+    {
+        import std.algorithm.iteration:splitter;
+        import std.algorithm.sorting:sort;
+        import std.range:drop,array;
+        import std.conv:to;
+        hts_reglist_t[string] rlist;
+        SAMFile * sam;
+
+        ///
+        this(SAMFile * sam,string[] queries)
+        {
+            this.sam=sam;
+            foreach(q;queries){
+                addRegion(q);
+            }
+        }
+        void addRegion(string reg)
+        {
+            //chr:1-2
+            //split into chr and 1-2
+            auto split=reg.splitter(":");
+            auto chr=split.front;
+            //split 1-2 into 1 and 2
+            split=split.drop(1).front.splitter("-");
+            if(sam.target_id(chr)<0){
+                hts_log_error(__FUNCTION__,"tid not present in sam/bam");
+            }
+            addRegion(sam.target_id(chr),split.front.to!int,split.drop(1).front.to!int);
+        }
+        void addRegion(int tid, int beg, int end)
+        {
+            if(tid >this.sam.n_targets || tid<0)
+                hts_log_error(__FUNCTION__,"tid not present in sam/bam");
+
+            auto val =(this.sam.target_names[tid] in this.rlist);
+            hts_pair32_t p;
+
+            if(beg<0)
+                hts_log_error(__FUNCTION__,"first coordinate < 0");
+
+            if(beg>=this.sam.target_len(tid))
+                hts_log_error(__FUNCTION__,"first coordinate larger than tid length");
+
+            if(end<0)
+                hts_log_error(__FUNCTION__,"second coordinate < 0");
+
+            if(end>=this.sam.target_len(tid))
+                hts_log_error(__FUNCTION__,"second coordinate larger than tid length");
+
+            p.beg=beg;
+            p.end=end;
+            hts_pair32_t[] plist;
+            if(val is null){
+                hts_reglist_t r;
+
+                //set tid
+                r.tid=tid;
+
+                //create intervals
+                plist=plist~p;
+                r.intervals=plist.ptr;
+                r.count=cast(uint)plist.length;
+                r.min_beg=p.beg;
+                r.max_end=p.end;
+                this.rlist[this.sam.target_names[tid]]=r;
+            }else{
+                plist=(val.intervals[0..val.count]~p).sort!(cmpInterval).array;
+                val.intervals=plist.ptr;
+                val.count=cast(uint)plist.length;
+                val.min_beg=plist[0].beg;
+                val.max_end=plist[$-1].end;
+            }
+        }
+        hts_reglist_t[] getRegList()
+        {
+            return rlist.byValue.array.sort!(cmpRegList).array;
+        }
+    }
 }
 
 /// Nucleotide complement table; from samtools/sam_view.c
@@ -330,4 +526,52 @@ private char *reverse(char *str)
         j++;
     }
     return str;
+}
+
+bool cmpInterval(hts_pair32_t a,hts_pair32_t b){
+    if(a.beg < b.beg){
+        return true;
+    }
+    if(a.end < b.end){
+        return true;
+    }
+    return false;
+}
+bool cmpRegList(hts_reglist_t a,hts_reglist_t b){
+    if(a.tid < b.tid){
+        return true;
+    }
+    return false;
+}
+
+int parseSam(string line,bam_hdr_t * header,bam1_t * b){
+    import dhtslib.htslib.kstring:kstring_t;
+    import std.utf:toUTFz;
+    kstring_t k;
+    k.s=toUTFz!(char *)(line);
+    k.l=line.length;
+    return sam_parse1(&k,header,b);
+}
+unittest{
+    import std.stdio;
+    import std.range:drop;
+    import std.utf:toUTFz;
+    import dhtslib.htslib.hts_log;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__,"Loading sam file");
+    auto range=File("htslib/test/realn01_exp-a.sam").byLineCopy();
+    auto b=bam_init1();
+    auto hdr=bam_hdr_init();
+    string hdr_str;
+    for(auto i=0;i<4;i++){
+        hdr_str~=range.front~"\n";
+        range.popFront;
+    }
+    hts_log_info(__FUNCTION__,"Header");
+    writeln(hdr_str);
+    hdr=sam_hdr_parse(cast(int)hdr_str.length,toUTFz!(char *)(hdr_str));
+    hts_log_info(__FUNCTION__,"Read status:"~parseSam(range.front,hdr,b).to!string);
+    auto r=new SAMRecord(b);
+    hts_log_info(__FUNCTION__,"Cigar"~r.cigar.toString);
+    assert(r.cigar.toString=="6M1D117M5D28M");
 }

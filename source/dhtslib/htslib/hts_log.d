@@ -106,3 +106,13 @@ void hts_log_trace(string ctx, string msg)
     hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), toStringz(colormsg));
 }
 
+unittest{
+    import std.stdio:writeln;
+    writeln("Testing htslog color logging");
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_debug(__FUNCTION__,"debug");
+    hts_log_error(__FUNCTION__,"error");
+    hts_log_info(__FUNCTION__,"info");
+    hts_log_trace(__FUNCTION__,"trace");
+    hts_log_warning(__FUNCTION__,"warning");
+}
