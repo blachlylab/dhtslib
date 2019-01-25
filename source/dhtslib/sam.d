@@ -355,7 +355,9 @@ struct SAMFile {
     /// Return an InputRange representing all recods in the SAM/BAM/CRAM
     AllRecordsRange all_records()
     {
-        return AllRecordsRange(this.fp, this.header, bam_init1());
+        auto range =AllRecordsRange(this.fp, this.header, bam_init1());
+        range.popFront();
+        return range;
     }
 
     /// Iterate through all records in the SAM/BAM/CRAM
