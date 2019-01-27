@@ -687,6 +687,8 @@ struct VCFWriter
     /// Add sample to this VCF
     /// * int bcf_hdr_add_sample(bcf_hdr_t *hdr, const(char) *sample);
     int addSample(string name)
+    in { assert(name != ""); }
+    do
     {
         assert(this.vcfhdr != null);
 
@@ -1048,7 +1050,8 @@ unittest
 
     // Exercise header
     assert(vw.vcfhdr.nsamples == 0);
-    // TODO, add samples, check new value
+    vw.addSample("NA12878");
+    assert(vw.vcfhdr.nsamples == 1);
 
     auto r = new VCFRecord(vw.vcfhdr, bcf_init1());
     
