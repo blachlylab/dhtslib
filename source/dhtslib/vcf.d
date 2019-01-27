@@ -1,12 +1,19 @@
+/**
+
+VCFv4.2 (including BCF) reader and writer.
+
+Specifications: https://samtools.github.io/hts-specs/VCFv4.2.pdf
+
+*/
 module dhtslib.vcf;
 
+import core.stdc.string;
 import core.vararg;
 
 import std.conv: to, ConvException;
 import std.datetime;
 import std.format: format;
 import std.range: ElementType;
-import std.stdio: writeln;
 import std.string: fromStringz, toStringz;
 import std.traits: isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 
@@ -71,11 +78,25 @@ struct VCFHeader
 
     2019-01-23 struct->class to mirror SAMRecord -- faster if reference type?
 
-    2019-01-23 WIP: getters for chrom, pos, id, ref,  complete (untested)
+    2019-01-23 WIP: getters for chrom, pos, id, ref, alt are complete (untested)
+
+After parsing a BCF or VCF line, bcf1_t must be unpacked. (not applicable when building bcf1_t from scratch)
+Depending on information needed, this can be done to various levels with performance tradeoff.
+Unpacking symbols:
+BCF_UN_ALL: all
+BCF_UN_SHR: all shared information (BCF_UN_STR|BCF_UN_FLT|BCF_UN_INFO)
+
+                        BCF_UN_STR
+                       /               BCF_UN_FLT
+                      |               /      BCF_UN_INFO
+                      |              |      /       ____________________________ BCF_UN_FMT
+                      V              V     V       /       |       |       |
+#CHROM  POS ID  REF ALT QUAL    FILTER  INFO    FORMAT  NA00001 NA00002 NA00003 ...
+
 */
 class VCFRecord
 {
-    bcf1_t* line;   /// htslib structured record TODO: change to 'b' for better internal consistency
+    bcf1_t* line;   /// htslib structured record TODO: change to 'b' for better internal consistency? (vcf.h/c actually use line quite a bit in fn params)
 
     VCFHeader *vcfheader;   /// corresponding header (required);
                             /// is ptr to avoid copying struct containing ptr to bcf_hdr_t (leads to double free())
@@ -91,33 +112,19 @@ class VCFRecord
         as it will not unpack all fields, only up to those requested (see htslib.vcf)
         For example, BCF_UN_STR is up to ALT inclusive, and BCF_UN_STR is up to FILTER
     */
-    /+
-    this(bcf_hdr_t *h, bcf1_t *b)
-    {
-        this.vcfheader = new VCFHeader(h);  // this looks like it will also lead to a double free() bug if we don't own bcf_hdr_t ...
-
-        this.line = b;
-    }
-    /// ditto
-    this(VCFHeader *h, bcf1_t *b)
-    {
-        this.vcfheader = h;
-
-        this.line = b;
-    }+/
-    /// ditto
     this(int MAX_UNPACK = BCF_UN_ALL, T)(T *h, bcf1_t *b)
     if(is(T == VCFHeader) || is(T == bcf_hdr_t))
     {
         static if (is(T == VCFHeader)) this.vcfheader = h;
-        else static if (is(T == bcf_hdr_t)) this.vcfheader = new VCFFHeader(h); // double free() bug if we don't own bcf_hdr_t h
+        //else static if (is(T == bcf_hdr_t)) this.vcfheader = new VCFHeader(h); // double free() bug if we don't own bcf_hdr_t h
+        else static if (is(T == bcf_hdr_t)) assert(0);  // ferret out situations that will lead to free() crashes
         else assert(0);
 
         this.line = b;
 
         // Now it must be unpacked
         // Protip: instantiating with alternate MAX_UNPACK can speed it tremendously
-        int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure about return value
+        int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
     }
     /// ditto
     this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
@@ -137,13 +144,29 @@ class VCFRecord
     }
     /// ditto
     /// From VCF line (TODO)
-    this(string line)
+    this(int MAX_UNPACK = BCF_UN_ALL)(VCFHeader *vcfhdr, string line)
     {
-        assert(0);
+        this.vcfheader = vcfhdr;
+
+        kstring_t kline;
+        auto dupline = line.dup; // slower, but safer than a cast // @suppress(dscanner.suspicious.unmodified)
+
+        kline.l = dupline.length;
+        kline.m = dupline.length;
+        kline.s = dupline.ptr;
+
+        this.line = bcf_init1();
+
+        auto ret = vcf_parse(&kline, this.vcfheader.hdr, this.line);
+        if (ret < 0) {
+            hts_log_error(__FUNCTION__, "vcf_parse returned < 0 -- code error or malformed VCF line");
+        } else {
+            ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
+        }
     }
 
     /// disable copying to prevent double-free (which should not come up except when writeln'ing)
-    //@disable this(this);  // commented out as class has no postblit ctor
+    //@disable this(this);  // commented out as class has no postblit ctor (relevant when VCFRecord was struct)
     /// dtor
     ~this()
     {
@@ -153,12 +176,16 @@ class VCFRecord
     //////// FIXED FIELDS ////////
     
     /* CHROM */
+    /// Get chromosome (CHROM)
     @property
-    const(char)[] chrom()
+    string chrom()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
-        return fromStringz(bcf_hdr_id2name(this.vcfheader.hdr, this.line.rid));
+        if (!this.line.unpacked)
+            bcf_unpack(this.line, BCF_UN_STR);
+        
+        return fromStringz(bcf_hdr_id2name(this.vcfheader.hdr, this.line.rid)).idup;
     }
+    /// Set chromosome (CHROM)
     @property
     void chrom(string c)
     {
@@ -170,31 +197,42 @@ class VCFRecord
         else line.rid = rid;
     }
 
+
     /* POS */
-    // TODO: internally BCF is uzing 0 based coordinates; we may want to return +1 ?
+    /// Get position (POS)
+    // NB: internally BCF is uzing 0 based coordinates; we only show +1 when printing a VCF line with toString (which calls vcf_format)
     @property
     int pos()
+    out(coord) { assert(coord >= 0); }
+    do
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
         return this.line.pos;
     }
+    /// Set position (POS)
     @property
     void pos(int p)
+    in { assert(p >= 0); }
+    do
     {
+        // TODO: should we check for pos >= 0 && pos < contig length? Could really hamper performance.
+        // TODO: if writing out the file with invalid POS values crashes htslib, will consider it
         this.line.pos = p;
     }
+
 
     /* ID */
     @property string id()
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
-        return fromStringz(this.line.d.id);
+        return fromStringz(this.line.d.id).idup;
     }
     /// Sets new ID string; comma-separated list allowed but no dup checking performed
-    int updateID(string id)
+    @property int id(string id)
     {
-        if(id == "") return 0;
-        return bcf_update_id(this.vcfheader.hdr, this.line, toStringz(id));
+        // bcf_update_id expects null pointer instead of empty string to mean "no value"
+        if (id == "") return bcf_update_id(this.vcfheader.hdr, this.line, null);
+        else return bcf_update_id(this.vcfheader.hdr, this.line, toStringz(id));
     }
     /// Append an ID (htslib performs duplicate checking)
     int addID(string id)
@@ -204,12 +242,38 @@ class VCFRecord
     }
 
 
-    /* Alleles (REF, ALT) */
-    /// Set alleles; comma-separated list
+    /* Alleles (REF, ALT)
+    
+        Internally, alleles are stored as a \0 separated array:
+        [C \0 T \0 T T \0.. \0]
+         ^    ^    ^ ^
+         |    |    L L ALT_1 = "TT"
+         |    L ALT_0 
+         L REF
+
+        TODO: Getters and setters poorly or inconsistently (?) named at this time or there are too many overloads?
+        TODO: need non-overwriting setter for ref and alt alleles
+        TODO: some of these may be inefficent; since they may be used in hot inner loops, pls optimize
+    */
+    /// All alleles getter (array)
+    @property string[] allelesAsArray()
+    {
+        string[] ret;
+        if (this.line.n_allele < 1) return ret; // n=0, no reference; n=1, ref but no alt
+
+        foreach(int i; 0 .. this.line.n_allele) // ref allele is index 0
+        {
+            ret ~= fromStringz(this.line.d.allele[i]).idup;
+        }
+        return ret;
+
+    }
+    /// Reference allele getter
     @property string refAllele()
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
-        return fromStringz(this.line.d.als;)
+        if (this.line.n_allele < 1) return ""; // a valid record could have no ref (or alt) alleles
+        else return fromStringz(this.line.d.als).idup;
     }
     // NB WIP: there could be zero, or multiple alt alleles
     /+@property string altAlleles()
@@ -217,9 +281,78 @@ class VCFRecord
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
         return fromStringz(this.line.d.als)
     }+/
+    /// Alternate alleles getter version 1: ["A", "ACTG", ...]
+    @property string[] altAllelesAsArray()
+    {
+        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+
+        string[] ret;
+        if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
+        return this.allelesAsArray[1 .. $];     // trim off REF
+    }
+    /// Alternate alleles getter version 2: "A,ACTG,..."
+    @property string altAllelesAsString()
+    {
+        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+
+        string ret;
+        if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
+
+        char[] tmp;
+        tmp.length = this.line.d.m_allele;    // max allocated size in htslib
+
+        char *a = this.line.d.allele[1];    // ref allele is index 0
+        const char *last = this.line.d.allele[this.line.n_allele - 1];    // pointer to start of last allele
+        size_t i = 0;
+
+        assert( this.line.d.allele[1] == (this.line.d.als + this.line.rlen + 1) );  // ensue data structure is as we think (+1: past ref's term \0)
+
+        while (i < this.line.d.m_allele)    // safety stop at max allocated size
+        {
+            if (*a) tmp[i] = *a;
+            else {  // '\0'
+                if (a < last) tmp[i] = ',';
+                else break;
+            }
+            i++;
+            a++;
+        }
+        tmp.length = i;
+
+        return tmp.idup;
+    }
+    /// Set alleles; comma-separated list
     @property void alleles(string a)
     {
-        bcf_update_alleles_str(this.vcfheader.hdr, this.line, toStringz(a));
+        if (a == "") {
+            this.line.n_allele = 0;
+            if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
+        }
+        else
+            bcf_update_alleles_str(this.vcfheader.hdr, this.line, toStringz(a));
+    }
+    /// Set alleles; array
+    @property void alleles(string[] a)
+    {
+        if (a.length == 0) {
+            this.line.n_allele = 0;
+            if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
+        }
+        else {
+            // TODO: Optimize -- this looks potentially very allocat-y and slow
+            const(char)*[] allelesp;
+            allelesp.length = a.length;
+            foreach(i; 0 .. a.length ) {
+                // In order to zero out all alleles, pass a zero-length allele to the string version,
+                // or a zero-length array to this version. Zero length string member of nonempty allele array is an error.
+                if (a[i].length == 0) {
+                    hts_log_error(__FUNCTION__, "Zero-length allele in nonempty allele array. Setting to '.'");
+                    allelesp[i] = ".".ptr;
+                }
+                else allelesp[i] = toStringz(a[i]);
+            }
+            bcf_update_alleles(this.vcfheader.hdr, this.line, allelesp.ptr, cast(int)a.length);
+        }
     }
     /// Set alleles; alt can be comma separated
     void setAlleles(string _ref, string alt)
@@ -228,9 +361,9 @@ class VCFRecord
         bcf_update_alleles_str(this.vcfheader.hdr, this.line, alleles.ptr);
     }
     /// Set alleles; min. 2 alleles (ref, alt1); unlimited alts may be specified
-    void setAlleles(string r, string a, ...)
+    void setAlleles(string _ref, string alt, ...)
     {
-        string alleles = r ~ "," ~ a;
+        string alleles = _ref ~ "," ~ alt;
 
         for (int i = 0; i < _arguments.length; i++)
         {
@@ -242,23 +375,46 @@ class VCFRecord
         bcf_update_alleles_str(this.vcfheader.hdr, this.line, alleles.ptr);
     }
 
+
     /* Quality (QUAL) */
-    @property float qual()      { return this.line.qual; }
-    @property void qual(float q){ this.line.qual = q; }
+    /// Get variant quality (QUAL)
+    @property float qual()
+    out(result) { assert(result >= 0); }
+    do
+    {
+        if (this.line.max_unpack < BCF_UN_FLT) bcf_unpack(this.line, BCF_UN_FLT);
+        return this.line.qual;
+    }
+    /// Set variant quality (QUAL)
+    @property void qual(float q)
+    in { assert(q >= 0); }
+    do { this.line.qual = q; }
 
 
     /* FILTER */
-    /// get FILTER column (TODO -- nothing in htslib)
-    @property const(char)[] filter()
+    /// Get FILTER column (nothing in htslib sadly)
+    @property string filter()
     {
-        //TODO
-        return "";
+        const(char)[] ret;
+
+        if (this.line.max_unpack < BCF_UN_FLT) bcf_unpack(this.line, BCF_UN_FLT);
+
+        if (this.line.d.n_flt) {
+            for(int i; i< this.line.d.n_flt; i++) {
+                if (i) ret ~= ";";
+                ret ~= fromStringz(this.vcfheader.hdr.id[BCF_DT_ID][ this.line.d.flt[0] ].key);
+            }
+        } else {
+            ret = ".";
+        }
+
+        return ret.idup;
     }
     /// Remove all entries in FILTER
     void removeFilters()
     {
-        auto ret = bcf_update_filter(this.vcfheader.hdr, this.line, null, 0);
-        if (!ret) hts_log_error(__FUNCTION__,"error removing filters in removeFilters");
+        const int ret = bcf_update_filter(this.vcfheader.hdr, this.line, null, 0);
+        if (!ret) hts_log_error(__FUNCTION__, "error removing filters in removeFilters");
     }
     /// Set the FILTER column to f
     @property void filter(string f)
@@ -272,11 +428,14 @@ class VCFRecord
         int[] fids;
         foreach(f; fs) {
             if(f == "") continue;
-            int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
+            const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
             if (fid == -1) hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
             else fids ~= fid;
         }
-        bcf_update_filter(this.vcfheader.hdr, this.line, fids.ptr, cast(int)fids.length);
+        if (fids.length > 0)
+            bcf_update_filter(this.vcfheader.hdr, this.line, fids.ptr, cast(int)fids.length);
+        else
+            hts_log_warning(__FUNCTION__, "No FILTER update was performed due to empty list");
     }
     /// Add a filter; from htslib: 
     /// "If flt_id is PASS, all existing filters are removed first. If other than PASS, existing PASS is removed."
@@ -288,7 +447,7 @@ class VCFRecord
     /// Remove a filter by name
     int removeFilter(string f)
     {
-        int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
+        const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
         return removeFilter(fid);
     }
     /// Remove a filter by numeric id
@@ -296,12 +455,21 @@ class VCFRecord
     {
         return bcf_remove_filter(this.vcfheader.hdr, this.line, fid, 0);
     }
-    /+
-    /**
-     *  Returns 1 if present, 0 if absent, or -1 if filter does not exist. "PASS" and "." can be used interchangeably.
-     */
-    int bcf_has_filter(const bcf_hdr_t *hdr, bcf1_t *line, char *filter);
-    +/
+    /// Determine whether FILTER is present. log warning if filter does not exist. "PASS" and "." can be used interchangeably.
+    bool hasFilter(string filter)
+    {
+        char[] f = filter.dup ~ '\0';
+        auto id = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, f.ptr);
+        hts_log_trace(__FUNCTION__, format("filter id %d", id));
+        const auto ret = bcf_has_filter(this.vcfheader.hdr, this.line, f.ptr);
+        if (ret > 0) return true;
+        else if (ret == 0) return false;
+        else {
+            hts_log_warning(__FUNCTION__, format("FILTER %s does not exist in the header", filter));
+            return false;
+        }
+    }
+
 
     /* INFO */
     /+
@@ -453,16 +621,28 @@ struct VCFWriter
     @disable this();
     /// open file or network resources for writing
     /// setup incl header allocation
-    /// bcf_hdr_init automatically sets version string (##fileformat=VCFv4.2)
-    /// bcf_hdr_init automatically adds the PASS filter
+    /// if mode==w:
+    ///     bcf_hdr_init automatically sets version string (##fileformat=VCFv4.2)
+    ///     bcf_hdr_init automatically adds the PASS filter
     this(string fn)
     {
         this.fp = vcf_open(toStringz(fn), toStringz("w"c));
         // TODO: if !fp abort
 
-        this.vcfhdr = new VCFHeader( bcf_hdr_init(toStringz("w"c)));
+        this.vcfhdr = new VCFHeader( bcf_hdr_init("w\0"c.ptr));
         addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
+        bcf_hdr_sync(this.vcfhdr.hdr);
 
+        hts_log_trace(__FUNCTION__, "Displaying header at construction");
+        //     int bcf_hdr_format(const(bcf_hdr_t) *hdr, int is_bcf, kstring_t *str);
+        kstring_t ks;
+        bcf_hdr_format(this.vcfhdr.hdr, 0, &ks);
+        char[] hdr;
+        hdr.length = ks.l;
+        import core.stdc.string: memcpy;
+        memcpy(hdr.ptr, ks.s, ks.l);
+        import std.stdio: writeln;
+        writeln(hdr);
     }
     /// setup and copy a header from another BCF/VCF as template
     this(T)(string fn, T other)
@@ -478,7 +658,7 @@ struct VCFWriter
     ~this()
     {
         const ret = vcf_close(this.fp);
-        if (ret != 0) hts_log_error(__FUNCTION__,"couldn't close VCF after writing");
+        if (ret != 0) hts_log_error(__FUNCTION__, "couldn't close VCF after writing");
 
         // Deallocate header
         //bcf_hdr_destroy(this.hdr);
@@ -530,7 +710,9 @@ struct VCFWriter
     {
         assert(this.vcfhdr != null);
         //    int bcf_hdr_append(bcf_hdr_t *h, const(char) *line);
-        return bcf_hdr_append(this.vcfhdr.hdr, toStringz(line));
+        const auto ret = bcf_hdr_append(this.vcfhdr.hdr, toStringz(line));
+        bcf_hdr_sync(this.vcfhdr.hdr);
+        return ret;
     }
     
     /** Add INFO (§1.2.2) or FORMAT (§1.2.4) tag
@@ -557,7 +739,7 @@ struct VCFWriter
 
         // check ID
         if (id == "") {
-            hts_log_error(__FUNCTION__,"no ID");
+            hts_log_error(__FUNCTION__, "no ID");
             return;
         }
 
@@ -572,7 +754,7 @@ struct VCFWriter
                     number.to!int;  // don't need to store result, will use format/%s
                 }
                 catch (ConvException e) {
-                    hts_log_error(__FUNCTION__,"Number not A/R/G/. nor an integer");
+                    hts_log_error(__FUNCTION__, "Number not A/R/G/. nor an integer");
                     return;
                 }
         }
@@ -584,15 +766,15 @@ struct VCFWriter
             type != "Flag" &&
             type != "Character" &&
             type != "String") {
-                hts_log_error(__FUNCTION__,"unrecognized type");
+                hts_log_error(__FUNCTION__, "unrecognized type");
                 return;
         }
 
         // check Description
-        if (description == "") hts_log_error(__FUNCTION__,"no description");
+        if (description == "") hts_log_error(__FUNCTION__, "no description");
 
         // check Source and Version
-        if (source == "" && _version != "") hts_log_error(__FUNCTION__,"version wo source");
+        if (source == "" && _version != "") hts_log_error(__FUNCTION__, "version wo source");
 
         // Format params
         if (source != "" && _version != "")
@@ -614,11 +796,11 @@ struct VCFWriter
     {
         // check ID
         if (id == "") {
-            hts_log_error(__FUNCTION__,"no ID");
+            hts_log_error(__FUNCTION__, "no ID");
             return;
         }
         // check Description
-        if (description == "") hts_log_error(__FUNCTION__,"no description");
+        if (description == "") hts_log_error(__FUNCTION__, "no description");
 
         string line = format("##FILTER=<ID=%s,Description=\"%s\">\0", id, description);
         bcf_hdr_append(this.vcfhdr.hdr, line.ptr);
@@ -644,7 +826,7 @@ struct VCFWriter
         bcf1_t *line = new bcf1_t;
 
         line.rid = bcf_hdr_name2id(this.vcfhdr.hdr, toStringz(contig));
-        if (line.rid == -1) hts_log_error(__FUNCTION__,"contig not found");
+        if (line.rid == -1) hts_log_error(__FUNCTION__, "contig not found");
 
         line.pos = pos;
 
@@ -714,7 +896,7 @@ struct VCFWriter
     int writeRecord(ref VCFRecord r)
     {
         const ret = bcf_write(this.fp, this.vcfhdr.hdr, r.line);
-        if (ret != 0) hts_log_error(__FUNCTION__,"bcf_write error");
+        if (ret != 0) hts_log_error(__FUNCTION__, "bcf_write error");
         return ret;
     }
     /// as expected
@@ -723,7 +905,7 @@ struct VCFWriter
         hts_log_warning(__FUNCTION__, "pre call");
         const ret = bcf_write(this.fp, hdr, rec);
         hts_log_warning(__FUNCTION__, "post call");
-        if (ret != 0) hts_log_error(__FUNCTION__,"bcf_write error");
+        if (ret != 0) hts_log_error(__FUNCTION__, "bcf_write error");
         return ret;
     }
 }
@@ -753,7 +935,7 @@ struct VCFReader
     ~this()
     {
         const ret = vcf_close(this.fp);
-        if (ret != 0) hts_log_error(__FUNCTION__,"couldn't close VCF after reading");
+        if (ret != 0) hts_log_error(__FUNCTION__, "couldn't close VCF after reading");
 
         // Deallocate header
         //bcf_hdr_destroy(this.hdr);
@@ -787,10 +969,10 @@ struct VCFReader
         (isIntegral!T || isSomeString!T))
     {
         // hlt : header line type
-        static if (tagType == "FILTER")     int hlt = BCF_HL_FLT;
-        else static if (tagType == "INFO")  int hlt = BCF_HL_INFO;
-        else static if (tagType == "FORMAT") int hlt= BCF_HL_FMT;
-        else static if (tagType == "contig") int hlt= BCF_HL_CTG;
+        static if (tagType == "FILTER")     const int hlt = BCF_HL_FLT;
+        else static if (tagType == "INFO")  const int hlt = BCF_HL_INFO; // @suppress(dscanner.suspicious.label_var_same_name)
+        else static if (tagType == "FORMAT") const int hlt= BCF_HL_FMT; // @suppress(dscanner.suspicious.label_var_same_name)
+        else static if (tagType == "contig") const int hlt= BCF_HL_CTG; // @suppress(dscanner.suspicious.label_var_same_name)
         else assert(0);
 
         bcf_hrec_t *hrec = bcf_hdr_get_hrec(this.vcfhdr.hdr, hlt, toStringz(key), toStringz(value), toStringz(str_class));
@@ -842,4 +1024,125 @@ struct VCFReader
         // its copy
         return new VCFRecord(this.vcfhdr, bcf_dup(this.b));
     }
+}
+
+///
+unittest
+{
+    import std.exception: assertThrown;
+    import std.stdio: writeln, writefln;
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+
+
+    auto vw = VCFWriter("/dev/null");
+
+    vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
+    vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
+    // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
+    vw.addTag!"INFO"("AF", "A", "Integer", "Number of Samples With Data");
+    vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>");
+    vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
+
+    auto r = new VCFRecord(vw.vcfhdr, bcf_init1());
+    
+    r.chrom = "20";
+    assert(r.chrom == "20");
+    assertThrown(r.chrom = "chr20");   // headerline chromosome is "20" not "chr20"
+
+    r.pos = 999_999;
+    assert(r.pos == 999_999);
+    r.pos = 62_435_964 + 1;     // Exceeds contig length
+
+    // Test ID field
+    // note that in an empty freshly initialized bcf1_t, the ID field is "" rather than "."
+    // Will consider adding initialization code
+    //writefln("ID: %s", r.id);
+    r.id = "";
+    assert(r.id == ".");
+    r.id = ".";
+    assert(r.id == ".");
+    r.id = "rs001";
+    assert(r.id == "rs001");
+    r.addID("rs999");
+    assert(r.id == "rs001;rs999");
+    r.addID("rs001");   // test duplicate checking
+    assert(r.id == "rs001;rs999");
+
+    // Test REF/ALT allele setters and getters
+    // many overloads to test for good coverage
+    // Test matrix: Set {zero, one, two, three} alleles * {set by string, set by array} = 8 test cases
+    //  * TODO: will also need to retreive alt alleles as array and string
+
+    string[] alleles_array;
+
+    // Zero alleles
+    r.alleles("");
+    const auto zs = r.allelesAsArray;
+    const auto zsr = r.refAllele;
+    assert(zs.length == 0);
+    assert(zsr == "");
+
+    r.alleles(alleles_array);
+    const auto za = r.allelesAsArray;
+    const auto zar = r.refAllele;
+    assert(za.length == 0);
+    assert(zar == "");
+    
+    // One allele
+    r.alleles("C");
+    const auto os = r.allelesAsArray;
+    const auto osr = r.refAllele;
+    assert(os.length == 1 && os[0] == "C");
+    assert(osr == "C");
+
+    r.alleles(["C"]);
+    const auto oa = r.allelesAsArray;
+    const auto oar = r.refAllele;
+    assert(oa.length == 1 && oa[0] == "C");
+    assert(oar == "C");
+
+    // Two alleles
+    r.alleles("C,T");
+    const auto ts = r.allelesAsArray;
+    const auto tsr= r.refAllele;
+    assert(ts == ["C", "T"]);
+    assert(tsr== "C");
+
+    r.alleles(["C", "T"]);
+    const auto ta = r.allelesAsArray;
+    const auto tar= r.refAllele;
+    assert(ta == ["C", "T"]);
+    assert(tar== "C");
+
+    const taaa = r.altAllelesAsArray;
+    const taas = r.altAllelesAsString;
+    assert(taaa == ["T"]);
+    assert(taas == "T");
+
+    // Test QUAL
+    r.qual = 1.0;
+    assert(r.qual == 1.0);
+    // now test setting qual without unpacking
+    // TODO: see https://forum.dlang.org/post/hebouvswxlslqhovzaia@forum.dlang.org, once resolved (or once factory function written),
+    //  add template value param BCF_UN_STR
+    auto rr = new VCFRecord(vw.vcfhdr, "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0.017\n"); // @suppress(dscanner.style.long_line)
+    rr.qual = 3.0;
+    assert(rr.qual == 3.0);
+
+
+    // Test FILTER
+    // add q10 filter (is in header)
+    r.filter = "q10";
+    assert(r.filter == "q10");
+    // add q30 filteR (not in header)
+    r.filter = "q30";
+    assert(r.filter == "q10");  // i.e., unchanged
+    
+    assert(r.hasFilter("PASS"));
+    assert(r.hasFilter("."));
+    assert(r.hasFilter("q10"));
+    assert(!r.hasFilter("q30"));
+
+    writeln("\ndhtslib.vcf: all tests passed\n");
 }

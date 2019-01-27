@@ -117,8 +117,8 @@ struct bcf_idpair_t { // @suppress(dscanner.style.phobos_naming_convention)
 /// Note that bcf_hdr_t structs must always be created via bcf_hdr_init()
 struct bcf_hdr_t { // @suppress(dscanner.style.phobos_naming_convention)
     int32_t[3] n;           /// n:the size of the dictionary block in use, (allocated size, m, is below to preserve ABI)
-    bcf_idpair_t *[3] id;   /// ?
-    void *[3] dict;         /// ID dictionary, contig dict and sample dict
+    bcf_idpair_t *[3] id;   /// ID dictionary {FILTER/INFO/FORMAT, contig, sample} ID key/entry
+    void *[3] dict;         /// hash table
     char **samples;         /// ?list of samples
     bcf_hrec_t **hrec;      /// Structured representation of this header line
     int nhrec;              /// # of header records

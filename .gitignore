@@ -1,10 +1,18 @@
+# Compiled Object files
 *.o
-*.a
-*.swp
-.dub/*
-dub.selections.json
+*.obj
 
-# binaries
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+
+# Executables
+*.exe
 tabix_gffreader
 bgzfreader
 samreader
@@ -12,9 +20,23 @@ vcfwriter
 bug_minimal
 sam_iter
 csam_iter
+vcf
+
+# DUB
+.dub
+docs.json
+__dummy.html
+docs/
+dub.selections.json
+
+# Code coverage
+*.lst
 
 # debugging
 *.dSYM/
 
 # test output
 output.vcf
+
+# vi/vim
+*.swp
