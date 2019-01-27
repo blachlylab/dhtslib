@@ -108,11 +108,11 @@ class VCFRecord
     Internal backing by bcf1_t means it must conform to the BCF2 rules -- i.e., header must contain
     appropriate INFO, CONTIG, and FILTER lines.
 
-    Protip: instantiating ctor with alternate MAX_UNPACK (template value param) can speed it tremendously
+    Protip: specifying alternate MAX_UNPACK can speed it tremendously
         as it will not unpack all fields, only up to those requested (see htslib.vcf)
         For example, BCF_UN_STR is up to ALT inclusive, and BCF_UN_STR is up to FILTER
     */
-    this(int MAX_UNPACK = BCF_UN_ALL, T)(T *h, bcf1_t *b)
+    this(T)(T *h, bcf1_t *b, int MAX_UNPACK = BCF_UN_ALL)
     if(is(T == VCFHeader) || is(T == bcf_hdr_t))
     {
         static if (is(T == VCFHeader)) this.vcfheader = h;
@@ -123,7 +123,7 @@ class VCFRecord
         this.line = b;
 
         // Now it must be unpacked
-        // Protip: instantiating with alternate MAX_UNPACK can speed it tremendously
+        // Protip: specifying alternate MAX_UNPACK can speed it tremendously
         int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
     }
     /// ditto
@@ -143,8 +143,7 @@ class VCFRecord
         this.filter = filter;
     }
     /// ditto
-    /// From VCF line (TODO)
-    this(int MAX_UNPACK = BCF_UN_ALL)(VCFHeader *vcfhdr, string line)
+    this(VCFHeader *vcfhdr, string line, int MAX_UNPACK = BCF_UN_ALL)
     {
         this.vcfheader = vcfhdr;
 
@@ -1050,7 +1049,7 @@ unittest
     // Exercise header
     assert(vw.vcfhdr.nsamples == 0);
     // TODO, add samples, check new value
-    
+
     auto r = new VCFRecord(vw.vcfhdr, bcf_init1());
     
     r.chrom = "20";
