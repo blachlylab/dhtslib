@@ -20,7 +20,6 @@ struct Cigar
 
     this(uint * cigar, int length)
     {
-        hts_log_debug(__FUNCTION__,"Cigar Length:"~length.to!string);
         cigar[0..length].each!(x=>ops~=CigarOp(x));
     }
     this(CigarOp[] ops){

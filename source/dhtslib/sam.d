@@ -3,10 +3,10 @@ module dhtslib.sam;
 import core.stdc.stdlib: calloc, free;
 import std.format;
 import std.parallelism: totalCPUs;
-import std.stdio: writeln, writefln,stderr;
+import std.stdio: writeln, writefln,stderr,File;
 import std.string: fromStringz, toStringz;
 
-import dhtslib.htslib.hts: htsFile, hts_open, hts_close;
+import dhtslib.htslib.hts: htsFile, hts_open, hts_close, hdopen,hclose, hFILE, hts_hopen;
 import dhtslib.htslib.hts: hts_itr_t,hts_itr_multi_t,hts_reglist_t,hts_pair32_t;
 import dhtslib.htslib.hts: seq_nt16_str;
 import dhtslib.htslib.hts: hts_set_threads;
@@ -50,6 +50,8 @@ class SAMRecord {
 
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
     @property bool isReversed() { return bam_is_rev(this.b); }
+    /// is read mapped?
+    @property bool isMapped() { return (b.core.flag & BAM_FUNMAP) ==0; }
     /// bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
     @property bool mateReversed() { return bam_is_mrev(this.b); }
     /// auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
@@ -124,6 +126,9 @@ struct SAMFile {
     /// htsFile
     private htsFile *fp;
 
+    /// hFILE if required
+    private hFILE *f;
+
     /// header struct
     bam_hdr_t *header = null;
 
@@ -179,6 +184,43 @@ struct SAMFile {
         }
         hts_log_debug( __FUNCTION__, format("SAM index: %s", this.idx));
     }
+    this(File f, int extra_threads = -1)
+    {
+        import std.parallelism: totalCPUs;
+
+        debug(dhtslib_debug) { writeln("SAMFile ctor"); }
+
+        // open file
+        this.filename = f.name();
+        this.fn = toStringz(f.name);
+        this.f = hdopen(f.fileno,cast(immutable(char)*)"r");
+        this.fp = hts_hopen(this.f,this.fn,cast(immutable(char)*)"r");
+
+        if (extra_threads == -1 && totalCPUs > 1) {
+            hts_log_info(__FUNCTION__, format("%d CPU cores detected; enabling multithreading", totalCPUs));
+            // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
+            // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
+            hts_set_threads(this.fp, totalCPUs );
+        } else if (extra_threads > 0 ) {
+            if ((extra_threads+1) > totalCPUs)
+                hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
+            hts_set_threads(this.fp, extra_threads);
+        } else if (extra_threads == 0) {
+            hts_log_debug(__FUNCTION__, "Zero extra threads requested");
+        } else {
+            hts_log_warning(__FUNCTION__, "Invalid negative number of extra threads requested");
+        }
+
+        // read header
+        this.header = sam_hdr_read(this.fp);
+        this.idx = sam_index_load(this.fp, this.fn);
+        if (this.idx == null) {
+            hts_log_info(__FUNCTION__, "SAM index not found");
+            // TODO: attempt to build
+            // TODO: edit range to return empty immediately if no idx
+        }
+        hts_log_debug( __FUNCTION__, format("SAM index: %s", this.idx));
+    }
     ~this()
     {
         debug(dhtslib_debug) { writeln("SAMFile dtor" ); }
@@ -186,8 +228,15 @@ struct SAMFile {
         bam_hdr_destroy(this.header);
 
         //TODO:hts_close segfaults
-        const auto ret = hts_close(fp);
-        if (ret < 0) writefln("There was an error closing %s", fromStringz(this.fn));
+        //We cant close the file pointer if another program has given us the pointer
+        if(this.f !is null){
+            //Causes double free
+            //auto close=hclose(this.f);
+            //if (ret != 0) writeln("There was an error hfile");
+        }else{
+            const auto ret = hts_close(fp);
+            if (ret < 0) writefln("There was an error closing %s", fromStringz(this.fn));
+        }
     }
 
     /// number of reference sequences; from bam_hdr_t
@@ -306,7 +355,9 @@ struct SAMFile {
     /// Return an InputRange representing all recods in the SAM/BAM/CRAM
     AllRecordsRange all_records()
     {
-        return AllRecordsRange(this.fp, this.header, bam_init1());
+        auto range =AllRecordsRange(this.fp, this.header, bam_init1());
+        range.popFront();
+        return range;
     }
 
     /// Iterate through all records in the SAM/BAM/CRAM
@@ -315,7 +366,7 @@ struct SAMFile {
         private htsFile     *fp;        // belongs to parent; shared
         private bam_hdr_t   *header;    // belongs to parent; shared
         private bam1_t      *b;
-
+        int success;
         ~this()
         {
             //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
@@ -325,7 +376,6 @@ struct SAMFile {
         @property bool empty()
         {
             //    int sam_read1(samFile *fp, bam_hdr_t *h, bam1_t *b);
-            immutable success = sam_read1(this.fp, this.header, this.b);
             if (success >= 0) return false;
             else if (success == -1) return true;
             else {
@@ -337,6 +387,7 @@ struct SAMFile {
         /// ditto
         void popFront()
         {
+            success = sam_read1(this.fp, this.header, this.b);
             // noop? 
             // free this.b ?
             
@@ -548,8 +599,9 @@ int parseSam(string line,bam_hdr_t * header,bam1_t * b){
     import dhtslib.htslib.kstring:kstring_t;
     import std.utf:toUTFz;
     kstring_t k;
-    k.s=toUTFz!(char *)(line);
-    k.l=line.length;
+    k.s=toUTFz!(char *)(line.dup);
+    k.m=line.length+1;
+    k.l=line.length+1;
     return sam_parse1(&k,header,b);
 }
 unittest{
