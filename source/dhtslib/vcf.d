@@ -411,10 +411,10 @@ class VCFRecord
         return ret.idup;
     }
     /// Remove all entries in FILTER
-    void removeFilters()
+    void removeAllFilters()
     {
-        const int ret = bcf_update_filter(this.vcfheader.hdr, this.line, null, 0);
-        if (!ret) hts_log_error(__FUNCTION__, "error removing filters in removeFilters");
+        // always returns zero
+        bcf_update_filter(this.vcfheader.hdr, this.line, null, 0);
     }
     /// Set the FILTER column to f
     @property void filter(string f)
@@ -599,10 +599,11 @@ class VCFRecord
         kstring_t s;
 
         const int ret = vcf_format(this.vcfheader.hdr, this.line, &s);
-        if (!ret)
+        if (ret)
         {
-            hts_log_error(__FUNCTION__, "vcf_format returned nonzero (likely EINVAL, invalid bcf1_t struct?)");
-            return "[VCFRecord:parse_error]";
+            hts_log_error(__FUNCTION__,
+                format("vcf_format returned nonzero (%d) (likely EINVAL, invalid bcf1_t struct?)", ret));
+            return "[VCFRecord vcf_format parse_error]";
         }
 
         return cast(string) s.s[0 .. s.l];
@@ -1046,6 +1047,10 @@ unittest
     vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>");
     vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
 
+    // Exercise header
+    assert(vw.vcfhdr.nsamples == 0);
+    // TODO, add samples, check new value
+    
     auto r = new VCFRecord(vw.vcfhdr, bcf_init1());
     
     r.chrom = "20";
@@ -1074,6 +1079,7 @@ unittest
     // Test REF/ALT allele setters and getters
     // many overloads to test for good coverage
     // Test matrix: Set {zero, one, two, three} alleles * {set by string, set by array} = 8 test cases
+    //  * also, there is setAlleles(ref, alt) and setAlleles(ref, alt1, ...) 
     //  * TODO: will also need to retreive alt alleles as array and string
 
     string[] alleles_array;
@@ -1122,6 +1128,28 @@ unittest
     assert(taaa == ["T"]);
     assert(taas == "T");
 
+    // alternate setter for >= 2 alleles
+    r.setAlleles("A", "G");
+    assert(r.allelesAsArray == ["A", "G"]);
+
+    // Three alleles
+    r.alleles("A,C,T");
+    assert(r.allelesAsArray == ["A", "C", "T"]);
+    assert(r.refAllele == "A");
+    assert(r.altAllelesAsString == "C,T");
+
+    // alternate the alleles for testing purposes
+    r.alleles(["G", "A", "C"]);
+    assert(r.allelesAsArray == ["G", "A", "C"]);
+    assert(r.refAllele == "G");
+    assert(r.altAllelesAsString == "A,C");
+
+    r.setAlleles("A", "C", "T");
+    assert(r.allelesAsArray == ["A", "C", "T"]);
+    assert(r.refAllele == "A");
+    assert(r.altAllelesAsString == "C,T");
+
+
     // Test QUAL
     r.qual = 1.0;
     assert(r.qual == 1.0);
@@ -1148,6 +1176,17 @@ unittest
 
     assert(r.hasFilter("q10"));
     assert(!r.hasFilter("q30"));
+
+    r.removeAllFilters();
+    assert(r.hasFilter("."));
+    r.addFilter("q10");
+    assert(r.hasFilter("q10"));
+    r.removeFilter("q10");
+    assert(r.hasFilter("PASS"));
+
+
+    // Finally, print the records:
+    writefln("VCF records via toString:\n%s%s", r, rr);
 
     writeln("\ndhtslib.vcf: all tests passed\n");
 }
