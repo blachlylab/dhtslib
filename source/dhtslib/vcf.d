@@ -460,8 +460,8 @@ class VCFRecord
     {
         char[] f = filter.dup ~ '\0';
         auto id = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, f.ptr);
-        hts_log_trace(__FUNCTION__, format("filter id %d", id));
         const auto ret = bcf_has_filter(this.vcfheader.hdr, this.line, f.ptr);
+
         if (ret > 0) return true;
         else if (ret == 0) return false;
         else {
@@ -633,6 +633,7 @@ struct VCFWriter
         addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
         bcf_hdr_sync(this.vcfhdr.hdr);
 
+        /+
         hts_log_trace(__FUNCTION__, "Displaying header at construction");
         //     int bcf_hdr_format(const(bcf_hdr_t) *hdr, int is_bcf, kstring_t *str);
         kstring_t ks;
@@ -643,6 +644,7 @@ struct VCFWriter
         memcpy(hdr.ptr, ks.s, ks.l);
         import std.stdio: writeln;
         writeln(hdr);
+        +/
     }
     /// setup and copy a header from another BCF/VCF as template
     this(T)(string fn, T other)
@@ -1132,15 +1134,18 @@ unittest
 
 
     // Test FILTER
+    assert(r.hasFilter("PASS"));
+    assert(r.hasFilter("."));
     // add q10 filter (is in header)
     r.filter = "q10";
     assert(r.filter == "q10");
+    assert(!r.hasFilter("PASS"));   // if has another filter, no longer PASS (unless added explicitly)
+    assert(!r.hasFilter("."));      // if has another filter, no longer has . (which is PASS, or no filter [spec conflict?])
+
     // add q30 filteR (not in header)
     r.filter = "q30";
     assert(r.filter == "q10");  // i.e., unchanged
-    
-    assert(r.hasFilter("PASS"));
-    assert(r.hasFilter("."));
+
     assert(r.hasFilter("q10"));
     assert(!r.hasFilter("q30"));
 
