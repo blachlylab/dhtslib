@@ -1,6 +1,7 @@
 module dhtslib.tagvalue;
 
 import std.stdio;
+import std.meta:AliasSeq,staticIndexOf;
 import std.string:fromStringz;
 import dhtslib.htslib.sam:bam_aux_get,bam1_t,bam_aux2i;
 import dhtslib.htslib.hts_log;
@@ -18,10 +19,12 @@ S ushort
 i int
 I uint
 f float
-B? array of type ?
+Bc array of type byte
 Z char array
+H hex?
 
 Memory layout
+pipes delimit byte boundaries in an array
 8/9 are example values
 2 is a count of the array
 the ubyte * starts at the type char
@@ -30,7 +33,15 @@ s |  | 8|
 i |  |  |  | 8|
 B |i |  |  |  | 2|  |  |  | 8|  |  |  | 9|
 
+
+Alias seq allows us to have an enum of types.
+https://forum.dlang.org/post/kmdjfzpugudmwfrdgson@forum.dlang.org
+Thanks Paul!
 */
+
+alias Types = AliasSeq!(byte,ubyte,short,ushort,int,uint,float,string,char);
+enum TypeIndex(T)=staticIndexOf!(T,Types);
+char[9] TypeChars = ['c','C','s','S','i','I','f','Z','A'];
 
 struct TagValue{
     ubyte* data;
@@ -53,9 +64,13 @@ struct TagValue{
         return (cast(T*)(data[6..T.sizeof+6].ptr))[0..n];
     }
 
-    //bool check(T){
-    //    return
-    //}
+    bool check(T)(){
+        return TypeChars[TypeIndex!T] == cast(char)data[0];
+    }
+
+    bool check(T:T[])(){
+        return (cast(char)data[0]=='B') && (TypeChars[TypeIndex!T] == cast(char)data[1]);
+    }
 
     string toString(){
         if(data !is null &&cast(char)data[0]=='Z'){
@@ -87,10 +102,11 @@ unittest{
 unittest{
     import dhtslib.sam;
     import dhtslib.htslib.hts_log;
+    import std.path:buildPath,dirName;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__,"Testing tagvalue");
     hts_log_info(__FUNCTION__,"Loading test file");
-    auto bam=SAMFile("htslib/test/auxf#values.sam",0);
+    auto bam=SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"),0);
     hts_log_info(__FUNCTION__,"Getting read 1");
     auto readrange=bam.all_records();
     auto read=readrange.front;
@@ -101,39 +117,50 @@ unittest{
     assert(read["Ac"].to!char=='c');
     assert(read["AC"].to!char=='C');
     hts_log_info(__FUNCTION__,"Testing int");
-    assert(read["I0"].to!byte==0);
-    assert(read["I1"].to!byte==1);
-    assert(read["I2"].to!byte==127);
+    assert(read["I0"].to!ubyte==0);
+    assert(read["I1"].to!ubyte==1);
+    assert(read["I2"].to!ubyte==127);
     assert(read["I3"].to!ubyte==128);
     assert(read["I4"].to!ubyte==255);
-    assert(read["I5"].to!short==256);
-    assert(read["I6"].to!short==32767);
-    assert(read["I7"].to!ushort==32768);
-    assert(read["I8"].to!ushort==65535);
-    assert(read["I9"].to!int==65536);
-    assert(read["IA"].to!int==2147483647);
+    assert(read["I5"].to!ushort==256);
+    assert(read["I6"].to!ushort==32_767);
+    assert(read["I7"].to!ushort==32_768);
+    assert(read["I8"].to!ushort==65_535);
+    assert(read["I9"].to!uint==65_536);
+    assert(read["IA"].to!uint==2_147_483_647);
     assert(read["i1"].to!byte==-1);
     assert(read["i2"].to!byte==-127);
     assert(read["i3"].to!byte==-128);
     assert(read["i4"].to!short==-255);
     assert(read["i5"].to!short==-256);
-    assert(read["i6"].to!short==-32767);
-    assert(read["i7"].to!short==-32768);
-    assert(read["i8"].to!int==-65535);
-    assert(read["i9"].to!int==-65536);
-    assert(read["iA"].to!int==-2147483647);
-    assert(read["iB"].to!int==-2147483648);
+    assert(read["i6"].to!short==-32_767);
+    assert(read["i7"].to!short==-32_768);
+    assert(read["i8"].to!int==-65_535);
+    assert(read["i9"].to!int==-65_536);
+    assert(read["iA"].to!int==-2_147_483_647);
+    assert(read["iB"].to!int==-2_147_483_648);
     hts_log_info(__FUNCTION__,"Testing float");
     assert(read["F0"].to!float==-1.0);
     assert(read["F1"].to!float==0.0);
     assert(read["F2"].to!float==1.0);
-    //assert(read["F3"].to!float==9.9e-19);
-    //assert(read["F4"].to!float==-9.9e-19);
+    hts_log_info(__FUNCTION__,"Running tag checking");
+    assert(read["I0"].check!ubyte==true);
+    assert(read["I5"].check!ushort==true);
+    assert(read["I9"].check!uint==true);
+    assert(read["i1"].check!byte==true);
+    assert(read["i4"].check!short==true);
+    assert(read["i8"].check!int==true);
+    assert(read["F0"].check!float==true);
     readrange.popFront;
     read=readrange.front;
     hts_log_info(__FUNCTION__,"Testing arrays");
-    assert(read["Bs"].to!(short[])==[-32768,-32767,0,32767]);
-    assert(read["Bi"].to!(int[])==[-2147483648,-2147483647,0,2147483647]);
-    assert(read["BS"].to!(ushort[])==[0,32767,32768,65535]);
-    assert(read["BI"].to!(uint[])==[0,2147483647,2147483648,4294967295]);
+    assert(read["Bs"].to!(short[])==[-32_768,-32_767,0,32_767]);
+    assert(read["Bi"].to!(int[])==[-2_147_483_648,-2_147_483_647,0,2_147_483_647]);
+    assert(read["BS"].to!(ushort[])==[0,32_767,32_768,65_535]);
+    assert(read["BI"].to!(uint[])==[0,2_147_483_647,2_147_483_648,4_294_967_295]);
+    hts_log_info(__FUNCTION__,"Running tag checking");
+    assert(read["Bs"].check!(short[])==true);
+    assert(read["Bi"].check!(int[])==true);
+    assert(read["BS"].check!(ushort[])==true);
+    assert(read["BI"].check!(uint[])==true);
 }
