@@ -8,6 +8,7 @@
 module dhtslib.htslib.hts;
 
 import std.bitmanip;
+import dhtslib.htslib.hfile:hFILE;
 
 extern (C):
 /// @file htslib/hts.h
@@ -46,7 +47,6 @@ import core.stdc.stdint;
 import dhtslib.htslib.bgzf;
 
 struct cram_fd;
-struct hFILE;
 struct hts_tpool;
 
 import dhtslib.htslib.kstring: __kstring_t, kstring_t;
@@ -413,20 +413,6 @@ htsFile *hts_hopen(hFILE *fp, const(char) *fn, const(char) *mode);
   @return    0 for success, or negative if an error occurred.
 */
 int hts_close(htsFile *fp);
-
-/// Associate a stream with an existing open file descriptor
-/** @return An hFILE pointer, or `NULL` (with _errno_ set) if an error occurred.
-Note that the file must be opened in binary mode, or else
-there will be problems on platforms that make a difference
-between text and binary mode.
-For socket descriptors (on Windows), _mode_ should contain `s`.
-*/
-hFILE *hdopen(int fd, const char *mode);
-
-/// Flush (for output streams) and close the stream
-/** @return  0 if successful, or `EOF` (with _errno_ set) if an error occurred.
-*/
-int hclose(hFILE *fp);
 
 /*!
   @abstract  Returns the file's format information
