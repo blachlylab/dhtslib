@@ -365,45 +365,46 @@ struct SAMFile
         return query(q);
     }
 
-    /// bam["chr1",1..2]
+    /// bam["chr1", 1..2]
     auto opIndex(string tid, int[2] pos)
     {
         return query(tid, pos[0], pos[1]);
     }
 
-    /// bam["chr1",1]
+    /// bam["chr1", 1]
     auto opIndex(string tid, int pos)
     {
         return query(tid, pos, pos + 1);
     }
 
     /** Deprecated: use multidimensional slicing with second parameter as range (["chr1", 1 .. 2]) */
-    /// bam["chr1",1,2]
+    /// bam["chr1", 1, 2]
     deprecated auto opIndex(string tid, int pos1, int pos2)
     {
         return query(tid, pos1, pos2);
     }
 
     /// Integer-based chr below
-    /// bam[0,1..2]
+    /// bam[0, 1..2]
     auto opIndex(int tid, int[2] pos)
     {
         return query(tid, pos[0], pos[1]);
     }
 
-    /// bam[0,1]
+    /// bam[0, 1]
     auto opIndex(int tid, int pos)
     {
         return query(tid, pos, pos + 1);
     }
 
-    /// bam[0,1,2]
+    /// bam[0, 1, 2]
     deprecated auto opIndex(int tid, int pos1, int pos2)
     {
         return query(tid, pos1, pos2);
     }
 
-    int[2] opSlice(size_t dim)(int start, int end) if (dim >= 0 && dim < 2)
+    /// support bam["chr1", 1..2 ]
+    int[2] opSlice(size_t dim)(int start, int end) if (dim  == 1)
     {
         return [start, end];
     }
@@ -543,8 +544,8 @@ struct SAMFile
         import std.range : drop, array;
         import std.conv : to;
 
-        hts_reglist_t[string] rlist;
-        SAMFile* sam;
+        private hts_reglist_t[string] rlist;
+        private SAMFile* sam;
 
         ///
         this(SAMFile* sam, string[] queries)
@@ -689,10 +690,10 @@ private int parseSam(string line, bam_hdr_t* header, bam1_t* b)
 
 unittest
 {
-    import std.stdio;
+    import std.stdio : writeln;
     import std.range : drop;
     import std.utf : toUTFz;
-    import dhtslib.htslib.hts_log;
+    import dhtslib.htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
 
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Loading sam file");
