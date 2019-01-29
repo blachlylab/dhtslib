@@ -5,11 +5,12 @@ import core.stdc.stdlib : malloc, free;
 
 import dhtslib.htslib.faidx;
 
-/// Build index for a FASTA or bgzip-compressed FASTA file.
-/**  @param  fn  FASTA file name
-     @param  fnfai Name of .fai file to build.
-     @param  fngzi Name of .gzi file to build (if fn is bgzip-compressed).
-     @return     0 on success; or -1 on failure
+/** Build index for a FASTA or bgzip-compressed FASTA file.
+
+    @param  fn  FASTA file name
+    @param  fnfai Name of .fai file to build.
+    @param  fngzi Name of .gzi file to build (if fn is bgzip-compressed).
+    @return     0 on success; or -1 on failure
 
 If fnfai is NULL, ".fai" will be appended to fn to make the FAI file name.
 If fngzi is NULL, ".gzi" will be appended to fn for the GZI file.  The GZI
@@ -18,7 +19,7 @@ file will only be built if fn is bgzip-compressed.
 bool buildFastaIndex(string fn, string fnfai = "", string fngzi = "")
 {
     // int fai_build3(const char *fn, const char *fnfai, const char *fngzi);
-    int ret = fai_build3( toStringz(fn),
+    const int ret = fai_build3( toStringz(fn),
                             fnfai ? toStringz(fnfai) : null,
                             fngzi ? toStringz(fngzi) : null);
     
@@ -27,10 +28,19 @@ bool buildFastaIndex(string fn, string fnfai = "", string fngzi = "")
     assert(0);
 }
 
+/** FASTA file with .fai or .gzi index
+
+Reads existing FASTA file, optionally creating FASTA index if one does not exist.
+
+Convenient member fns to get no. of sequences, get sequence names and lengths,
+test for membership, and rapidly fetch sequence at offset.
+*/
 struct IndexedFastaFile {
 
-    faidx_t *faidx;
+    private faidx_t *faidx;
 
+    /// construct from filename, optionally creating index if it does not exist
+    /// throws Exception (TODO: remove) if file DNE, or if index DNE unless create->true
     this(string fn, bool create=false)
     {
         if (create) {
@@ -48,10 +58,15 @@ struct IndexedFastaFile {
         fai_destroy(this.faidx);
     }
 
-    /** fetchSequence (overloaded)
-     *
-     *  Region in the format "chr2:20,000-30,000"
-     */
+    /// Fetch sequence in region by assoc array-style lookup:
+    /// `string sequence = fafile["chr2:20123-30456"]`
+    auto opIndex(string region)
+    {
+        return fetchSequence(region);
+    }
+
+    /// Fetch sequence in region by assoc array-style lookup:
+    /// `string sequence = fafile["chr2:20123-30456"]`
     string fetchSequence(string region)
     {
         char *fetchedSeq;
@@ -69,24 +84,43 @@ struct IndexedFastaFile {
         return seq;
     }
 
-    /** fetchSequence (overloaded)
-     *
-     * htslib API for my reference:
-     * @param  fai  Pointer to the faidx_t struct
-     * @param  c_name Region name
-     * @param  p_beg_i  Beginning position number (zero-based)
-     * @param  p_end_i  End position number (zero-based)
-     * @param  len  Length of the region; -2 if c_name not present, -1 general error
-     * @return      Pointer to the sequence; null on failure
-     *  The returned sequence is allocated by `malloc()` family and should be destroyed
-     *  by end users by calling `free()` on it.
-     *
-     */
+    /// Fetch sequence in region by multidimensional slicing:
+    /// `string sequence = fafile["chr2", 20123 .. 30456]`
+    ///
+    /// Sadly, $ to represent max length is not supported
+    auto opIndex(string contig, int[2] pos)
+    {
+        return fetchSequence(contig, pos[0], pos[1]);
+    }
+    /// ditto
+    int[2] opSlice(size_t dim)(int start, int end) if (dim == 1)
+    in { assert(start >= 0); }
+    do
+    {
+        return [start, end];
+    }
+
+    /// Fetch sequence in region by multidimensional slicing:
+    /// `string sequence = fafile["chr2", 20123 .. 30456]`
+    ///
+    /// Sadly, $ to represent max length is not supported
     string fetchSequence(string contig, int start, int end)
     {
-        // char *faidx_fetch_seq(const faidx_t *fai, const char *c_name, int p_beg_i, int p_end_i, int *len);
         char *fetchedSeq;
         int fetchedLen;
+        /* htslib API for my reference:
+         *
+         * char *faidx_fetch_seq(const faidx_t *fai, const char *c_name, int p_beg_i, int p_end_i, int *len);
+         * @param  fai  Pointer to the faidx_t struct
+         * @param  c_name Region name
+         * @param  p_beg_i  Beginning position number (zero-based)
+         * @param  p_end_i  End position number (zero-based)
+         * @param  len  Length of the region; -2 if c_name not present, -1 general error
+         * @return      Pointer to the sequence; null on failure
+         *  The returned sequence is allocated by `malloc()` family and should be destroyed
+         *  by end users by calling `free()` on it.
+         *
+        */
         fetchedSeq = faidx_fetch_seq(this.faidx, toStringz(contig), start, end, &fetchedLen);
         
         string seq = fromStringz(fetchedSeq).idup;
@@ -98,13 +132,15 @@ struct IndexedFastaFile {
         return seq;
     }
 
+    /// Test whether the FASTA file/index contains string seqname
     bool hasSeq(string seqname)
     {
         // int faidx_has_seq(const faidx_t *fai, const char *seq);
         return cast(bool) faidx_has_seq(this.faidx, toStringz(seqname) );
     }
 
-    @property nSeq()
+    /// Return the number of sequences in the FASTA file/index
+    @property auto nSeq()
     {
         return faidx_nseq(this.faidx);
     }
@@ -124,7 +160,7 @@ struct IndexedFastaFile {
     {
         // TODO should I check for -1 and throw exception or pass to caller?
         // int faidx_seq_len(const faidx_t *fai, const char *seq);
-        int l = faidx_seq_len(this.faidx, toStringz(seqname) );
+        const int l = faidx_seq_len(this.faidx, toStringz(seqname) );
         if ( l == -1 ) throw new Exception("seqLen: sequence name not found");
         return l;
     }
