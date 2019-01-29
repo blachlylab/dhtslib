@@ -225,9 +225,9 @@ struct SAMFile
         }
         else static if (is(T == File))
         {
-            this.filename = f.name();
-            this.fn = toStringz(f.name);
-            this.f = hdopen(f.fileno, cast(immutable(char)*) "r");
+            this.filename = fn.name();
+            this.fn = toStringz(fn.name);
+            this.f = hdopen(fn.fileno, cast(immutable(char)*) "r");
             this.fp = hts_hopen(this.f, this.fn, cast(immutable(char)*) "r");
         }
         else assert(0);
