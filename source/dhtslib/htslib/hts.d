@@ -8,7 +8,6 @@
 module dhtslib.htslib.hts;
 
 import std.bitmanip;
-import dhtslib.htslib.hfile:hFILE;
 
 extern (C):
 /// @file htslib/hts.h
@@ -47,6 +46,7 @@ import core.stdc.stdint;
 import dhtslib.htslib.bgzf;
 
 struct cram_fd;
+import dhtslib.htslib.hfile : hFILE;
 struct hts_tpool;
 
 import dhtslib.htslib.kstring: __kstring_t, kstring_t;
