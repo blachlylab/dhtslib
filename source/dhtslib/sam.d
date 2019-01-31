@@ -124,10 +124,8 @@ class SAMRecord
 
         for (int i; i < this.b.core.l_qseq; i++)
         {
-            if (this.b.core.flag & BAM_FREVERSE)    s[i] = seq_nt16_str[seq_comp_table[bam_seqi(seqdata, i)]];
-            else                                    s[i] = seq_nt16_str[bam_seqi(seqdata, i)];
+            s[i] = seq_nt16_str[bam_seqi(seqdata, i)];
         }
-        if (this.b.core.flag & BAM_FREVERSE) reverse(s);
         return s;
     }
 
@@ -145,9 +143,6 @@ class SAMRecord
 
         for (int i; i < this.b.core.l_qseq; i++)
             q[i] = cast(char)(qualdata[i] + 33);
-        if (this.b.core.flag & BAM_FREVERSE)
-            reverse(q);
-
         return q;
     }
 
@@ -689,16 +684,33 @@ private int parseSam(string line, bam_hdr_t* header, bam1_t* b)
     return sam_parse1(&k, header, b);
 }
 
+unittest{
+    writeln();
+    import dhtslib.sam;
+    import dhtslib.htslib.hts_log;
+    import std.path:buildPath,dirName;
+    import std.string:fromStringz;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto sam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"), 0);
+    auto readrange = sam.allRecords;
+    hts_log_info(__FUNCTION__, "Getting read 1");
+    auto read = readrange.front();
+    writeln(fromStringz(read.sequence));
+    assert(fromStringz(read.sequence)=="GCTAGCTCAG");
+}
+
 unittest
 {
     import std.stdio : writeln;
     import std.range : drop;
     import std.utf : toUTFz;
     import dhtslib.htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
-
+    import std.path:buildPath,dirName;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Loading sam file");
-    auto range = File("htslib/test/realn01_exp-a.sam").byLineCopy();
+    auto range = File(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","realn01_exp-a.sam")).byLineCopy();
     auto b = bam_init1();
     auto hdr = bam_hdr_init();
     string hdr_str;
