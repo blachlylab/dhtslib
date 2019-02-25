@@ -709,6 +709,7 @@ unittest
     import std.utf : toUTFz;
     import dhtslib.htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
     import std.path:buildPath,dirName;
+    import std.conv:to;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Loading sam file");
     auto range = File(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","realn01_exp-a.sam")).byLineCopy();
