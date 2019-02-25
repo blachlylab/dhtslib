@@ -688,7 +688,7 @@ private int parseSam(string line, bam_hdr_t* header, bam1_t* b)
     k.l = line.length + 1;
     return sam_parse1(&k, header, b);
 }
-
+debug(dhtslib_unittest)
 unittest
 {
     import std.stdio : writeln;

@@ -150,7 +150,7 @@ enum Ops
     DIFF = 8,
     BACK = 9
 }
-
+debug(dhtslib_unittest)
 unittest
 {
     writeln();
@@ -190,7 +190,7 @@ Ops charToOp(char c)
     }
     return cast(Ops) 9;
 }
-
+debug(dhtslib_unittest)
 unittest
 {
     writeln();
