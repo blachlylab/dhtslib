@@ -41,7 +41,24 @@ struct Cigar
     {
         return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
     }
-
+    @property int ref_bases_covered(){
+        int len;
+        foreach(op;this.ops){
+            switch (op.op)
+            {
+            case Ops.MATCH:
+            case Ops.EQUAL:
+            case Ops.DIFF:
+            case Ops.DEL:
+            case Ops.REF_SKIP:
+                len += op.length;
+                break;
+            default:
+                break;
+            }
+        }
+        return len;
+    }
     /// return the alignment length expressed by this Cigar
     int alignedLength()
     {
