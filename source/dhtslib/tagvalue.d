@@ -3,7 +3,9 @@ module dhtslib.tagvalue;
 import std.stdio;
 import std.meta:AliasSeq,staticIndexOf;
 import std.string:fromStringz;
-import dhtslib.htslib.sam:bam_aux_get,bam1_t,bam_aux2i;
+import std.traits;
+import core.stdc.errno:EINVAL,ENOTSUP,EOVERFLOW,ERANGE,ENOMEM;
+import dhtslib.htslib.sam;
 import dhtslib.htslib.hts_log;
 
 /**
@@ -165,4 +167,121 @@ unittest{
     assert(read["Bi"].check!(int[])==true);
     assert(read["BS"].check!(ushort[])==true);
     assert(read["BI"].check!(uint[])==true);
+}
+
+struct Tags{
+    bam1_t * b;
+    
+    this(bam1_t * b){
+        this.b=b;
+    }
+    
+    TagValue opIndex(char[2] tag){
+        return TagValue(b,tag);
+    }
+    
+    void opIndexAssign(T)(T data, char[2] tag)
+    {
+        int ret;
+        static if(is(T==float)){
+            ret=bam_aux_update_float(b,tag,data);
+        }else static if(isNumeric!T){
+            ret=bam_aux_update_int(b,tag,cast(long)data);
+        }else static if(isSomeString!T){
+            auto d=data.dup;
+            ret=bam_aux_update_str(b,tag,cast(int)d.length,d.ptr);
+        }else{
+            pragma(msg,T.stringof~" is not a valid bam aux type");
+        }
+        debug{
+            if(ret==ENOTSUP || ret==EINVAL){
+                hts_log_warning(__FUNCTION__,(
+                    "Either bam aux data is corrupt or "~T.stringof~
+                    " is not the correct type for bam type "~TypeChars[TypeIndex!T]).idup);
+                assert(0);
+            }
+            if(ret==EOVERFLOW || ret==ERANGE){
+                import std.conv:to;
+                hts_log_warning(__FUNCTION__,(data.to!string~" is either too large or too small").idup);
+                assert(0);
+            }
+            if(ret==ENOMEM){
+                hts_log_warning(__FUNCTION__,("Either bam record is too large or realloc failed").idup);
+                assert(0);
+            }
+        }
+    }
+
+    void opIndexAssign(T:T[])(T data, char[2] tag){
+        int ret;
+        ret=bam_aux_append(b,tag,TypeChars[TypeIndex!T],1,cast(ubyte*)&data);
+        debug{
+            if(ret==ENOTSUP || ret==EINVAL){
+                hts_log_warning(__FUNCTION__,(
+                    "Either bam aux data is corrupt or "~T.stringof~
+                    " is not the correct type for bam type "~TypeChars[TypeIndex!T]).idup);
+                assert(0);
+            }
+            if(ret==EOVERFLOW || ret==ERANGE){
+                import std.conv:to;
+                hts_log_warning(__FUNCTION__,(data.to!string~" is either too large or too small").idup);
+                assert(0);
+            }
+            if(ret==ENOMEM){
+                hts_log_warning(__FUNCTION__,("Either bam record is too large or realloc failed").idup);
+                assert(0);
+            }
+        }
+    }
+}
+
+debug(dhtslib_unittest)
+unittest{
+    import dhtslib.sam;
+    import dhtslib.htslib.hts_log;
+    import std.path:buildPath,dirName;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__,"Testing tags");
+    hts_log_info(__FUNCTION__,"Loading test file");
+    auto bam=SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"),0);
+    hts_log_info(__FUNCTION__,"Getting read 1");
+    auto readrange=bam.all_records();
+    auto read=readrange.front;
+    auto tags=Tags(read.b);
+    // hts_log_info(__FUNCTION__,"Testing string");
+    // tags["ID"]="hello";
+    // assert(tags["ID"].to!string=="hello");
+    // tags["IE"]="hello";
+    // assert(tags["IE"].to!string=="hello");
+    hts_log_info(__FUNCTION__,"Testing int");
+    tags["I0"]=1;
+    assert(tags["I0"].to!ubyte==1);
+    tags["I5"]=257;
+    assert(tags["I5"].to!ushort==257);
+    tags["I9"]=65_537;
+    assert(tags["I9"].to!uint==65_537);
+    tags["i1"]=-2;
+    assert(tags["i1"].to!byte==-2);
+    tags["i4"]=-256;
+    assert(tags["i4"].to!short==-256);
+    tags["i8"]=-65_536;
+    assert(tags["i8"].to!int==-65_536);
+    hts_log_info(__FUNCTION__,"Testing float");
+    tags["F0"]=-2.0f;
+    assert(tags["F0"].to!float==-2.0);
+    tags["F1"]=-1.0f;
+    assert(tags["F1"].to!float==-1.0);
+    tags["F2"]=4.0f;
+    assert(tags["F2"].to!float==4.0);
+    readrange.popFront;
+    read=readrange.front;
+    tags=Tags(read.b);
+    hts_log_info(__FUNCTION__,"Testing arrays");
+    tags["Bs"]=[-32_768,-32_767,0,32_766];
+    assert(tags["Bs"].to!(short[])==[-32_768,-32_767,0,32_766]);
+    tags["Bi"]=[-2_147_483_648,-2_147_483_647,0,2_147_483_646];
+    assert(read["Bi"].to!(int[])==[-2_147_483_648,-2_147_483_647,0,2_147_483_646]);
+    assert(read["Bi"].to!(int[])==[-2_147_483_648,-2_147_483_647,0,2_147_483_647]);
+    assert(read["BS"].to!(ushort[])==[0,32_767,32_768,65_535]);
+    assert(read["BI"].to!(uint[])==[0,2_147_483_647,2_147_483_648,4_294_967_295]);
 }
