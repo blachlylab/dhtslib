@@ -80,31 +80,81 @@ class SAMRecord
         bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
     }
 
+
+    /* bam1_core_t fields */
+
+    /// chromosome ID, defined by bam_hdr_t
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int tid() { return this.b.core.tid; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void tid(int tid) { this.b.core.tid = tid; }
+
+    /// 0-based leftmost coordinate
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int pos() { return this.b.core.pos; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void pos(int pos) { this.b.core.pos = pos; }
+
+    // TODO: @field  bin     bin calculated by bam_reg2bin()
+
+    /// mapping quality
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property ubyte qual() { return this.b.core.qual; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void qual(ubyte q) { this.b.core.qual = q; }
+
+    // TODO:  @field  l_qname length of the query name
+
+    /// bitwise flag
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property ushort flag() { return this.b.core.flag; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void flag(ushort fl) { this.b.core.flag = fl; }
+
+    /// is read reversed?
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
+    pragma(inline, true)
     @property bool isReversed()
     {
         return bam_is_rev(this.b);
     }
 
     /// is read mapped?
+    pragma(inline, true)
     @property bool isMapped()
     {
         return (b.core.flag & BAM_FUNMAP) == 0;
     }
 
+    /// is mate reversed?
     /// bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
+    pragma(inline, true)
     @property bool mateReversed()
     {
         return bam_is_mrev(this.b);
     }
 
     /// auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
+    pragma(inline, true)
     @property char[] queryName()
     {
         return fromStringz(bam_get_qname(this.b));
     }
 
     /// query (and quality string) length
+    pragma(inline, true)
     @property int length()
     {
         return this.b.core.l_qseq;
@@ -164,6 +214,35 @@ class SAMRecord
         }
         return t;
     }
+
+    /// chromosome ID of next read in template, defined by bam_hdr_t
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int mateTID() { return this.b.core.mtid; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void mateTID(int mtid) { this.b.core.mtid = mtid; }
+
+    /// 0-based leftmost coordinate of next read in template
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int matePos() { return this.b.core.mpos; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void matePos(int mpos) { this.b.core.mpos = mpos; }
+
+    /// Presumably Insert size, but is undocumented.
+    /// Per samtools source, is measured 5' to 5'
+    /// https://github.com/samtools/samtools/blob/bd1a409aa750d25d70a093405d174db8709a3f2c/bam_mate.c#L320
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int insertSize() { return this.b.core.isize; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void insertSize(int isize) { this.b.core.isize = isize; }
 }
 
 /**
