@@ -80,31 +80,81 @@ class SAMRecord
         bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
     }
 
+
+    /* bam1_core_t fields */
+
+    /// chromosome ID, defined by bam_hdr_t
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int tid() { return this.b.core.tid; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void tid(int tid) { this.b.core.tid = tid; }
+
+    /// 0-based leftmost coordinate
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int pos() { return this.b.core.pos; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void pos(int pos) { this.b.core.pos = pos; }
+
+    // TODO: @field  bin     bin calculated by bam_reg2bin()
+
+    /// mapping quality
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property ubyte qual() { return this.b.core.qual; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void qual(ubyte q) { this.b.core.qual = q; }
+
+    // TODO:  @field  l_qname length of the query name
+
+    /// bitwise flag
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property ushort flag() { return this.b.core.flag; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void flag(ushort fl) { this.b.core.flag = fl; }
+
+    /// is read reversed?
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
+    pragma(inline, true)
     @property bool isReversed()
     {
         return bam_is_rev(this.b);
     }
 
     /// is read mapped?
+    pragma(inline, true)
     @property bool isMapped()
     {
         return (b.core.flag & BAM_FUNMAP) == 0;
     }
 
+    /// is mate reversed?
     /// bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
+    pragma(inline, true)
     @property bool mateReversed()
     {
         return bam_is_mrev(this.b);
     }
 
     /// auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
+    pragma(inline, true)
     @property char[] queryName()
     {
         return fromStringz(bam_get_qname(this.b));
     }
 
     /// query (and quality string) length
+    pragma(inline, true)
     @property int length()
     {
         return this.b.core.l_qseq;
@@ -124,10 +174,8 @@ class SAMRecord
 
         for (int i; i < this.b.core.l_qseq; i++)
         {
-            if (this.b.core.flag & BAM_FREVERSE)    s[i] = seq_nt16_str[seq_comp_table[bam_seqi(seqdata, i)]];
-            else                                    s[i] = seq_nt16_str[bam_seqi(seqdata, i)];
+            s[i] = seq_nt16_str[bam_seqi(seqdata, i)];
         }
-        if (this.b.core.flag & BAM_FREVERSE) reverse(s);
         return s;
     }
 
@@ -145,9 +193,6 @@ class SAMRecord
 
         for (int i; i < this.b.core.l_qseq; i++)
             q[i] = cast(char)(qualdata[i] + 33);
-        if (this.b.core.flag & BAM_FREVERSE)
-            reverse(q);
-
         return q;
     }
 
@@ -169,6 +214,35 @@ class SAMRecord
         }
         return t;
     }
+
+    /// chromosome ID of next read in template, defined by bam_hdr_t
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int mateTID() { return this.b.core.mtid; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void mateTID(int mtid) { this.b.core.mtid = mtid; }
+
+    /// 0-based leftmost coordinate of next read in template
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int matePos() { return this.b.core.mpos; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void matePos(int mpos) { this.b.core.mpos = mpos; }
+
+    /// Presumably Insert size, but is undocumented.
+    /// Per samtools source, is measured 5' to 5'
+    /// https://github.com/samtools/samtools/blob/bd1a409aa750d25d70a093405d174db8709a3f2c/bam_mate.c#L320
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int insertSize() { return this.b.core.isize; }
+    /// ditto
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property void insertSize(int isize) { this.b.core.isize = isize; }
 }
 
 /**
@@ -225,9 +299,9 @@ struct SAMFile
         }
         else static if (is(T == File))
         {
-            this.filename = f.name();
-            this.fn = toStringz(f.name);
-            this.f = hdopen(f.fileno, cast(immutable(char)*) "r");
+            this.filename = fn.name();
+            this.fn = toStringz(fn.name);
+            this.f = hdopen(fn.fileno, cast(immutable(char)*) "r");
             this.fp = hts_hopen(this.f, this.fn, cast(immutable(char)*) "r");
         }
         else assert(0);
@@ -366,45 +440,46 @@ struct SAMFile
         return query(q);
     }
 
-    /// bam["chr1",1..2]
+    /// bam["chr1", 1..2]
     auto opIndex(string tid, int[2] pos)
     {
         return query(tid, pos[0], pos[1]);
     }
 
-    /// bam["chr1",1]
+    /// bam["chr1", 1]
     auto opIndex(string tid, int pos)
     {
         return query(tid, pos, pos + 1);
     }
 
     /** Deprecated: use multidimensional slicing with second parameter as range (["chr1", 1 .. 2]) */
-    /// bam["chr1",1,2]
+    /// bam["chr1", 1, 2]
     deprecated auto opIndex(string tid, int pos1, int pos2)
     {
         return query(tid, pos1, pos2);
     }
 
     /// Integer-based chr below
-    /// bam[0,1..2]
+    /// bam[0, 1..2]
     auto opIndex(int tid, int[2] pos)
     {
         return query(tid, pos[0], pos[1]);
     }
 
-    /// bam[0,1]
+    /// bam[0, 1]
     auto opIndex(int tid, int pos)
     {
         return query(tid, pos, pos + 1);
     }
 
-    /// bam[0,1,2]
+    /// bam[0, 1, 2]
     deprecated auto opIndex(int tid, int pos1, int pos2)
     {
         return query(tid, pos1, pos2);
     }
 
-    int[2] opSlice(size_t dim)(int start, int end) if (dim >= 0 && dim < 2)
+    /// support bam["chr1", 1..2 ]
+    int[2] opSlice(size_t dim)(int start, int end) if (dim  == 1)
     {
         return [start, end];
     }
@@ -544,8 +619,8 @@ struct SAMFile
         import std.range : drop, array;
         import std.conv : to;
 
-        hts_reglist_t[string] rlist;
-        SAMFile* sam;
+        private hts_reglist_t[string] rlist;
+        private SAMFile* sam;
 
         ///
         this(SAMFile* sam, string[] queries)
@@ -687,17 +762,36 @@ private int parseSam(string line, bam_hdr_t* header, bam1_t* b)
     k.l = line.length + 1;
     return sam_parse1(&k, header, b);
 }
+debug(dhtslib_unittest)
+unittest{
+    writeln();
+    import dhtslib.sam;
+    import dhtslib.htslib.hts_log;
+    import std.path:buildPath,dirName;
+    import std.string:fromStringz;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto sam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"), 0);
+    auto readrange = sam.allRecords;
+    hts_log_info(__FUNCTION__, "Getting read 1");
+    auto read = readrange.front();
+    writeln(fromStringz(read.sequence));
+    assert(fromStringz(read.sequence)=="GCTAGCTCAG");
+}
 
+debug(dhtslib_unittest)
 unittest
 {
-    import std.stdio;
+    import std.stdio : writeln;
     import std.range : drop;
     import std.utf : toUTFz;
-    import dhtslib.htslib.hts_log;
-
+    import dhtslib.htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
+    import std.path:buildPath,dirName;
+    import std.conv:to;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Loading sam file");
-    auto range = File("htslib/test/realn01_exp-a.sam").byLineCopy();
+    auto range = File(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","realn01_exp-a.sam")).byLineCopy();
     auto b = bam_init1();
     auto hdr = bam_hdr_init();
     string hdr_str;

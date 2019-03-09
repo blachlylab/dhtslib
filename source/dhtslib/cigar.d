@@ -32,12 +32,33 @@ struct Cigar
         this.ops = ops;
     }
 
+    bool is_null(){
+        return ops.length == 1 && ops[0].raw == '*';
+    }
+
     /// Format Cigar struct as CIGAR string in accordance with SAM spec
     string toString()
     {
         return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
     }
-
+    @property int ref_bases_covered(){
+        int len;
+        foreach(op;this.ops){
+            switch (op.op)
+            {
+            case Ops.MATCH:
+            case Ops.EQUAL:
+            case Ops.DIFF:
+            case Ops.DEL:
+            case Ops.REF_SKIP:
+                len += op.length;
+                break;
+            default:
+                break;
+            }
+        }
+        return len;
+    }
     /// return the alignment length expressed by this Cigar
     int alignedLength()
     {
@@ -66,6 +87,12 @@ struct Cigar
     }
 }
 
+// Each pair of bits has first bit set iff the operation is query consuming,
+// and second bit set iff it is reference consuming.
+//                                            X  =  P  H  S  N  D  I  M
+private static immutable uint CIGAR_TYPE = 0b11_11_00_00_01_10_10_01_11;
+
+
 /// Represents a distinct cigar operation
 union CigarOp
 {
@@ -87,6 +114,27 @@ union CigarOp
     {
         this.op = op;
         this.length = len;
+    }
+    /// Credit to Biod for this code below
+    /// https://github.com/biod/BioD from their bam.cigar module
+    /// True iff operation is one of M, =, X, I, S
+    bool is_query_consuming() @property const nothrow @nogc {
+        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 1) != 0;
+    }
+
+    /// True iff operation is one of M, =, X, D, N
+    bool is_reference_consuming() @property const nothrow @nogc {
+        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 2) != 0;
+    }
+
+    /// True iff operation is one of M, =, X
+    bool is_match_or_mismatch() @property const nothrow @nogc {
+        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 3) == 3;
+    }
+
+    /// True iff operation is one of 'S', 'H'
+    bool is_clipping() @property const nothrow @nogc {
+        return ((raw & 0xF) >> 1) == 2; // 4 or 5
     }
 }
 
@@ -119,7 +167,7 @@ enum Ops
     DIFF = 8,
     BACK = 9
 }
-
+debug(dhtslib_unittest)
 unittest
 {
     writeln();
@@ -159,7 +207,7 @@ Ops charToOp(char c)
     }
     return cast(Ops) 9;
 }
-
+debug(dhtslib_unittest)
 unittest
 {
     writeln();
@@ -169,4 +217,6 @@ unittest
     auto cig = cigarFromString(c);
     hts_log_info(__FUNCTION__, "Cigar:" ~ cig.toString());
     assert(cig.toString() == c);
+    assert(cig.ops[0].is_query_consuming && cig.ops[0].is_reference_consuming);
+    assert(!cig.ops[1].is_query_consuming && cig.ops[1].is_reference_consuming);
 }

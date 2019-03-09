@@ -80,6 +80,7 @@ struct TagValue{
     }
 }
 
+debug(dhtslib_unittest)
 unittest{
     TagValue v;
     ubyte[12] testdata;
@@ -99,6 +100,7 @@ unittest{
     writeln("testing int");
     assert(v.to!int==3);
 }
+debug(dhtslib_unittest)
 unittest{
     import dhtslib.sam;
     import dhtslib.htslib.hts_log;

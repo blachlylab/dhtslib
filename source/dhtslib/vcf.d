@@ -1031,6 +1031,7 @@ struct VCFReader
 }
 
 ///
+debug(dhtslib_unittest)
 unittest
 {
     import std.exception: assertThrown;

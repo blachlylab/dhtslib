@@ -105,7 +105,7 @@ void hts_log_trace(string ctx, string msg)
     string colormsg = "\x1b[1;36m" ~ msg ~ "\x1b[0m";
     hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), toStringz(colormsg));
 }
-
+debug(dhtslib_unittest)
 unittest{
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_trace(__FUNCTION__, "Test: trace");
