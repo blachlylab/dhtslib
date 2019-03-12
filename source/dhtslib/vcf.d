@@ -505,29 +505,63 @@ class VCFRecord
     void addInfo(T)(string tag, T[] data)
     if(!is(T==immutable(char)))             // otherwise string::immutable(char)[] will match the other template
     {
-        // TODO
+        int ret = -1;
+
+        static if(isIntegral!T) {
+            auto integer = cast(int) data;
+            ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), &integer, data.length);
+        }
+        
+        else static if(isFloatingPoint!T) {
+            auto flt = cast(float) data;    // simply passing "2.0" (or whatever) => data is a double
+            ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, data.length);
+        }
+        
+        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s", data));
     }
 
     /* FORMAT (sample info) */
     void addFormat(T)(string tag, T data)
-    if(isIntegral!T)
     {
         int ret = -1;
 
         static if(isIntegral!T) {
             auto integer = cast(int) data;
-            ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), &data, 1);
+            ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), &integer, 1);
+        }
+        
+        else static if(isFloatingPoint!T) {
+            auto flt = cast(float) data;    // simply passing "2.0" (or whatever) => data is a double
+            ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, 1);
         }
 
+        else static if(isSomeString!T)
+            ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), toStringz(data));
+        
+        else static if(isBoolean!T) {
+            immutable int set = data ? 1 : 0; // if data == true, pass 1 to bcf_update_info_flag(n=); n=0 => clear flag 
+            ret = bcf_update_format_flag(this.vcfheader.hdr, this.line, toStringz(tag), null, set);
+        }
+        
+        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add format (ignoring): %s", data));
     }
     /// auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, int *values, int n) // @suppress(dscanner.style.undocumented_declaration)
     void addFormat(T)(string tag, T[] data)
-    if(is(T == int))
     {
-        int ret = -1;
+                int ret = -1;
 
-        static if(is(T == int))
-            ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), data.ptr, cast(int)data.length);
+        static if(isIntegral!T) {
+            auto integer = cast(int[]) data;
+            ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), integer.ptr, cast(int)data.length);
+        }
+        
+        else static if(isFloatingPoint!T) {
+            auto flt = cast(float[]) data;    // simply passing "2.0" (or whatever) => data is a double
+            ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag), flt.ptr, cast(int)data.length);
+        }
+        
+        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add format (ignoring): %s", data));
+
     }
 
     /// add INFO or FORMAT key:value pairs to a record
