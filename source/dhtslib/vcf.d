@@ -687,7 +687,7 @@ struct VCFWriter
         this.fp = vcf_open(toStringz(fn), toStringz("w"c));
         // TODO: if !fp abort
 
-        static if(is(T == VCFHeader*)) { this.vcfhdr.hdr  = new VCFHeader( bcf_hdr_dup(other.hdr) ); }
+        static if(is(T == VCFHeader*)) { this.vcfhdr      = new VCFHeader( bcf_hdr_dup(other.hdr) ); }
         else static if(is(T == bcf_hdr_t*)) { this.vcfhdr = new VCFHeader( bcf_hdr_dup(other) ); }
     }
     /// dtor
