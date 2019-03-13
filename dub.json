@@ -38,6 +38,13 @@
             "libs": ["hts"]
         },
         {
+            "name": "vcf_reader_test",
+            "targetType": "executable",
+            "targetName": "vcfreader",
+            "mainSourceFile": "test/vcf/vcfreader.d",
+            "libs": ["hts"]
+        },
+        {
             "name": "source",
             "targetType": "sourceLibrary",
             "libs": ["hts"]
@@ -47,6 +54,7 @@
             "targetType": "sourceLibrary",
             "preBuildCommands-posix":["cd $PACKAGE_DIR;make deps"],
             "sourceFiles":["./htslib/libhts.a"],
+            "libs": ["curl","crypto"]
         }
     ]
 }

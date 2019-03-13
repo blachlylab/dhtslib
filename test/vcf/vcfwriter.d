@@ -46,30 +46,30 @@ int main()
 
     //string[] filters = ["TRIALLELIC", "GOATS"];
     string[] filters = ["PASS", "triallelic", "nonex"];
-    VCFRecord r = VCFRecord(vcfhdr, "chr3", 999, "rs321", "C", "T", 40, filters);
+    VCFRecord r = new VCFRecord(vcfhdr, "chr3", 999, "rs321", "C", "T", 40, filters);
     r.addInfo("NS", 1);
     r.addInfo("XS", "Hello");
     r.addInfo("XFL", 2.1);
     r.addFormat("DP", [x,x] );
     w.writeRecord(r);
 
-    r = VCFRecord(vcfhdr, "chr3", 1001, "", "", "", 30, "");
+    r = new VCFRecord(vcfhdr, "chr3", 1001, "", "", "", 30, "");
     r.setAlleles("A", "G");
     r.addInfo("XF", true);
     r.addFormat("DP", [x,x] );
     w.writeRecord(r);
 
-    r = VCFRecord(vcfhdr, "chr3", 1002, "", "", "", 30, "PASS");
+    r = new VCFRecord(vcfhdr, "chr3", 1002, "", "", "", 30, "PASS");
     r.setAlleles("A", "T", "TCGA");
     r.addFormat("DP", [x,x] );
     r.addFormat("XDP", [x,y]);
     w.writeRecord(r);
 
-    r = VCFRecord(vcfhdr, "chr3", 1003, "", "A", "G", 30, "PASS");
+    r = new VCFRecord(vcfhdr, "chr3", 1003, "", "A", "G", 30, "PASS");
     r.addFormat("XXX", [x, y, z, zz]);
     w.writeRecord(r);
 
-    r = VCFRecord(vcfhdr, "chr3", 1004, "", "G", "A", 20, "PASS");
+    r = new VCFRecord(vcfhdr, "chr3", 1004, "", "G", "A", 20, "PASS");
     r.add!"FORMAT"("DP", [x,y]);
     //r.addValue!("FORMAT", int)("DP", [x,y]);
     w.writeRecord(r);
