@@ -661,7 +661,7 @@ struct VCFWriter
     this(string fn)
     {
         this.fp = vcf_open(toStringz(fn), toStringz("w"c));
-        // TODO: if !fp abort
+        if (!this.fp) throw new Exception("Could not hts_open file");
 
         this.vcfhdr = new VCFHeader( bcf_hdr_init("w\0"c.ptr));
         addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
@@ -685,7 +685,7 @@ struct VCFWriter
     if(is(T == VCFHeader*) || is(T == bcf_hdr_t*))
     {
         this.fp = vcf_open(toStringz(fn), toStringz("w"c));
-        // TODO: if !fp abort
+        if (!this.fp) throw new Exception("Could not hts_open file");
 
         static if(is(T == VCFHeader*)) { this.vcfhdr      = new VCFHeader( bcf_hdr_dup(other.hdr) ); }
         else static if(is(T == bcf_hdr_t*)) { this.vcfhdr = new VCFHeader( bcf_hdr_dup(other) ); }
@@ -958,12 +958,18 @@ struct VCFReader
     bcf1_t*[]    rows;   /// individual records
     bcf1_t* b;          /// record for use in iterator, will be recycled
 
+    private static int refct;
+
+    this(this)
+    {
+        this.refct++;
+    }
     @disable this();
     /// read existing VCF file
     this(string fn)
     {
-        this.fp = bcf_open(toStringz(fn), toStringz("r"c));
-        // TODO: if !fp abort
+        this.fp = vcf_open(toStringz(fn), "r"c.ptr);
+        if (!this.fp) throw new Exception("Could not hts_open file");
 
         this.vcfhdr = new VCFHeader( bcf_hdr_read(this.fp));
 
@@ -972,14 +978,20 @@ struct VCFReader
     /// dtor
     ~this()
     {
-        const ret = vcf_close(this.fp);
-        if (ret != 0) hts_log_error(__FUNCTION__, "couldn't close VCF after reading");
+        this.refct--;
 
-        // Deallocate header
-        //bcf_hdr_destroy(this.hdr);
-        // 2018-09-15: Do not deallocate header; will be free'd by VCFHeader dtor
+        // block file close and bcf1_t free() with reference counting
+        // to allow VCFReader to implement Range interface
+        if(!this.refct) {
+            const ret = vcf_close(this.fp);
+            if (ret != 0) hts_log_error(__FUNCTION__, "couldn't close VCF after reading");
 
-        bcf_destroy1(this.b);
+            // Deallocate header
+            //bcf_hdr_destroy(this.hdr);
+            // 2018-09-15: Do not deallocate header; will be free'd by VCFHeader dtor
+
+            bcf_destroy1(this.b);
+        }
     }
     invariant
     {
