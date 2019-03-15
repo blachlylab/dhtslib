@@ -660,6 +660,7 @@ struct VCFWriter
     ///     bcf_hdr_init automatically adds the PASS filter
     this(string fn)
     {
+        if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
         this.fp = vcf_open(toStringz(fn), toStringz("w"c));
         if (!this.fp) throw new Exception("Could not hts_open file");
 
@@ -684,6 +685,7 @@ struct VCFWriter
     this(T)(string fn, T other)
     if(is(T == VCFHeader*) || is(T == bcf_hdr_t*))
     {
+        if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
         this.fp = vcf_open(toStringz(fn), toStringz("w"c));
         if (!this.fp) throw new Exception("Could not hts_open file");
 
@@ -968,6 +970,7 @@ struct VCFReader
     /// read existing VCF file
     this(string fn)
     {
+        if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
         this.fp = vcf_open(toStringz(fn), "r"c.ptr);
         if (!this.fp) throw new Exception("Could not hts_open file");
 
