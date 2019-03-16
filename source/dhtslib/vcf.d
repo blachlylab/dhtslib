@@ -155,6 +155,7 @@ class VCFRecord
         kline.s = dupline.ptr;
 
         this.line = bcf_init1();
+        this.line.max_unpack = MAX_UNPACK;
 
         auto ret = vcf_parse(&kline, this.vcfheader.hdr, this.line);
         if (ret < 0) {
@@ -521,6 +522,7 @@ class VCFRecord
     }
 
     /* FORMAT (sample info) */
+    /// bc_update_format_{int32,flat,string,flag}
     void addFormat(T)(string tag, T data)
     {
         int ret = -1;
@@ -957,8 +959,9 @@ struct VCFReader
     vcfFile     *fp;    /// htsFile
     //bcf_hdr_t   *hdr;   /// header
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
-    bcf1_t*[]    rows;   /// individual records
     bcf1_t* b;          /// record for use in iterator, will be recycled
+
+    int MAX_UNPACK;     /// see dhtslib.htslib.vcf
 
     private static int refct;
 
@@ -968,7 +971,8 @@ struct VCFReader
     }
     @disable this();
     /// read existing VCF file
-    this(string fn)
+    /// MAX_UNPACK: setting alternate value could speed reading
+    this(string fn, int MAX_UNPACK = BCF_UN_ALL)
     {
         if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
         this.fp = vcf_open(toStringz(fn), "r"c.ptr);
@@ -977,6 +981,7 @@ struct VCFReader
         this.vcfhdr = new VCFHeader( bcf_hdr_read(this.fp));
 
         this.b = bcf_init1();
+        this.b.max_unpack = MAX_UNPACK;
     }
     /// dtor
     ~this()
@@ -1078,7 +1083,7 @@ struct VCFReader
         // * unpacking and
         // * destroying
         // its copy
-        return new VCFRecord(this.vcfhdr, bcf_dup(this.b));
+        return new VCFRecord(this.vcfhdr, bcf_dup(this.b), this.MAX_UNPACK);
     }
 }
 
