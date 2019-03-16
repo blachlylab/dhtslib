@@ -1051,11 +1051,14 @@ struct VCFReader
         immutable success = bcf_read(this.fp, this.vcfhdr.hdr, this.b);
         if (success >= 0) return false;
         else if (success == -1) {
-            hts_log_warning(__FUNCTION__, "bcf_read returned -1; EOF? TODO: check b->errcode");
+            // EOF
+            // see htslib my comments https://github.com/samtools/htslib/issues/246
+            // and commit 9845bc9a947350d0f34e6ce69e79ab81b6339bd2
             return true;
         }
         else {
             hts_log_error(__FUNCTION__, "*** CRITICAL ERROR bcf_read < -1");
+            // TODO: check b->errcode
             return true;
         }
     }
