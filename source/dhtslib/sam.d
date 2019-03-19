@@ -132,9 +132,11 @@ class SAMRecord
     }
 
     /// is read mapped?
-    pragma(inline, true)
     @property bool isMapped()
     {
+        version(LDC){
+            pragma(inline, true);
+        }
         return (b.core.flag & BAM_FUNMAP) == 0;
     }
 
