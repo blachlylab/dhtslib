@@ -688,7 +688,7 @@ struct VCFWriter
         if (!this.fp) throw new Exception("Could not hts_open file");
 
         this.vcfhdr = new VCFHeader( bcf_hdr_init("w\0"c.ptr));
-        addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
+        addFiledate();
         bcf_hdr_sync(this.vcfhdr.hdr);
 
         /+
@@ -735,6 +735,7 @@ struct VCFWriter
         return this.vcfhdr;
     }
 
+    // TODO
     /// copy header lines from a template without overwiting existing lines
     void copyHeaderLines(bcf_hdr_t *other)
     {
@@ -776,6 +777,12 @@ struct VCFWriter
         const auto ret = bcf_hdr_append(this.vcfhdr.hdr, toStringz(line));
         bcf_hdr_sync(this.vcfhdr.hdr);
         return ret;
+    }
+    /// Add a filedate= headerline, which is not called out specifically in  the spec,
+    /// but appears in the spec's example files. We could consider allowing a param here.
+    int addFiledate()
+    {
+        return addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
     }
     
     /** Add INFO (§1.2.2) or FORMAT (§1.2.4) tag
@@ -876,6 +883,20 @@ struct VCFWriter
         bcf_hdr_append(this.vcfhdr.hdr, filter.ptr);
     }
 
+    /** Add contig definition (§1.2.7) to header meta-info 
+    
+        other: "url=...,md5=...,etc."
+    */
+    void addTag(string tagType)(string id, const int length = 0, string other = "")
+    if(tagType == "contig" || tagType == "CONTIG")
+    {
+        string contig = "##contig=<ID=" ~ id ~
+            (length > 0  ? ",length=" ~ length.to!string : "") ~
+            (other != "" ? "," ~ other : "") ~
+            ">\0";
+        
+        bcf_hdr_append(this.vcfhdr.hdr, contig.ptr);
+    }
     
     /**
         Add a record
