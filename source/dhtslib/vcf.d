@@ -381,6 +381,7 @@ class VCFRecord
             bcf_update_alleles(this.vcfheader.hdr, this.line, allelesp.ptr, cast(int)a.length);
         }
     }
+    // TODO: Set REF allele only
     /// Set alleles; alt can be comma separated
     void setAlleles(string _ref, string alt)
     {
