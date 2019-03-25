@@ -276,6 +276,12 @@ class VCFRecord
         TODO: need non-overwriting setter for ref and alt alleles
         TODO: some of these may be inefficent; since they may be used in hot inner loops, pls optimize
     */
+    /// REF allele length
+    pragma(inline, true)
+    @property int refLen()
+    {
+        return this.line.rlen;
+    }
     /// All alleles getter (array)
     @property string[] allelesAsArray()
     {
@@ -887,7 +893,7 @@ struct VCFWriter
     
         other: "url=...,md5=...,etc."
     */
-    void addTag(string tagType)(string id, const int length = 0, string other = "")
+    auto addTag(string tagType)(string id, const int length = 0, string other = "")
     if(tagType == "contig" || tagType == "CONTIG")
     {
         string contig = "##contig=<ID=" ~ id ~
@@ -895,7 +901,7 @@ struct VCFWriter
             (other != "" ? "," ~ other : "") ~
             ">\0";
         
-        bcf_hdr_append(this.vcfhdr.hdr, contig.ptr);
+        return bcf_hdr_append(this.vcfhdr.hdr, contig.ptr);
     }
     
     /**
