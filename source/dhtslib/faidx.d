@@ -5,6 +5,15 @@ import core.stdc.stdlib : malloc, free;
 
 import dhtslib.htslib.faidx;
 
+/** Coodinate Systems, since htslib sequence fetching methods surprisingly use zero-based, closed */
+enum CoordSystem
+{
+    zbho = 0,   /// zero-based, half-open
+    zbc,        /// zero-based, closed (behavior of faidx_fetch_seq)
+    obho,       /// one-based, half-open
+    obc         /// one-based, closed
+}
+
 /** Build index for a FASTA or bgzip-compressed FASTA file.
 
     @param  fn  FASTA file name
@@ -104,10 +113,24 @@ struct IndexedFastaFile {
     /// `string sequence = fafile["chr2", 20123 .. 30456]`
     ///
     /// Sadly, $ to represent max length is not supported
-    string fetchSequence(string contig, int start, int end)
+    string fetchSequence(CoordSystem cs = CoordSystem.zbho)(string contig, int start, int end)
     {
         char *fetchedSeq;
         int fetchedLen;
+
+        static if (cs == CoordSystem.zbho) {
+            end--;
+        }
+        else static if (cs == CoordSystem.zbc) {
+            // ok
+        }
+        else static if (cs == CoordSystem.obho) {
+            start--;
+            end--;
+        }
+        else static if (cs == CoordSystem.obc) {
+            start--;
+        }
         /* htslib API for my reference:
          *
          * char *faidx_fetch_seq(const faidx_t *fai, const char *c_name, int p_beg_i, int p_end_i, int *len);
@@ -129,6 +152,7 @@ struct IndexedFastaFile {
         if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
         else if (fetchedLen == -2) throw new Exception("fai_fetch: sequence not found");
 
+        assert(seq.length == fetchedLen);
         return seq;
     }
 
