@@ -728,6 +728,118 @@ private char* reverse(char* str)
     return str;
 }
 
+struct SamWriter{
+    /// filename; as usable from D
+    string filename;
+
+    /// filename \0-terminated C string; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
+    private immutable(char)* fn;
+
+    /// htsFile
+    private htsFile* fp;
+
+    /// hFILE if required
+    private hFILE* f;
+
+    /// header struct
+    bam_hdr_t* header = null;
+
+    private kstring_t line;
+
+    /// disallow copying
+    @disable this(this);
+
+    /** Create a representation of SAM/BAM/CRAM file from given filename or File
+
+    Params:
+        fn =            string filename (complete path passed to htslib; may support S3:// https:// etc.)
+        extra_threads = extra threads for compression/decompression
+                        -1 use all available cores (default)
+                        0  use no extra threads
+                        >1 add indicated number of threads (to a default of 1)
+    */
+    this(T)(T fn,bam_hdr_t * header, int extra_threads = -1)
+    if (is(T == string) || is(T == File))
+    {
+        import std.parallelism : totalCPUs;
+
+        // open file
+        static if (is(T == string))
+        {
+            this.filename = fn;
+            this.fn = toStringz(fn);
+            this.fp = hts_open(this.fn, cast(immutable(char)*) "w");
+        }
+        else static if (is(T == File))
+        {
+            this.filename = fn.name();
+            this.fn = toStringz(fn.name);
+            this.f = hdopen(fn.fileno, cast(immutable(char)*) "w");
+            this.fp = hts_hopen(this.f, this.fn, cast(immutable(char)*) "r");
+        }
+        else assert(0);
+
+        if (extra_threads == -1)
+        {
+            if ( totalCPUs > 1)
+            {
+                hts_log_info(__FUNCTION__,
+                        format("%d CPU cores detected; enabling multithreading", totalCPUs));
+                // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
+                // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
+                hts_set_threads(this.fp, totalCPUs);
+            }
+        }
+        else if (extra_threads > 0)
+        {
+            if ((extra_threads + 1) > totalCPUs)
+                hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
+            hts_set_threads(this.fp, extra_threads);
+        }
+        else if (extra_threads == 0)
+        {
+            hts_log_debug(__FUNCTION__, "Zero extra threads requested");
+        }
+        else
+        {
+            hts_log_warning(__FUNCTION__, "Invalid negative number of extra threads requested");
+        }
+
+        // read header
+        this.header = bam_hdr_dup(header);
+        sam_hdr_write(this.fp,this.header);
+    }
+
+    ~this()
+    {
+        debug (dhtslib_debug)
+        {
+            writeln("SAMFile dtor");
+        }
+
+        bam_hdr_destroy(this.header);
+
+        //TODO:hts_close segfaults
+        //We cant close the file pointer if another program has given us the pointer
+        if (this.f !is null)
+        {
+            //Causes double free
+            //auto close=hclose(this.f);
+            //if (ret != 0) writeln("There was an error hfile");
+        }
+        else
+        {
+            const auto ret = hts_close(fp);
+            if (ret < 0)
+                writefln("There was an error closing %s", fromStringz(this.fn));
+        }
+    }
+
+    void write(SAMRecord * rec){
+        sam_write1(this.fp,this.header,rec.b);
+    }
+}
+
 /// Used in sorting
 bool cmpInterval(hts_pair32_t a, hts_pair32_t b)
 {
