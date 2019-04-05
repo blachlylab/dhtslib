@@ -174,7 +174,7 @@ class SAMRecord
         //copy rest of data
         ubyte[] rest=b.data[b.core.l_qname..b.l_data].dup;
         
-        //if enough space
+        //if not enough space
         if(qname_n.length+l_rest>b.m_data){
             auto ptr=cast(ubyte*)realloc(b.data,qname_n.length+l_rest);
             assert(ptr!=null);
@@ -217,7 +217,10 @@ class SAMRecord
         }
         return s.idup;
     }
-     pragma(inline, true)
+
+    /// Note this does NOT change the length of the Cigar or quality string
+    /// You could potentially form an incorrect bam record
+    pragma(inline, true)
     @property void sequence(string seq)
     {
         //nibble encode sequence
@@ -239,7 +242,7 @@ class SAMRecord
         //copy rest of data
         ubyte[] rest=b.data[start_rest..b.l_data].dup;
         
-        //if enough space
+        //if not enough space
         if(en_seq.length+l_prev+(b.l_data-start_rest)>b.m_data){
             auto ptr=cast(ubyte*)realloc(b.data,en_seq.length+l_prev+(b.l_data-start_rest));
             assert(ptr!=null);
@@ -252,7 +255,7 @@ class SAMRecord
         b.data[l_prev..en_seq.length+l_prev]=en_seq;
         b.data[l_prev+en_seq.length..l_prev+en_seq.length+(b.l_data-start_rest)]=rest;
 
-        //reset data length, qname length, extra nul length
+        //reset data length, seq length
         b.l_data=cast(uint)en_seq.length+l_prev+(b.l_data-start_rest);
         b.core.l_qseq=cast(int)(seq.length);
     }
