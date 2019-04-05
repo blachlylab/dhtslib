@@ -28,7 +28,7 @@ Standards: Sequence Alignment/Map Format Specification v1 14 Dec 2018 http://sam
 */
 module dhtslib.sam;
 
-import core.stdc.stdlib : calloc, free;
+import core.stdc.stdlib : calloc, free,realloc;
 import std.format;
 import std.parallelism : totalCPUs;
 import std.stdio : writeln, writefln, stderr, File;
@@ -154,6 +154,43 @@ class SAMRecord
     {
         return fromStringz(bam_get_qname(this.b));
     }
+    
+    pragma(inline, true)
+    @property void queryName(string qname)
+    {
+        assert(qname.length<255);
+
+        //make cstring
+        auto qname_n=qname.dup~'\0';
+
+        //append extra nulls to 32bit align cigar
+        auto extranul=0;
+        for (; qname_n.length % 4 != 0; extranul++) qname_n~='\0';
+        assert(extranul<=3);
+
+        //get length of rest of data
+        auto l_rest=b.l_data-b.core.l_qname;
+
+        //copy rest of data
+        ubyte[] rest=b.data[b.core.l_qname..b.l_data].dup;
+        
+        //if enough space
+        if(qname_n.length+l_rest>b.m_data){
+            auto ptr=cast(ubyte*)realloc(b.data,qname_n.length+l_rest);
+            assert(ptr!=null);
+            b.data=ptr;
+            b.m_data=cast(uint)qname_n.length+l_rest;
+        }
+
+        //reassign q_name and rest of data
+        b.data[0..qname_n.length]=(cast(ubyte[])qname_n);
+        b.data[qname_n.length..qname_n.length+l_rest]=rest;
+
+        //reset data length, qname length, extra nul length
+        b.l_data=cast(uint)qname_n.length+l_rest;
+        b.core.l_qname=cast(ubyte)(qname_n.length);
+        b.core.l_extranul=cast(ubyte)extranul;
+    }
 
     /// query (and quality string) length
     pragma(inline, true)
@@ -164,12 +201,12 @@ class SAMRecord
 
     /// Return pointer to sequence Cstring
     /// see samtools/sam_view.c: get_read
-    @property char* sequence()
+    @property string sequence()
     {
         // calloc fills with \0; +1 len for Cstring
-        char* s = cast(char*) calloc(1, this.b.core.l_qseq + 1);
-        //char[] s;
-        //s.length = this.b.core.l_qseq;
+        // char* s = cast(char*) calloc(1, this.b.core.l_qseq + 1);
+        char[] s;
+        s.length = this.b.core.l_qseq;
 
         // auto bam_get_seq(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname); }
         auto seqdata = bam_get_seq(this.b);
@@ -178,7 +215,46 @@ class SAMRecord
         {
             s[i] = seq_nt16_str[bam_seqi(seqdata, i)];
         }
-        return s;
+        return s.idup;
+    }
+     pragma(inline, true)
+    @property void sequence(string seq)
+    {
+        //nibble encode sequence
+        ubyte[] en_seq;
+        en_seq.length=(seq.length+1)>>1;
+        for(auto i=0;i<seq.length;i++){
+            en_seq[i>>1]|=seq_nt16_table[seq[i]]<< ((~i&1)<<2);
+        }
+
+        //get length of data before seq
+        uint l_prev=b.core.l_qname + cast(uint)(b.core.n_cigar*uint.sizeof);
+
+        //get starting point after seq
+        uint start_rest=l_prev+((b.core.l_qseq+1)>>1);
+
+        //copy previous data
+        ubyte[] prev=b.data[0..l_prev].dup;
+
+        //copy rest of data
+        ubyte[] rest=b.data[start_rest..b.l_data].dup;
+        
+        //if enough space
+        if(en_seq.length+l_prev+(b.l_data-start_rest)>b.m_data){
+            auto ptr=cast(ubyte*)realloc(b.data,en_seq.length+l_prev+(b.l_data-start_rest));
+            assert(ptr!=null);
+            b.data=ptr;
+            b.m_data=cast(uint)en_seq.length+l_prev+(b.l_data-start_rest);
+        }
+
+        //reassign q_name and rest of data
+        b.data[0..l_prev]=prev;
+        b.data[l_prev..en_seq.length+l_prev]=en_seq;
+        b.data[l_prev+en_seq.length..l_prev+en_seq.length+(b.l_data-start_rest)]=rest;
+
+        //reset data length, qname length, extra nul length
+        b.l_data=cast(uint)en_seq.length+l_prev+(b.l_data-start_rest);
+        b.core.l_qseq=cast(int)(seq.length);
     }
 
     /// Return pointer to quality Cstring
@@ -245,6 +321,49 @@ class SAMRecord
     pragma(inline, true)
     @nogc @safe nothrow
     @property void insertSize(int isize) { this.b.core.isize = isize; }
+}
+immutable ubyte[256] seq_nt16_table = [
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+     1, 2, 4, 8, 15,15,15,15, 15,15,15,15, 15, 0 /*=*/,15,15,
+    15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+    15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+    15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+    15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
+];
+unittest{
+    writeln();
+    import dhtslib.sam;
+    import dhtslib.htslib.hts_log;
+    import std.path:buildPath,dirName;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Testing rename read");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","range.bam"), 0);
+    auto read=bam.all_records.front;
+    assert(read.queryName=="HS18_09653:4:1315:19857:61712");
+    read.queryName="HS18_09653:4:1315:19857:6171";
+    assert(read.queryName=="HS18_09653:4:1315:19857:6171");
+    assert(read.cigar.toString() == "78M1D22M");
+    read.queryName="HS18_09653:4:1315:19857:617122";
+    assert(read.queryName=="HS18_09653:4:1315:19857:617122");
+    assert(read.cigar.toString() == "78M1D22M");
+    assert(read.sequence=="AGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTGAAAAAACATTTTTTGGGTTTTT");
+    read.sequence=read.sequence[0..10];
+    writeln(read.sequence);
+    assert(read.sequence=="AGCTAGGGCA");
+    assert(read.cigar.toString() == "78M1D22M");
+    hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
 }
 
 /**

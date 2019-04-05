@@ -173,11 +173,11 @@ unittest
     writeln();
     import dhtslib.sam;
     import dhtslib.htslib.hts_log;
-
+    import std.path:buildPath,dirName;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing cigar");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto bam = SAMFile("htslib/test/range.bam", 0);
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","range.bam"), 0);
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto read = readrange.front();
