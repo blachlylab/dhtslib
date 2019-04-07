@@ -67,6 +67,9 @@ struct TagValue{
     bool check(T)(){
         return TypeChars[TypeIndex!T] == cast(char)data[0];
     }
+    bool check(T:string)(){
+        return TypeChars[TypeIndex!T] == cast(char)data[0];
+    }
 
     bool check(T:T[])(){
         return (cast(char)data[0]=='B') && (TypeChars[TypeIndex!T] == cast(char)data[1]);
