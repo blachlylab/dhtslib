@@ -262,25 +262,98 @@ class SAMRecord
 
     /// Return pointer to quality Cstring
     /// see samtools/sam_view.c: get_quality
-    @property char* qscores()
+    @property char[] qscores(bool phredScale=true)()
     {
         // calloc fills with \0; +1 len for Cstring
-        char* q = cast(char*) calloc(1, this.b.core.l_qseq + 1);
-        //char[] q;
-        //q.length = this.b.core.l_qseq;
+        // char* q = cast(char*) calloc(1, this.b.core.l_qseq + 1);
+        char[] q;
+        q.length = this.b.core.l_qseq;
 
         // auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname + (((*b).core.l_qseq + 1)>>1); }
         char* qualdata = cast(char*) bam_get_qual(this.b);
 
         for (int i; i < this.b.core.l_qseq; i++)
-            q[i] = cast(char)(qualdata[i] + 33);
+            static if(phredScale) q[i] = cast(char)(qualdata[i] + 33);
+            else q[i] = cast(char)(qualdata[i]);
         return q;
+    }
+
+    pragma(inline, true)
+    @property void q_scores(bool phredScale=true)(string seq)
+    {
+        auto s= seq.dup;
+        for(auto i=0;i<seq.length;i++){
+            static if(phredScale) s[i]=seq[i]-33;
+        }
+        
+        //get length of data before seq
+        uint l_prev=b.core.l_qname + cast(uint)(b.core.n_cigar*uint.sizeof)+(b.core.l_qseq+1)>>1;
+
+        //get starting point after seq
+        uint start_rest=l_prev+b.core.l_qseq;
+
+        //copy previous data
+        ubyte[] prev=b.data[0..l_prev].dup;
+
+        //copy rest of data
+        ubyte[] rest=b.data[start_rest..b.l_data].dup;
+        
+        //if not enough space
+        if(s.length+l_prev+(b.l_data-start_rest)>b.m_data){
+            auto ptr=cast(ubyte*)realloc(b.data,s.length+l_prev+(b.l_data-start_rest));
+            assert(ptr!=null);
+            b.data=ptr;
+            b.m_data=cast(uint)s.length+l_prev+(b.l_data-start_rest);
+        }
+
+        //reassign q_name and rest of data
+        b.data[0..l_prev]=prev;
+        b.data[l_prev..s.length+l_prev]=cast(ubyte[])s;
+        b.data[l_prev+s.length..l_prev+s.length+(b.l_data-start_rest)]=rest;
+
+        //reset data length, seq length
+        b.l_data=cast(uint)s.length+l_prev+(b.l_data-start_rest);
+        b.core.l_qseq=cast(int)(s.length);
     }
 
     /// Create cigar from bam1_t record
     @property Cigar cigar()
     {
         return Cigar(bam_get_cigar(b), (*b).core.n_cigar);
+    }
+
+    pragma(inline, true)
+    @property void cigar(Cigar cigar)
+    {
+        
+        //get length of data before seq
+        uint l_prev=b.core.l_qname;
+
+        //get starting point after seq
+        uint start_rest=l_prev+cast(uint)(b.core.n_cigar*uint.sizeof);
+
+        //copy previous data
+        ubyte[] prev=b.data[0..l_prev].dup;
+
+        //copy rest of data
+        ubyte[] rest=b.data[start_rest..b.l_data].dup;
+        
+        //if not enough space
+        if(uint.sizeof*cigar.ops.length+l_prev+(b.l_data-start_rest)>b.m_data){
+            auto ptr=cast(ubyte*)realloc(b.data,uint.sizeof*cigar.ops.length+l_prev+(b.l_data-start_rest));
+            assert(ptr!=null);
+            b.data=ptr;
+            b.m_data=cast(uint)(uint.sizeof*cigar.ops.length)+l_prev+(b.l_data-start_rest);
+        }
+
+        //reassign q_name and rest of data
+        b.data[0..l_prev]=prev;
+        b.data[l_prev..uint.sizeof*cigar.ops.length+l_prev]=cast(ubyte[])(cast(uint[])cigar.ops);
+        b.data[l_prev+uint.sizeof*cigar.ops.length..l_prev+uint.sizeof*cigar.ops.length+(b.l_data-start_rest)]=rest;
+
+        //reset data length, seq length
+        b.l_data=cast(uint)(uint.sizeof*cigar.ops.length)+l_prev+(b.l_data-start_rest);
+        b.core.n_cigar=cast(int)(cigar.ops.length);
     }
 
     /// Get aux tag from bam1_t record and return a TagValue
@@ -366,6 +439,10 @@ unittest{
     writeln(read.sequence);
     assert(read.sequence=="AGCTAGGGCA");
     assert(read.cigar.toString() == "78M1D22M");
+    auto c=read.cigar;
+    c.ops[$-1].length=21;
+    read.cigar=c;
+    assert(read.cigar.toString() == "78M1D21M");
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
 }
 
