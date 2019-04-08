@@ -373,7 +373,7 @@ class SAMRecord
         }else static if(is(T==float)){
             bam_aux_update_float(b,index[0..2],value);
         }else static if(isSomeString!T){
-            bam_aux_update_str(b,index[0..2],cast(int)value.length,value.ptr);
+            bam_aux_update_str(b,index[0..2],cast(int)value.length+1,toStringz(value));
         }
     }
     void opIndexAssign(T:T[])(T[] value,string index)
@@ -477,8 +477,8 @@ unittest{
     assert(read["RG"].check!string);
     
     //TODO string assignment corrupts aux data
-    // read["RG"]="test"c;
-    // assert(read["RG"].to!string=="test");
+    read["RG"]="test";
+    assert(read["RG"].to!string=="test");
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
 }
 
@@ -1013,8 +1013,8 @@ unittest{
     auto readrange = sam.allRecords;
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto read = readrange.front();
-    writeln(fromStringz(read.sequence));
-    assert(fromStringz(read.sequence)=="GCTAGCTCAG");
+    writeln(read.sequence);
+    assert(read.sequence=="GCTAGCTCAG");
 }
 
 debug(dhtslib_unittest)

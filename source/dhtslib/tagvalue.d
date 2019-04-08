@@ -81,6 +81,30 @@ struct TagValue{
         }
         return "";
     }
+
+    long toInt(){
+        switch(cast(char)data[0]){
+            case 'c':return cast(long)(to!byte);
+            case 'C':return cast(long)(to!ubyte);
+            case 's':return cast(long)(to!short);
+            case 'S':return cast(long)(to!ushort);
+            case 'i':return cast(long)(to!int);
+            case 'I':return cast(long)(to!uint);
+            default: return long.min;
+        }
+    }
+    long[] toIntArray(){
+        switch(cast(char)data[1]){
+            case 'c':return cast(long[])(to!(byte[]));
+            case 'C':return cast(long[])(to!(ubyte[]));
+            case 's':return cast(long[])(to!(short[]));
+            case 'S':return cast(long[])(to!(ushort[]));
+            case 'i':return cast(long[])(to!(int[]));
+            case 'I':return cast(long[])(to!(uint[]));
+            default: return [];
+        }
+    }
+
 }
 
 debug(dhtslib_unittest)
@@ -144,6 +168,28 @@ unittest{
     assert(read["i9"].to!int==-65_536);
     assert(read["iA"].to!int==-2_147_483_647);
     assert(read["iB"].to!int==-2_147_483_648);
+    assert(read["I0"].toInt==0);
+    assert(read["I1"].toInt==1);
+    assert(read["I2"].toInt==127);
+    assert(read["I3"].toInt==128);
+    assert(read["I4"].toInt==255);
+    assert(read["I5"].toInt==256);
+    assert(read["I6"].toInt==32_767);
+    assert(read["I7"].toInt==32_768);
+    assert(read["I8"].toInt==65_535);
+    assert(read["I9"].toInt==65_536);
+    assert(read["IA"].toInt==2_147_483_647);
+    assert(read["i1"].toInt==-1);
+    assert(read["i2"].toInt==-127);
+    assert(read["i3"].toInt==-128);
+    assert(read["i4"].toInt==-255);
+    assert(read["i5"].toInt==-256);
+    assert(read["i6"].toInt==-32_767);
+    assert(read["i7"].toInt==-32_768);
+    assert(read["i8"].toInt==-65_535);
+    assert(read["i9"].toInt==-65_536);
+    assert(read["iA"].toInt==-2_147_483_647);
+    assert(read["iB"].toInt==-2_147_483_648);
     hts_log_info(__FUNCTION__,"Testing float");
     assert(read["F0"].to!float==-1.0);
     assert(read["F1"].to!float==0.0);
@@ -163,6 +209,11 @@ unittest{
     assert(read["Bi"].to!(int[])==[-2_147_483_648,-2_147_483_647,0,2_147_483_647]);
     assert(read["BS"].to!(ushort[])==[0,32_767,32_768,65_535]);
     assert(read["BI"].to!(uint[])==[0,2_147_483_647,2_147_483_648,4_294_967_295]);
+    writeln(read["Bs"].toIntArray);
+    assert(read["Bs"].toIntArray==[-32_768,-32_767,0,32_767]);
+    assert(read["Bi"].toIntArray==[-2_147_483_648,-2_147_483_647,0,2_147_483_647]);
+    assert(read["BS"].toIntArray==[0,32_767,32_768,65_535]);
+    assert(read["BI"].toIntArray==[0,2_147_483_647,2_147_483_648,4_294_967_295]);
     hts_log_info(__FUNCTION__,"Running tag checking");
     assert(read["Bs"].check!(short[])==true);
     assert(read["Bi"].check!(int[])==true);
