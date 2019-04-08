@@ -253,7 +253,8 @@ Encapsulates a SAM/BAM file.
 Implements InputRange interface using htslib calls.
 If indexed, Random-access query via multidimensional slicing.
 */
-struct SAMFile
+alias SAMFile=SAMReader;
+struct SAMReader
 {
     /// filename; as usable from D
     string filename;
@@ -363,7 +364,7 @@ struct SAMFile
             //auto close=hclose(this.f);
             //if (ret != 0) writeln("There was an error hfile");
         }
-        else
+        else if(this.fp !is null)
         {
             const auto ret = hts_close(fp);
             if (ret < 0)
@@ -728,7 +729,14 @@ private char* reverse(char* str)
     return str;
 }
 
-struct SamWriter{
+enum SAMWriterTypes{
+    BAM,
+    SAM,
+    CRAM
+}
+
+struct SAMWriter
+{
     /// filename; as usable from D
     string filename;
 
@@ -758,24 +766,27 @@ struct SamWriter{
                         0  use no extra threads
                         >1 add indicated number of threads (to a default of 1)
     */
-    this(T)(T fn,bam_hdr_t * header, int extra_threads = -1)
+    this(T)(T fn,bam_hdr_t * header, SAMWriterTypes t=SAMWriterTypes.BAM,int extra_threads = -1)
     if (is(T == string) || is(T == File))
     {
         import std.parallelism : totalCPUs;
-
+        char[] mode;
+        if(t==SAMWriterTypes.BAM) mode=['w','b','\0'];
+        else if(t==SAMWriterTypes.SAM) mode=['w','\0'];
+        else if(t==SAMWriterTypes.CRAM) mode=['w','c','\0'];
         // open file
         static if (is(T == string))
         {
             this.filename = fn;
             this.fn = toStringz(fn);
-            this.fp = hts_open(this.fn, cast(immutable(char)*) "w");
+            this.fp = hts_open(this.fn, mode.ptr);
         }
         else static if (is(T == File))
         {
             this.filename = fn.name();
             this.fn = toStringz(fn.name);
             this.f = hdopen(fn.fileno, cast(immutable(char)*) "w");
-            this.fp = hts_hopen(this.f, this.fn, cast(immutable(char)*) "r");
+            this.fp = hts_hopen(this.f, this.fn, mode.ptr);
         }
         else assert(0);
 
@@ -827,7 +838,7 @@ struct SamWriter{
             //auto close=hclose(this.f);
             //if (ret != 0) writeln("There was an error hfile");
         }
-        else
+        else if(this.fp !is null)
         {
             const auto ret = hts_close(fp);
             if (ret < 0)
@@ -836,8 +847,33 @@ struct SamWriter{
     }
 
     void write(SAMRecord * rec){
-        sam_write1(this.fp,this.header,rec.b);
+        auto ret=sam_write1(this.fp,this.header,rec.b);
+        assert(ret>=0);
     }
+}
+debug(dhtslib_unittest)
+unittest{
+    writeln();
+    import dhtslib.sam;
+    import dhtslib.htslib.hts_log;
+    import std.path:buildPath,dirName;
+    import std.string:fromStringz;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Testing SAMWriter");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto sam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"), 0);
+    auto readrange = sam.allRecords;
+    auto sam2 = SAMWriter("test.bam",sam.header);
+    hts_log_info(__FUNCTION__, "Getting read 1");
+    auto read = readrange.front();
+    sam2.write(&read);
+    destroy(sam2);
+    sam = SAMFile("test.bam");
+    readrange = sam.allRecords;
+    read = readrange.front();
+    writeln(fromStringz(read.sequence));
+    assert(fromStringz(read.sequence)=="GCTAGCTCAG");
+    // destroy(sam2);
 }
 
 /// Used in sorting
