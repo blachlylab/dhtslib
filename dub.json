@@ -44,9 +44,7 @@
         },
         {
             "name": "source-static",
-            "targetType": "sourceLibrary",
-            "preBuildCommands-posix":["cd $PACKAGE_DIR;make deps"],
-            "sourceFiles":["./htslib/libhts.a"],
+            "targetType": "sourceLibrary"
         }
     ]
 }
