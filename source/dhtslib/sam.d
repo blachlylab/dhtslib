@@ -159,7 +159,7 @@ class SAMRecord
     pragma(inline, true)
     @property void queryName(string qname)
     {
-        assert(qname.length<255);
+        assert(qname.length<252);
 
         //make cstring
         auto qname_n=qname.dup~'\0';
@@ -472,6 +472,66 @@ unittest{
     c.ops[$-1].length=21;
     read.cigar=c;
     assert(read.cigar.toString() == "78M1D21M");
+    assert(read["RG"].check!string);
+    assert(read["RG"].to!string=="1");
+    
+    //change tag
+    hts_log_info(__FUNCTION__, "Testing tags");
+    read["X0"]=2;
+    assert(read["X0"].to!ubyte==2);
+    assert(read["RG"].check!string);
+    
+    read["RG"]="test";
+    assert(read["RG"].to!string=="test");
+    hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
+}
+
+unittest{
+    writeln();
+    import dhtslib.sam;
+    import dhtslib.htslib.hts_log;
+    import std.path:buildPath,dirName;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Testing SAMRecord mutation w/ realloc");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","range.bam"), 0);
+    auto read=bam.all_records.front;
+
+    //change queryname
+    hts_log_info(__FUNCTION__, "Testing queryname");
+    assert(read.queryName=="HS18_09653:4:1315:19857:61712");
+
+    //we do this only to force realloc
+    read.b.m_data=read.b.l_data;
+
+
+    auto prev_m=read.b.m_data;
+    read.queryName="HS18_09653:4:1315:19857:61712HS18_09653:4:1315:19857:61712";
+    assert(read.b.m_data >prev_m);
+    assert(read.queryName=="HS18_09653:4:1315:19857:61712HS18_09653:4:1315:19857:61712");
+    assert(read.cigar.toString() == "78M1D22M");
+    assert(read["RG"].check!string);
+    assert(read["RG"].to!string=="1");
+
+    //change sequence
+    hts_log_info(__FUNCTION__, "Testing sequence");
+    assert(read.sequence=="AGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTGAAAAAACATTTTTTGGGTTTTT");
+    prev_m=read.b.m_data;
+    read.sequence="AGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTGAAAAAACATTTTTTGGGTTTTTAGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTGAAAAAACATTTTTTGGGTTTTT";
+    assert(read.b.m_data >prev_m);
+    assert(read.sequence=="AGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTGAAAAAACATTTTTTGGGTTTTTAGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTGAAAAAACATTTTTTGGGTTTTT");
+    assert(read.cigar.toString() == "78M1D22M");
+    assert(read["RG"].check!string);
+    assert(read["RG"].to!string=="1");
+
+    //change cigar
+    hts_log_info(__FUNCTION__, "Testing cigar");
+    auto c=read.cigar;
+    c.ops=c.ops~c.ops;
+    prev_m=read.b.m_data;
+    read.cigar=c;
+    assert(read.b.m_data >prev_m);
+    assert(read.cigar.toString() == "78M1D22M78M1D22M");
     assert(read["RG"].check!string);
     assert(read["RG"].to!string=="1");
     
