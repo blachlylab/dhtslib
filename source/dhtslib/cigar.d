@@ -23,7 +23,7 @@ struct Cigar
     /// Construct Cigar from raw data
     this(uint* cigar, int length)
     {
-        cigar[0 .. length].each!(x => ops ~= CigarOp(x));
+        ops=(cast(CigarOp *)cigar)[0..length];
     }
 
     /// Construct Cigar from an array of CIGAR ops
