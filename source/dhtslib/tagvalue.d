@@ -105,7 +105,9 @@ struct TagValue{
             default: return [];
         }
     }
-
+    float[] toFloatArray(){
+        return to!(float[]);
+    }
 }
 
 debug(dhtslib_unittest)
