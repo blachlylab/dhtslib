@@ -219,8 +219,7 @@ class SAMRecord
         return s.idup;
     }
 
-    /// Note this does NOT change the length of the Cigar or quality string
-    /// You could potentially form an incorrect bam record
+    /// Assigns sequence and resets quality score
     pragma(inline, true)
     @property void sequence(string seq)
     {
@@ -265,7 +264,7 @@ class SAMRecord
 
     /// Return pointer to quality Cstring
     /// see samtools/sam_view.c: get_quality
-    @property char[] qscores(bool phredScale=true)()
+    char[] qscores(bool phredScale=true)()
     {
         // calloc fills with \0; +1 len for Cstring
         // char* q = cast(char*) calloc(1, this.b.core.l_qseq + 1);
@@ -281,42 +280,36 @@ class SAMRecord
         return q;
     }
 
+    ///Adds qscore sequence given that it is the same length as the bam sequence
     pragma(inline, true)
-    @property void q_scores(bool phredScale=true)(string seq)
+    void q_scores(bool phredScale=true)(string seq)
     {
+        if(seq.length!=b.core.l_qseq){
+            hts_log_error(__FUNCTION__,"qscore length does not match sequence length");
+            return;
+        }
         auto s= seq.dup;
         for(auto i=0;i<seq.length;i++){
             static if(phredScale) s[i]=seq[i]-33;
         }
         
         //get length of data before seq
-        uint l_prev=b.core.l_qname + cast(uint)(b.core.n_cigar*uint.sizeof)+(b.core.l_qseq+1)>>1;
-
-        //get starting point after seq
-        uint start_rest=l_prev+b.core.l_qseq;
-
-        //copy previous data
-        ubyte[] prev=b.data[0..l_prev].dup;
-
-        //copy rest of data
-        ubyte[] rest=b.data[start_rest..b.l_data].dup;
-        
-        //if not enough space
-        if(s.length+l_prev+(b.l_data-start_rest)>b.m_data){
-            auto ptr=cast(ubyte*)realloc(b.data,s.length+l_prev+(b.l_data-start_rest));
-            assert(ptr!=null);
-            b.data=ptr;
-            b.m_data=cast(uint)s.length+l_prev+(b.l_data-start_rest);
-        }
-
-        //reassign q_name and rest of data
-        b.data[0..l_prev]=prev;
+        uint l_prev=b.core.l_qname + cast(uint)(b.core.n_cigar*uint.sizeof)+((b.core.l_qseq+1)>>1);
         b.data[l_prev..s.length+l_prev]=cast(ubyte[])s;
-        b.data[l_prev+s.length..l_prev+s.length+(b.l_data-start_rest)]=rest;
+    }
 
-        //reset data length, seq length
-        b.l_data=cast(uint)s.length+l_prev+(b.l_data-start_rest);
-        b.core.l_qseq=cast(int)(s.length);
+    ///Adds qscore sequence given that it is the same length as the bam sequence
+    pragma(inline, true)
+    void qscores(ubyte[] seq)
+    {
+        if(seq.length!=b.core.l_qseq){
+            hts_log_error(__FUNCTION__,"qscore length does not match sequence length");
+            return;
+        }
+        
+        //get length of data before seq
+        uint l_prev=b.core.l_qname + cast(uint)(b.core.n_cigar*uint.sizeof)+((b.core.l_qseq+1)>>1);
+        b.data[l_prev..seq.length+l_prev]=seq;
     }
 
     /// Create cigar from bam1_t record
@@ -325,6 +318,7 @@ class SAMRecord
         return Cigar(bam_get_cigar(b), (*b).core.n_cigar);
     }
 
+    ///Assigns a cigar string
     pragma(inline, true)
     @property void cigar(Cigar cigar)
     {
@@ -365,6 +359,8 @@ class SAMRecord
     {
         return TagValue(b, val[0..2]);
     }
+
+    //Assign a tag key value pair
     void opIndexAssign(T)(T value,string index)
     {
         import std.traits:isIntegral,isSomeString;
@@ -376,6 +372,8 @@ class SAMRecord
             bam_aux_update_str(b,index[0..2],cast(int)value.length+1,toStringz(value));
         }
     }
+
+    //Assign a tag key array pair
     void opIndexAssign(T:T[])(T[] value,string index)
     {
         bam_aux_update_array(b,index[0..2],TypeChars[TypeIndex!T],value.length,value.ptr);
@@ -457,6 +455,13 @@ unittest{
     assert(read.sequence=="AGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTGAAAAAACATTTTTTGGGTTTTT");
     read.sequence=read.sequence[0..10];
     assert(read.sequence=="AGCTAGGGCA");
+    ubyte[] q=[255,255,255,255,255,255,255,255,255,255];
+    assert(read.qscores!false==cast(char[])(q));
+    q=[1,14,20,40,30,10,14,20,40,30];
+    read.qscores(q);
+    assert(read.qscores!false==cast(char[])(q));
+    q[]+=33;
+    assert(read.qscores==cast(char[])(q));
     assert(read.cigar.toString() == "78M1D22M");
     assert(read["RG"].check!string);
     assert(read["RG"].to!string=="1");
@@ -476,7 +481,6 @@ unittest{
     assert(read["X0"].to!ubyte==2);
     assert(read["RG"].check!string);
     
-    //TODO string assignment corrupts aux data
     read["RG"]="test";
     assert(read["RG"].to!string=="test");
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
