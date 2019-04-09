@@ -5,6 +5,7 @@ import std.meta:AliasSeq,staticIndexOf;
 import std.string:fromStringz;
 import dhtslib.htslib.sam:bam_aux_get,bam1_t,bam_aux2i;
 import dhtslib.htslib.hts_log;
+import std.conv:to;
 
 /**
 This represents a tag value from a bam record
@@ -95,12 +96,12 @@ struct TagValue{
     }
     long[] toIntArray(){
         switch(cast(char)data[1]){
-            case 'c':return cast(long[])(to!(byte[]));
-            case 'C':return cast(long[])(to!(ubyte[]));
-            case 's':return cast(long[])(to!(short[]));
-            case 'S':return cast(long[])(to!(ushort[]));
-            case 'i':return cast(long[])(to!(int[]));
-            case 'I':return cast(long[])(to!(uint[]));
+            case 'c':return (to!(byte[]).to!(long[]));
+            case 'C':return (to!(ubyte[]).to!(long[]));
+            case 's':return (to!(short[]).to!(long[]));
+            case 'S':return (to!(ushort[]).to!(long[]));
+            case 'i':return (to!(int[]).to!(long[]));
+            case 'I':return (to!(uint[]).to!(long[]));
             default: return [];
         }
     }
