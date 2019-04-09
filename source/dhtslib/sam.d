@@ -202,7 +202,7 @@ class SAMRecord
 
     /// Return pointer to sequence Cstring
     /// see samtools/sam_view.c: get_read
-    @property string sequence()
+    @property const(char)[] sequence()
     {
         // calloc fills with \0; +1 len for Cstring
         // char* s = cast(char*) calloc(1, this.b.core.l_qseq + 1);
@@ -216,12 +216,12 @@ class SAMRecord
         {
             s[i] = seq_nt16_str[bam_seqi(seqdata, i)];
         }
-        return s.idup;
+        return s;
     }
 
     /// Assigns sequence and resets quality score
     pragma(inline, true)
-    @property void sequence(string seq)
+    @property void sequence(const(char)[] seq)
     {
         //nibble encode sequence
         ubyte[] en_seq;
@@ -264,7 +264,7 @@ class SAMRecord
 
     /// Return pointer to quality Cstring
     /// see samtools/sam_view.c: get_quality
-    char[] qscores(bool phredScale=true)()
+    const(char)[] qscores(bool phredScale=true)()
     {
         // calloc fills with \0; +1 len for Cstring
         // char* q = cast(char*) calloc(1, this.b.core.l_qseq + 1);
@@ -282,7 +282,7 @@ class SAMRecord
 
     ///Adds qscore sequence given that it is the same length as the bam sequence
     pragma(inline, true)
-    void q_scores(bool phredScale=true)(string seq)
+    void q_scores(bool phredScale=true)(const(char)[] seq)
     {
         if(seq.length!=b.core.l_qseq){
             hts_log_error(__FUNCTION__,"qscore length does not match sequence length");
