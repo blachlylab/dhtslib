@@ -254,7 +254,7 @@ Implements InputRange interface using htslib calls.
 If indexed, Random-access query via multidimensional slicing.
 */
 alias SAMFile=SAMReader;
-class SAMReader
+struct SAMReader
 {
     /// filename; as usable from D
     string filename;
@@ -277,7 +277,7 @@ class SAMReader
     private kstring_t line;
 
     /// disallow copying
-    // @disable this(this);
+    @disable this(this);
 
     /** Create a representation of SAM/BAM/CRAM file from given filename or File
 
@@ -434,7 +434,7 @@ class SAMReader
     /// Query by ["chr1:1-2","chr1:1000-1001"]
     auto query(string[] regions)
     {
-        return RecordRangeMulti(this.fp, this.idx, this.header, this, regions);
+        return RecordRangeMulti(this.fp, this.idx, this.header, &(this), regions);
     }
 
     /// bam["chr1:1-2"]
@@ -586,7 +586,7 @@ class SAMReader
         private int r;
 
         ///
-        this(htsFile* fp, hts_idx_t* idx, bam_hdr_t* header, SAMFile sam, string[] regions)
+        this(htsFile* fp, hts_idx_t* idx, bam_hdr_t* header, SAMFile* sam, string[] regions)
         {
             rlist = RegionList(sam, regions).getRegList();
             this.fp = fp;
@@ -623,10 +623,10 @@ class SAMReader
         import std.conv : to;
 
         private hts_reglist_t[string] rlist;
-        private SAMFile sam;
+        private SAMFile* sam;
 
         ///
-        this(SAMFile sam, string[] queries)
+        this(SAMFile* sam, string[] queries)
         {
             this.sam = sam;
             foreach (q; queries)
@@ -735,7 +735,7 @@ enum SAMWriterTypes{
     CRAM
 }
 
-class SAMWriter
+struct SAMWriter
 {
     /// filename; as usable from D
     string filename;
@@ -755,7 +755,7 @@ class SAMWriter
     private kstring_t line;
 
     /// disallow copying
-    // @disable this(this);
+    @disable this(this);
 
     /** Create a representation of SAM/BAM/CRAM file from given filename or File
 
@@ -861,14 +861,14 @@ unittest{
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMWriter");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto sam = new SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"), 0);
+    auto sam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"), 0);
     auto readrange = sam.allRecords;
-    auto sam2 = new SAMWriter("test.bam",sam.header);
+    auto sam2 = SAMWriter("test.bam",sam.header);
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto read = readrange.front();
     sam2.write(&read);
     destroy(sam2);
-    sam = new SAMFile("test.bam");
+    sam = SAMFile("test.bam");
     readrange = sam.allRecords;
     read = readrange.front();
     writeln(fromStringz(read.sequence));
@@ -922,7 +922,7 @@ unittest{
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto sam = new SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"), 0);
+    auto sam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","auxf#values.sam"), 0);
     auto readrange = sam.allRecords;
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto read = readrange.front();
