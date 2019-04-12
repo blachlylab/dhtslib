@@ -37,7 +37,7 @@ import std.string : fromStringz, toStringz;
 
 import dhtslib.htslib.hts : htsFile, hts_open, hts_close, hts_hopen;
 import dhtslib.htslib.hts : hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
-import dhtslib.htslib.hts : seq_nt16_str;
+import dhtslib.htslib.hts : seq_nt16_str,seq_nt16_table;
 import dhtslib.htslib.hts : hts_set_threads;
 import dhtslib.htslib.hfile : hdopen, hclose, hFILE;
 
@@ -408,25 +408,6 @@ class SAMRecord
     @nogc @safe nothrow
     @property void insertSize(int isize) { this.b.core.isize = isize; }
 }
-immutable ubyte[256] seq_nt16_table = [
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-     1, 2, 4, 8, 15,15,15,15, 15,15,15,15, 15, 0 /*=*/,15,15,
-    15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
-    15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
-    15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
-    15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
-
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
-];
 unittest{
     writeln();
     import dhtslib.sam;
