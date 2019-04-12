@@ -200,7 +200,7 @@ class SAMRecord
         return this.b.core.l_qseq;
     }
 
-    /// Return pointer to sequence Cstring
+    /// Return char array of the sequence
     /// see samtools/sam_view.c: get_read
     @property const(char)[] sequence()
     {
@@ -262,7 +262,7 @@ class SAMRecord
         b.core.l_qseq=cast(int)(seq.length);
     }
 
-    /// Return pointer to quality Cstring
+    /// Return char array of the qscores
     /// see samtools/sam_view.c: get_quality
     const(char)[] qscores(bool phredScale=true)()
     {
