@@ -288,7 +288,7 @@ struct SAMReader
                         0  use no extra threads
                         >1 add indicated number of threads (to a default of 1)
     */
-    this(T)(T fn, int extra_threads = -1)
+    this(T)(T f, int extra_threads = -1)
     if (is(T == string) || is(T == File))
     {
         import std.parallelism : totalCPUs;
@@ -296,15 +296,15 @@ struct SAMReader
         // open file
         static if (is(T == string))
         {
-            this.filename = fn;
-            this.fn = toStringz(fn);
+            this.filename = f;
+            this.fn = toStringz(f);
             this.fp = hts_open(this.fn, cast(immutable(char)*) "r");
         }
         else static if (is(T == File))
         {
-            this.filename = fn.name();
-            this.fn = toStringz(fn.name);
-            this.f = hdopen(fn.fileno, cast(immutable(char)*) "r");
+            this.filename = f.name();
+            this.fn = toStringz(f.name);
+            this.f = hdopen(f.fileno, cast(immutable(char)*) "r");
             this.fp = hts_hopen(this.f, this.fn, cast(immutable(char)*) "r");
         }
         else assert(0);
@@ -732,7 +732,8 @@ private char* reverse(char* str)
 enum SAMWriterTypes{
     BAM,
     SAM,
-    CRAM
+    CRAM,
+    DEDUCE
 }
 
 struct SAMWriter
@@ -766,26 +767,38 @@ struct SAMWriter
                         0  use no extra threads
                         >1 add indicated number of threads (to a default of 1)
     */
-    this(T)(T fn,bam_hdr_t * header, SAMWriterTypes t=SAMWriterTypes.BAM,int extra_threads = -1)
+    this(T)(T f,bam_hdr_t * header, SAMWriterTypes t=SAMWriterTypes.DEDUCE,int extra_threads = -1)
     if (is(T == string) || is(T == File))
     {
         import std.parallelism : totalCPUs;
         char[] mode;
-        if(t==SAMWriterTypes.BAM) mode=['w','b','\0'];
-        else if(t==SAMWriterTypes.SAM) mode=['w','\0'];
-        else if(t==SAMWriterTypes.CRAM) mode=['w','c','\0'];
+        if(t == SAMWriterTypes.BAM) mode=['w','b','\0'];
+        else if(t == SAMWriterTypes.SAM) mode=['w','\0'];
+        else if(t == SAMWriterTypes.CRAM) mode=['w','c','\0'];
         // open file
         static if (is(T == string))
         {
-            this.filename = fn;
-            this.fn = toStringz(fn);
+            if(t == SAMWriterTypes.DEDUCE){
+                import std.path:extension;
+                auto ext=extension(f);
+                if(ext==".bam") mode=['w','b','\0'];
+                else if(ext==".sam") mode=['w','\0'];
+                else if(ext==".cram") mode=['w','c','\0'];
+                else {
+                    hts_log_error(__FUNCTION__,"extension "~ext~" not valid");
+                    throw new Exception("DEDUCE SAMWriterType used with non-valid extension");
+                }
+            }
+            this.filename = f;
+            this.fn = toStringz(f);
             this.fp = hts_open(this.fn, mode.ptr);
         }
         else static if (is(T == File))
         {
-            this.filename = fn.name();
-            this.fn = toStringz(fn.name);
-            this.f = hdopen(fn.fileno, cast(immutable(char)*) "w");
+            assert(t!=SAMWriterTypes.DEDUCE);
+            this.filename = f.name();
+            this.fn = toStringz(f.name);
+            this.f = hdopen(f.fileno, cast(immutable(char)*) "w");
             this.fp = hts_hopen(this.f, this.fn, mode.ptr);
         }
         else assert(0);
@@ -825,7 +838,7 @@ struct SAMWriter
     {
         debug (dhtslib_debug)
         {
-            writeln("SAMFile dtor");
+            writeln("SAMWriter dtor");
         }
 
         bam_hdr_destroy(this.header);
