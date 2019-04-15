@@ -75,7 +75,7 @@ struct IndexedFastaFile {
     }
 
     /// Fetch sequence in region by assoc array-style lookup:
-    /// `string sequence = fafile["chr2:20123-30456"]`
+    /// `string sequence = fafile.fetchSequence("chr2:20123-30456")`
     string fetchSequence(string region)
     {
         char *fetchedSeq;
@@ -110,9 +110,7 @@ struct IndexedFastaFile {
     }
 
     /// Fetch sequence in region by multidimensional slicing:
-    /// `string sequence = fafile["chr2", 20123 .. 30456]`
-    ///
-    /// Sadly, $ to represent max length is not supported
+    /// `string sequence = fafile.fetchSequence("chr2", 20123, 30456)`
     string fetchSequence(CoordSystem cs = CoordSystem.zbho)(string contig, int start, int end)
     {
         char *fetchedSeq;
