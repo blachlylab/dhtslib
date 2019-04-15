@@ -47,7 +47,12 @@ test for membership, and rapidly fetch sequence at offset.
 struct IndexedFastaFile {
 
     private faidx_t *faidx;
+    private int refct;      // Postblit refcounting in case the object is passed around
 
+    this(this)
+    {
+        refct++;
+    }
     /// construct from filename, optionally creating index if it does not exist
     /// throws Exception (TODO: remove) if file DNE, or if index DNE unless create->true
     this(string fn, bool create=false)
@@ -60,11 +65,12 @@ struct IndexedFastaFile {
             this.faidx = fai_load3( toStringz(fn) , null, null, 0);
             if (this.faidx is null) throw new Exception("Unable to load the FASTA index.");
         }
-
+        refct = 1;
     }
     ~this()
     {
-        fai_destroy(this.faidx);
+        if (--refct == 0)
+            fai_destroy(this.faidx);
     }
 
     /// Fetch sequence in region by assoc array-style lookup:
