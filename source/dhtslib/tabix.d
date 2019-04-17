@@ -41,6 +41,23 @@ struct TabixIndexedFile {
 
         loadHeader();
     }
+    this(string fn,string fntbi)
+    {
+        debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
+        this.fp = hts_open( toStringz(fn), "r");
+        if ( !this.fp ) {
+            writefln("Could not read %s\n", fn);
+            throw new Exception("Couldn't read file");
+        }
+        //enum htsExactFormat format = hts_get_format(fp)->format;
+        this.tbx = tbx_index_load2( toStringz(fn),toStringz(fntbi) );
+        if (!this.tbx) { 
+            writefln("Could not load .tbi index of %s\n", fn );
+            throw new Exception("Couldn't load tabix index file");
+        }
+
+        loadHeader();
+    }
     ~this()
     {
         debug(dhtslib_debug) { writeln("TabixIndexedFile dtor"); }
