@@ -356,15 +356,7 @@ struct SAMReader
 
         bam_hdr_destroy(this.header);
 
-        //TODO:hts_close segfaults
-        //We cant close the file pointer if another program has given us the pointer
-        if (this.f !is null)
-        {
-            //Causes double free
-            //auto close=hclose(this.f);
-            //if (ret != 0) writeln("There was an error hfile");
-        }
-        else if(this.fp !is null)
+        if((this.fp !is null) && (this.f is null))
         {
             const auto ret = hts_close(fp);
             if (ret < 0)
@@ -843,15 +835,7 @@ struct SAMWriter
 
         bam_hdr_destroy(this.header);
 
-        //TODO:hts_close segfaults
-        //We cant close the file pointer if another program has given us the pointer
-        if (this.f !is null)
-        {
-            //Causes double free
-            //auto close=hclose(this.f);
-            //if (ret != 0) writeln("There was an error hfile");
-        }
-        else if(this.fp !is null)
+        if((this.fp !is null) && (this.f is null))
         {
             const auto ret = hts_close(fp);
             if (ret < 0)
