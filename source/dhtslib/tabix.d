@@ -23,7 +23,7 @@ struct TabixIndexedFile {
 
     /// Initialize with a complete file path name to the tabix-indexed file
     /// The tabix index (.tbi) must already exist alongside
-    this(string fn)
+    this(string fn,string fntbi="")
     {
         debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
         this.fp = hts_open( toStringz(fn), "r");
@@ -32,25 +32,8 @@ struct TabixIndexedFile {
             throw new Exception("Couldn't read file");
         }
         //enum htsExactFormat format = hts_get_format(fp)->format;
-        
-        this.tbx = tbx_index_load( toStringz(fn) );
-        if (!this.tbx) { 
-            writefln("Could not load .tbi index of %s\n", fn );
-            throw new Exception("Couldn't load tabix index file");
-        }
-
-        loadHeader();
-    }
-    this(string fn,string fntbi)
-    {
-        debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
-        this.fp = hts_open( toStringz(fn), "r");
-        if ( !this.fp ) {
-            writefln("Could not read %s\n", fn);
-            throw new Exception("Couldn't read file");
-        }
-        //enum htsExactFormat format = hts_get_format(fp)->format;
-        this.tbx = tbx_index_load2( toStringz(fn),toStringz(fntbi) );
+        if(fntbi!="") this.tbx = tbx_index_load2( toStringz(fn),toStringz(fntbi) );
+        else this.tbx = tbx_index_load( toStringz(fn) );
         if (!this.tbx) { 
             writefln("Could not load .tbi index of %s\n", fn );
             throw new Exception("Couldn't load tabix index file");
