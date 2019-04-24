@@ -7,3 +7,4 @@ public import dhtslib.sam;
 public import dhtslib.tabix;
 public import dhtslib.tagvalue;
 public import dhtslib.vcf;
+public import dhtslib.fastq;
