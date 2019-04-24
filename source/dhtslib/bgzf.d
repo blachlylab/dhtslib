@@ -52,10 +52,7 @@ struct BGZFile {
                 writefln("bgzf_mt() -> %d", ret);
             }
         }
-
-        // Do not prime the range with popFront(),
-        // because otherwise attempting to iterate again will yield the first row (only)
-
+        popFront;
     }
     ~this()
     {
@@ -73,28 +70,29 @@ struct BGZFile {
     }
 
     /// InputRange interface
-    @property bool empty()
-    {
-        // equivalent to htslib ks_release
-        this.line.l = 0;
-        this.line.m = 0;
-        this.line.s = null;
+    bool empty=false;
+    // {
+    //     // equivalent to htslib ks_release
+    //     this.line.l = 0;
+    //     this.line.m = 0;
+    //     this.line.s = null;
         
-        // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
-        immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
-        return (res < 0 ? true : false);
-    }
+    //     // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
+    //     immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
+    //     return (res < 0 ? true : false);
+    // }
     /// ditto
     void popFront()
     {
 
         free(this.line.s);
-
         // equivalent to htslib ks_release
         this.line.l = 0;
         this.line.m = 0;
         this.line.s = null;
-        
+        // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
+        immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
+        this.empty=(res < 0 ? true : false);
     }
     /// ditto
     string front()
