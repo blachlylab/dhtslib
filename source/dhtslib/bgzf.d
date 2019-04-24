@@ -71,17 +71,6 @@ struct BGZFile {
 
     /// InputRange interface
     bool empty=false;
-    // {
-    //     // equivalent to htslib ks_release
-    //     this.line.l = 0;
-    //     this.line.m = 0;
-    //     this.line.s = null;
-        
-    //     // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
-    //     immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
-    //     return (res < 0 ? true : false);
-    // }
-    /// ditto
     void popFront()
     {
 
@@ -90,6 +79,7 @@ struct BGZFile {
         this.line.l = 0;
         this.line.m = 0;
         this.line.s = null;
+        
         // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
         immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
         this.empty=(res < 0 ? true : false);
