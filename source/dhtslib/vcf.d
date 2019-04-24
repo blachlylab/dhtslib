@@ -10,6 +10,7 @@ module dhtslib.vcf;
 import core.stdc.string;
 import core.vararg;
 
+import std.stdio;
 import std.conv: to, ConvException;
 import std.datetime;
 import std.format: format;
@@ -20,6 +21,8 @@ import std.traits: isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNum
 import dhtslib.htslib.hts_log;
 import dhtslib.htslib.kstring;
 import dhtslib.htslib.vcf;
+import dhtslib.htslib.hfile:hdopen,hFILE;
+import dhtslib.htslib.hts:hts_hopen;
 
 alias BCFRecord = VCFRecord;
 alias BCFWriter = VCFWriter;
@@ -672,6 +675,21 @@ class VCFRecord
         return cast(string) s.s[0 .. s.l];
     }
 }
+/*
+ *  Defines the filetype written by VCFWriter
+ *  BCF: compressed BCF file
+ *  BCF_U: uncompressed BCF file
+ *  VCF: compressed VCF file
+ *  VCF_U: uncompressed VCF file
+ *  DEDUCE: if a filename is provided we will attempt to identify filetype
+ */
+enum VCFWriterTypes{
+    BCF,
+    BCF_U,
+    VCF,
+    VCF_U,
+    DEDUCE
+}
 
 /** Basic support for writing VCF, BCF files */
 struct VCFWriter
@@ -681,17 +699,50 @@ struct VCFWriter
     //bcf_hdr_t   *hdr;   /// header
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
     bcf1_t*[]    rows;   /// individual records
-
+    string filename;
+    hFILE * f;
+    immutable(char) * fn;
     @disable this();
     /// open file or network resources for writing
     /// setup incl header allocation
     /// if mode==w:
     ///     bcf_hdr_init automatically sets version string (##fileformat=VCFv4.2)
     ///     bcf_hdr_init automatically adds the PASS filter
-    this(string fn)
+    this(T)(T f,VCFWriterTypes t=VCFWriterTypes.DEDUCE)
+    if (is(T == string) || is(T == File))
     {
-        if (fn == "") throw new Exception("Empty filename passed to VCFWriter constructor");
-        this.fp = vcf_open(toStringz(fn), toStringz("w"c));
+        char[] mode;
+        // open file
+        if(t == VCFWriterTypes.VCF_U) mode=['w','\0'];
+        else if(t == VCFWriterTypes.VCF) mode=['w','z','\0'];
+        else if(t == VCFWriterTypes.BCF) mode=['w','b','\0'];
+        else if(t == VCFWriterTypes.BCF_U) mode=['w','b','u','\0'];
+        static if (is(T == string))
+        {
+            if (f == "") throw new Exception("Empty filename passed to VCFWriter constructor");
+            if(t == VCFWriterTypes.DEDUCE){
+                import std.path:extension;
+                auto ext=extension(f);
+                if(ext==".vcf") mode=['w','\0'];
+                else if(ext==".bcf") mode=['w','b','\0'];
+                else if(ext==".gz") mode=['w','z','\0'];
+                else {
+                    hts_log_error(__FUNCTION__,"extension "~ext~" not valid");
+                    throw new Exception("DEDUCE VCFWriterType used with non-valid extension");
+                }
+            }
+            this.filename = f;
+            this.fn = toStringz(f);
+            this.fp = vcf_open(this.fn, mode.ptr);
+        }
+        else static if (is(T == File))
+        {
+            assert(t!=VCFWriterTypes.DEDUCE);
+            this.filename = f.name();
+            this.fn = toStringz(f.name);
+            this.f = hdopen(f.fileno, cast(immutable(char)*) "w");
+            this.fp = hts_hopen(this.f, this.fn, mode.ptr);
+        }
         if (!this.fp) throw new Exception("Could not hts_open file");
 
         this.vcfhdr = new VCFHeader( bcf_hdr_init("w\0"c.ptr));
@@ -725,8 +776,10 @@ struct VCFWriter
     /// dtor
     ~this()
     {
-        const ret = vcf_close(this.fp);
-        if (ret != 0) hts_log_error(__FUNCTION__, "couldn't close VCF after writing");
+        if(this.f is null){
+            const ret = vcf_close(this.fp);
+            if (ret != 0) hts_log_error(__FUNCTION__, "couldn't close VCF after writing");
+        }
 
         // Deallocate header
         //bcf_hdr_destroy(this.hdr);
@@ -1009,6 +1062,8 @@ struct VCFReader
     //bcf_hdr_t   *hdr;   /// header
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
     bcf1_t* b;          /// record for use in iterator, will be recycled
+    hFILE * f;
+    string filename;
 
     int MAX_UNPACK;     /// see dhtslib.htslib.vcf
 
@@ -1021,10 +1076,21 @@ struct VCFReader
     @disable this();
     /// read existing VCF file
     /// MAX_UNPACK: setting alternate value could speed reading
-    this(string fn, int MAX_UNPACK = BCF_UN_ALL)
+    this(T)(T fn,int MAX_UNPACK = BCF_UN_ALL)
+    if (is(T == string) || is(T == File))
     {
-        if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
-        this.fp = vcf_open(toStringz(fn), "r"c.ptr);
+        static if (is(T == string))
+        {
+            if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
+            this.fp = vcf_open(toStringz(fn), "r"c.ptr);
+        }
+        else static if (is(T == File))
+        {
+            this.filename = f.name();
+            this.fn = toStringz(f.name);
+            this.f = hdopen(f.fileno, "r"c.ptr);
+            this.fp = hts_hopen(this.f, this.fn, "r"c.ptr);
+        }
         if (!this.fp) throw new Exception("Could not hts_open file");
 
         this.vcfhdr = new VCFHeader( bcf_hdr_read(this.fp));
@@ -1142,12 +1208,12 @@ debug(dhtslib_unittest)
 unittest
 {
     import std.exception: assertThrown;
-    import std.stdio: writeln, writefln;
-
+    import std.stdio: writeln, writefln,File;
+    auto f=File("/dev/null");
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
 
 
-    auto vw = VCFWriter("/dev/null");
+    auto vw = VCFWriter(f,VCFWriterTypes.VCF_U);
 
     vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
