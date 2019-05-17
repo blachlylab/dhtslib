@@ -3,22 +3,22 @@
 // Removed if(n)defs
 // Changed #defines to const/immutable
 // Removed all HTS_RESULT_USED (__attribute__ ((__warn_unused_result__)))
-// Commented out function declared as HTS_DEPRECATED(message)
+// HTS_DEPRECATED(message) to deprecated("message")
 // Do not #include "hts_defs.h"
 // Change numeric #defines to enum int
 // typedef struct to alias
 // modified bitfields in struct and aligned(1)
 // removed redundant struct declarations when declaring struct pointers
 // replace local definition with import kstring_t
+// const TYPE * to const(TYPE) *
 module dhtslib.htslib.bgzf;
 
 import std.bitmanip;
 
 extern (C):
 
-
-/// @file htslib/bgzf.h
-/// Low-level routines for direct BGZF operations.
+// @file htslib/bgzf.h
+// Low-level routines for direct BGZF operations.
 /*
    Copyright (c) 2008 Broad Institute / Massachusetts Institute of Technology
                  2011, 2012 Attractive Chaos <attractor@live.co.uk>
@@ -48,27 +48,32 @@ extern (C):
 
 import core.stdc.stdint;
 import core.stdc.stdio;
-//import std.zlib; // ??
 import etc.c.zlib;
 import core.sys.posix.sys.types;
 
-enum int BGZF_BLOCK_SIZE =     0xff00; // make sure compressBound(BGZF_BLOCK_SIZE) < BGZF_MAX_BLOCK_SIZE
-enum int BGZF_MAX_BLOCK_SIZE = 0x10000;
+enum int BGZF_BLOCK_SIZE =     0xff00;  /// make sure compressBound(BGZF_BLOCK_SIZE) < BGZF_MAX_BLOCK_SIZE
+enum int BGZF_MAX_BLOCK_SIZE = 0x10000; /// ditto
 
-enum int BGZF_ERR_ZLIB   = 1;
-enum int BGZF_ERR_HEADER = 2;
-enum int BGZF_ERR_IO     = 4;
-enum int BGZF_ERR_MISUSE = 8;
-enum int BGZF_ERR_MT     = 16; // stream cannot be multi-threaded
-enum int BGZF_ERR_CRC    = 32;
+enum int BGZF_ERR_ZLIB   = 1;   /// zlib error
+enum int BGZF_ERR_HEADER = 2;   /// header format error
+enum int BGZF_ERR_IO     = 4;   /// io error
+enum int BGZF_ERR_MISUSE = 8;   /// misuse error: (a) writeable file (b) where not SEEK_SET (c) GZ (rather than BGZ) file
+enum int BGZF_ERR_MT     = 16;  /// stream cannot be multi-threaded
+enum int BGZF_ERR_CRC    = 32;  /// returned by inflate_block() when bgzf_uncompress() has CRC error
 
-struct hFILE;
-struct hts_tpool;
-struct bgzf_mtaux_t;
-struct __bgzidx_t;
-alias __bgzidx_t bgzidx_t;
-struct bgzf_cache_t;
+/// see hts.d
+struct hFILE; // @suppress(dscanner.style.phobos_naming_convention)
+/// see thread_pool.d
+struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
+/// Memory pool for bgzf_job structs, to avoid many malloc/free, see htslib/bgzf.c
+struct bgzf_mtaux_t; // @suppress(dscanner.style.phobos_naming_convention)
+/// BGZF index
+struct __bgzidx_t; // @suppress(dscanner.style.phobos_naming_convention)
+alias bgzidx_t = __bgzidx_t;
+/// bgzf cache
+struct bgzf_cache_t; // @suppress(dscanner.style.phobos_naming_convention)
 
+/// Block Gzipped File
 struct BGZF {
     // Reserved bits should be written as 0; read as "don't care"
     //unsigned errcode:16, reserved:1, is_write:1, no_eof_block:1, is_be:1;
@@ -84,18 +89,21 @@ struct BGZF {
         bool, "last_block_eof", 1,
         bool, "is_compressed",  1,
         bool, "is_gzip",        1));
-    int cache_size;
-    int block_length, block_clength, block_offset;
-    int64_t block_address, uncompressed_address;
-    void *uncompressed_block;
-    void *compressed_block;
-    bgzf_cache_t *cache;
-    hFILE *fp; // actual file handle
-    bgzf_mtaux_t *mt; // only used for multi-threading
-    bgzidx_t *idx;      // BGZF index
-    int idx_build_otf;  // build index on the fly, set by bgzf_index_build_init()
-    z_stream *gz_stream;// for gzip-compressed files
-};
+    int cache_size;     /// cache size in bytes
+    int block_length;   /// ?
+    int block_clength;  /// ?
+    int block_offset;   /// ?
+    int64_t block_address;  /// ?
+    int64_t uncompressed_address; /// ?
+    void *uncompressed_block;   /// data ptr
+    void *compressed_block;     /// data ptr
+    bgzf_cache_t *cache;/// cache
+    hFILE *fp;          /// actual file handle
+    bgzf_mtaux_t *mt;   /// only used for multi-threading
+    bgzidx_t *idx;      /// BGZF index
+    int idx_build_otf;  /// build index on the fly, set by bgzf_index_build_init()
+    z_stream *gz_stream;/// for gzip-compressed files
+}
 
 import dhtslib.htslib.kstring: __kstring_t, kstring_t;
 
@@ -119,18 +127,21 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      *              outputs uncompressed data wrapped in the zlib format.
      * @return      BGZF file handler; 0 on error
      */
-    BGZF* bgzf_dopen(int fd, const char *mode);
+    BGZF* bgzf_dopen(int fd, const(char) *mode);
 
-    BGZF* bgzf_fdopen(int fd, const char *mode) { return bgzf_dopen(fd, mode); }    // for backward compatibility
+    /// ditto
+    pragma(inline, true)
+    BGZF* bgzf_fdopen(int fd, const(char) *mode) { return bgzf_dopen(fd, mode); }    // for backward compatibility
+    
     /**
      * Open the specified file for reading or writing.
      */
-    BGZF* bgzf_open(const char* path, const char *mode);
+    BGZF* bgzf_open(const(char)* path, const(char) *mode);
 
     /**
      * Open an existing hFILE stream for reading or writing.
      */
-    BGZF* bgzf_hopen(hFILE *fp, const char *mode);
+    BGZF* bgzf_hopen(hFILE *fp, const(char) *mode);
 
     /**
      * Close the BGZF and free all associated resources.
@@ -159,7 +170,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @param length size of data to write
      * @return       number of bytes written (i.e., _length_); negative on error
      */
-    ssize_t bgzf_write(BGZF *fp, const void *data, size_t length);
+    ssize_t bgzf_write(BGZF *fp, const(void) *data, size_t length);
 
     /**
      * Write _length_ bytes from _data_ to the file, the index will be used to
@@ -171,7 +182,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @param length size of data to write
      * @return       number of bytes written (i.e., _length_); negative on error
      */
-    ssize_t bgzf_block_write(BGZF *fp, const void *data, size_t length);
+    ssize_t bgzf_block_write(BGZF *fp, const(void) *data, size_t length);
 
     /**
      * Read up to _length_ bytes directly from the underlying stream without
@@ -195,7 +206,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @param length number of raw bytes to write
      * @return       number of bytes actually written; -1 on error
      */
-    ssize_t bgzf_raw_write(BGZF *fp, const void *data, size_t length);
+    ssize_t bgzf_raw_write(BGZF *fp, const(void) *data, size_t length);
 
     /**
      * Write the data in the buffer to the file.
@@ -211,6 +222,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * call to bgzf_seek can be used to position the file at the same point.
      * Return value is non-negative on success.
      */
+    pragma(inline, true)
     ulong bgzf_tell(BGZF *fp) { return ((*fp).block_address << 16) | ((*fp).block_offset & 0xFFFF); }
     
     /**
@@ -252,7 +264,8 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @param fn    file name
      * @return      1 if _fn_ is BGZF; 0 if not or on I/O error
      */
-    // int bgzf_is_bgzf(const char *fn) HTS_DEPRECATED("Use bgzf_compression() or hts_detect_format() instead");
+    deprecated("Use bgzf_compression() or hts_detect_format() instead")
+    int bgzf_is_bgzf(const(char) *fn);
 
     /*********************
      * Advanced routines *
@@ -325,7 +338,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @param level  compression level
      * @return       0 on success and negative on error
      */
-    int bgzf_compress(void *dst, size_t *dlen, const void *src, size_t slen, int level);
+    int bgzf_compress(void *dst, size_t *dlen, const(void) *src, size_t slen, int level);
 
     /*******************
      * bgzidx routines *
@@ -368,7 +381,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @return 0 on success and -1 on error.
      */
     int bgzf_index_load(BGZF *fp,
-                        const char *bname, const char *suffix);
+                        const(char) *bname, const(char) *suffix);
 
     /// Load BGZF index from an hFILE
     /**
@@ -386,7 +399,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * used instead.
      */
     int bgzf_index_load_hfile(BGZF *fp, hFILE *idx,
-                              const char *name);
+                              const(char) *name);
 
     /// Save BGZF index
     /**
@@ -396,7 +409,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @return 0 on success and -1 on error.
      */
     int bgzf_index_dump(BGZF *fp,
-                        const char *bname, const char *suffix);
+                        const(char) *bname, const(char) *suffix);
 
     /// Write a BGZF index to an hFILE
     /**
@@ -413,6 +426,4 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      */
 
     int bgzf_index_dump_hfile(BGZF *fp, hFILE *idx,
-                              const char *name);
-
-
+                              const(char) *name);
