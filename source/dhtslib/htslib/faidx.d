@@ -1,11 +1,10 @@
 // htslib-1.9 faidx.h as D module
-
 module dhtslib.htslib.faidx;
 
 extern (C):
 
-/// @file htslib/faidx.h
-/// FASTA random access.
+// @file htslib/faidx.h
+// FASTA random access.
 /*
    Copyright (C) 2008, 2009, 2013, 2014, 2016, 2017-2018 Genome Research Ltd.
 
@@ -61,16 +60,17 @@ extern (C):
     wrapped in the same way.
  */
 
-struct __faidx_t;
 /// Opaque structure representing FASTA index
-alias __faidx_t faidx_t;
+struct __faidx_t; // @suppress(dscanner.style.phobos_naming_convention)
+/// ditto
+alias faidx_t = __faidx_t;
 
 /// File format to be dealing with.
-enum fai_format_options {
+enum fai_format_options { // @suppress(dscanner.style.phobos_naming_convention)
     FAI_NONE,
     FAI_FASTA,
     FAI_FASTQ
-};
+}
 
 /// Build index for a FASTA or FASTQ or bgzip-compressed FASTA or FASTQ file.
 /**  @param  fn  FASTA/FASTQ file name
@@ -82,8 +82,7 @@ If fnfai is NULL, ".fai" will be appended to fn to make the FAI file name.
 If fngzi is NULL, ".gzi" will be appended to fn for the GZI file.  The GZI
 file will only be built if fn is bgzip-compressed.
 */
-//int fai_build3(const char *fn, const char *fnfai, const char *fngzi) HTS_RESULT_USED;
-int fai_build3(const char *fn, const char *fnfai, const char *fngzi);
+int fai_build3(const(char) *fn, const(char) *fnfai, const(char) *fngzi);
 
 /// Build index for a FASTA or FASTQ or bgzip-compressed FASTA or FASTQ file.
 /** @param  fn  FASTA/FASTQ file name    @return     0 on success; or -1 on failure
@@ -91,15 +90,15 @@ int fai_build3(const char *fn, const char *fnfai, const char *fngzi);
 File "fn.fai" will be generated.  This function is equivalent to
 fai_build3(fn, NULL, NULL);
 */
-//int fai_build(const char *fn) HTS_RESULT_USED;
-int fai_build(const char *fn);
+int fai_build(const(char) *fn);
 
 /// Destroy a faidx_t struct
 void fai_destroy(faidx_t *fai);
 
-enum fai_load_options {
+/// Options for fai_load functions
+enum fai_load_options { // @suppress(dscanner.style.phobos_naming_convention)
     FAI_CREATE = 0x01,
-};
+}
 
 /// Load FASTA indexes.
 /** @param  fn  File name of the FASTA file (can be compressed with bgzip).
@@ -115,7 +114,7 @@ The bgzip index is only needed if fn is compressed.
 If (flags & FAI_CREATE) is true, the index files will be built using
 fai_build3() if they are not already present.
 */
-faidx_t *fai_load3(const char *fn, const char *fnfai, const char *fngzi,
+faidx_t *fai_load3(const(char) *fn, const(char) *fnfai, const(char) *fngzi,
                    int flags);
 
 /// Load index from "fn.fai".
@@ -124,7 +123,7 @@ faidx_t *fai_load3(const char *fn, const char *fnfai, const char *fngzi,
 
 This function is equivalent to fai_load3(fn, NULL, NULL, FAI_CREATE|FAI_CACHE);
 */
-faidx_t *fai_load(const char *fn);
+faidx_t *fai_load(const(char) *fn);
 
 /// Load FASTA or FASTQ indexes.
 /** @param  fn  File name of the FASTA/FASTQ file (can be compressed with bgzip).
@@ -141,7 +140,7 @@ The bgzip index is only needed if fn is compressed.
 If (flags & FAI_CREATE) is true, the index files will be built using
 fai_build3() if they are not already present.
 */
-faidx_t *fai_load3_format(const char *fn, const char *fnfai, const char *fngzi,
+faidx_t *fai_load3_format(const(char) *fn, const(char) *fnfai, const(char) *fngzi,
                    int flags, fai_format_options format);
 
 /// Load index from "fn.fai".
@@ -151,7 +150,7 @@ faidx_t *fai_load3_format(const char *fn, const char *fnfai, const char *fngzi,
 
 This function is equivalent to fai_load3_format(fn, NULL, NULL, FAI_CREATE|FAI_CACHE, format);
 */
-faidx_t *fai_load_format(const char *fn, fai_format_options format);
+faidx_t *fai_load_format(const(char) *fn, fai_format_options format);
 
 /// Fetch the sequence in a region
 /** @param  fai  Pointer to the faidx_t struct
@@ -162,7 +161,7 @@ faidx_t *fai_load_format(const char *fn, fai_format_options format);
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char *fai_fetch(const faidx_t *fai, const char *reg, int *len);
+char *fai_fetch(const(faidx_t) *fai, const(char) *reg, int *len);
 
 /// Fetch the quality string for a region for FASTQ files
 /** @param  fai  Pointer to the faidx_t struct
@@ -173,7 +172,7 @@ char *fai_fetch(const faidx_t *fai, const char *reg, int *len);
 The returned quality string is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char *fai_fetchqual(const faidx_t *fai, const char *reg, int *len);
+char *fai_fetchqual(const(faidx_t) *fai, const(char) *reg, int *len);
 
 /// Fetch the number of sequences
 /** @param  fai  Pointer to the faidx_t struct
@@ -192,7 +191,7 @@ char *fai_fetchqual(const faidx_t *fai, const char *reg, int *len);
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char *faidx_fetch_seq(const faidx_t *fai, const char *c_name, int p_beg_i, int p_end_i, int *len);
+char *faidx_fetch_seq(const(faidx_t) *fai, const(char) *c_name, int p_beg_i, int p_end_i, int *len);
 
 /// Fetch the quality string in a region for FASTQ files
 /** @param  fai  Pointer to the faidx_t struct
@@ -205,20 +204,20 @@ char *faidx_fetch_seq(const faidx_t *fai, const char *c_name, int p_beg_i, int p
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char *faidx_fetch_qual(const faidx_t *fai, const char *c_name, int p_beg_i, int p_end_i, int *len);
+char *faidx_fetch_qual(const(faidx_t) *fai, const(char) *c_name, int p_beg_i, int p_end_i, int *len);
 
 /// Query if sequence is present
 /**   @param  fai  Pointer to the faidx_t struct
       @param  seq  Sequence name
       @return      1 if present or 0 if absent
 */
-int faidx_has_seq(const faidx_t *fai, const char *seq);
+int faidx_has_seq(const(faidx_t) *fai, const(char) *seq);
 
 /// Return number of sequences in fai index
-int faidx_nseq(const faidx_t *fai);
+int faidx_nseq(const(faidx_t) *fai);
 
 /// Return name of i-th sequence
-const(char) *faidx_iseq(const faidx_t *fai, int i);
+const(char) *faidx_iseq(const(faidx_t) *fai, int i);
 
 /// Return sequence length, -1 if not present
-int faidx_seq_len(const faidx_t *fai, const char *seq);
+int faidx_seq_len(const(faidx_t) *fai, const(char) *seq);
