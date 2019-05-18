@@ -64,19 +64,19 @@ extern __gshared int hts_verbose;
 * \param context       Context where the event occurred. Typically set to "__func__".
 * \param format        Format string with placeholders, like printf.
 */
-void hts_log(htsLogLevel severity, const char *context, const char *format, ...);
+void hts_log(htsLogLevel severity, const(char) *context, const(char) *format, ...);
 
 pragma(inline, true):
 /**! Logs an event with severity HTS_LOG_ERROR and default context. Parameters: format, ... */
 //#define hts_log_error(...) hts_log(HTS_LOG_ERROR, __func__, __VA_ARGS__)
-void hts_log_error(string ctx, string msg)
+void hts_log_error(const(char)[] ctx, string msg)
 {
     string colormsg = "\x1b[0;31m" ~ msg ~ "\x1b[0m";
     hts_log(htsLogLevel.HTS_LOG_ERROR, toStringz(ctx), toStringz(colormsg));
 }
 /**! Logs an event with severity HTS_LOG_WARNING and default context. Parameters: format, ... */
 //#define hts_log_warning(...) hts_log(HTS_LOG_WARNING, __func__, __VA_ARGS__)
-void hts_log_warning(string ctx, string msg)
+void hts_log_warning(const(char)[] ctx, string msg)
 {
     string colormsg = "\x1b[0;33m" ~ msg ~ "\x1b[0m";
     hts_log(htsLogLevel.HTS_LOG_WARNING, toStringz(ctx), toStringz(colormsg));
@@ -84,7 +84,7 @@ void hts_log_warning(string ctx, string msg)
 
 /**! Logs an event with severity HTS_LOG_INFO and default context. Parameters: format, ... */
 //#define hts_log_info(...) hts_log(HTS_LOG_INFO, __func__, __VA_ARGS__)
-void hts_log_info(string ctx, string msg)
+void hts_log_info(const(char)[] ctx, string msg)
 {
     string colormsg = "\x1b[0;32m" ~ msg ~ "\x1b[0m";
     hts_log(htsLogLevel.HTS_LOG_INFO, toStringz(ctx), toStringz(colormsg));
@@ -92,7 +92,7 @@ void hts_log_info(string ctx, string msg)
 
 /**! Logs an event with severity HTS_LOG_DEBUG and default context. Parameters: format, ... */
 //#define hts_log_debug(...) hts_log(HTS_LOG_DEBUG, __func__, __VA_ARGS__)
-void hts_log_debug(string ctx, string msg)
+void hts_log_debug(const(char)[] ctx, string msg)
 {
     string colormsg = "\x1b[0;36m" ~ msg ~ "\x1b[0m";
     hts_log(htsLogLevel.HTS_LOG_DEBUG, toStringz(ctx), toStringz(colormsg));
@@ -100,7 +100,7 @@ void hts_log_debug(string ctx, string msg)
 
 /**! Logs an event with severity HTS_LOG_TRACE and default context. Parameters: format, ... */
 //#define hts_log_trace(...) hts_log(HTS_LOG_TRACE, __func__, __VA_ARGS__)
-void hts_log_trace(string ctx, string msg)
+void hts_log_trace(const(char)[] ctx, string msg)
 {
     string colormsg = "\x1b[1;36m" ~ msg ~ "\x1b[0m";
     hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), toStringz(colormsg));
