@@ -43,7 +43,7 @@ of the hFILE-related inline functions.  They may change in future releases.
 User code should not use them directly; you should imagine that hFILE is an
 opaque incomplete type.
 */
-struct hFILE {
+struct hFILE { // @suppress(dscanner.style.phobos_naming_convention)
     // @cond internal
     char *buffer;   /// ?
     char *begin;    /// ?
@@ -156,8 +156,7 @@ Bytes will be read into the buffer up to and including a delimiter, until
 EOF is reached, or _size-1_ bytes have been written, whichever comes first.
 The string will then be terminated with a NUL byte (`\0`).
 */
-ssize_t hgetdelim(char *buffer, size_t size, int delim, hFILE *fp)
-   ;
+ssize_t hgetdelim(char *buffer, size_t size, int delim, hFILE *fp);
 
 /// Read a line from the stream, up to a maximum length
 /** @param buffer  The buffer into which bytes will be written
