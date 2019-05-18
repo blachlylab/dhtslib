@@ -57,24 +57,28 @@ import core.stdc.stdint;
 #endif
 +/
 
-/* kstring_t is a simple non-opaque type whose fields are likely to be
+/** kstring_t is a simple non-opaque type whose fields are likely to be
  * used directly by user code (but see also ks_str() and ks_len() below).
  * A kstring_t object is initialised by either of
  *       kstring_t str = { 0, 0, NULL };
  *       kstring_t str; ...; str.l = str.m = 0; str.s = NULL;
+ * (NB: in Dlang it is automagically initialized to zeros unless declared = void)
  * and either ownership of the underlying buffer should be given away before
  * the object disappears (see ks_release() below) or the kstring_t should be
  * destroyed with  free(str.s);  */
-struct __kstring_t {
+struct __kstring_t { // @suppress(dscanner.style.phobos_naming_convention)
+	/// length(l) of max(m)
 	size_t l, m;
-	char *s;
+	char *s;	/// pointer to string -- must free(str.s) when done with it
 } 
 alias kstring_t = __kstring_t;
 
-struct ks_tokaux_t {
-	uint64_t[4] tab;
+/// ???
+struct ks_tokaux_t { // @suppress(dscanner.style.phobos_naming_convention)
+	uint64_t[4] tab;	/// ???
+	/// ???
 	int sep, finished;
-	const(char) *p; // end of the current token
+	const(char) *p;		/// end of the current token
 }
 /+
 	int kvsprintf(kstring_t *s, const char *fmt, va_list ap) KS_ATTR_PRINTF(2,0);
