@@ -408,6 +408,8 @@ class SAMRecord
     @nogc @safe nothrow
     @property void insertSize(int isize) { this.b.core.isize = isize; }
 }
+
+debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
@@ -467,6 +469,7 @@ unittest{
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
 }
 
+debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
