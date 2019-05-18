@@ -61,8 +61,6 @@ DEALINGS IN THE SOFTWARE.  */
 import core.stdc.stdint;
 import dhtslib.htslib.hts;
 import dhtslib.htslib.bgzf:BGZF;
-//struct BGZF;
-struct hts_idx_t;
 import dhtslib.htslib.kstring: __kstring_t, kstring_t;
 
 /// Highest SAM format version supported by this library
@@ -72,7 +70,7 @@ auto SAM_FORMAT_VERSION = "1.6"c;
  *** SAM/BAM header ***
  **********************/
 
-/*! @typedef
+/**! @typedef
  @abstract Structure for the alignment header.
  @field n_targets   number of reference sequences
  @field l_text      length of the plain text in the header
@@ -82,53 +80,55 @@ auto SAM_FORMAT_VERSION = "1.6"c;
  @field sdict       header dictionary
  */
 
-struct bam_hdr_t {
-    int  n_targets, ignore_sam_err;
-    uint l_text;
-    uint *target_len;
-    byte *cigar_tab;
-    char **target_name;
-    char *text;
-    void *sdict;
-};
+struct bam_hdr_t { // @suppress(dscanner.style.phobos_naming_convention)
+    int  n_targets;         /// number of targets (contigs)
+    int ignore_sam_err; /// ? Ignore SAM format errors?
+    uint l_text;        /// ? text data length
+    uint *target_len;   /// ? number of targets (contigs)
+    byte *cigar_tab;    /// ? CIGAR table
+    char **target_name; /// ? C-style array of target (contig) names
+    char *text;         /// ?
+    void *sdict;        /// ?
+}
 
 /****************************
  *** CIGAR related macros ***
  ****************************/
 
 enum {
-    BAM_CMATCH      = 0,
-    BAM_CINS        = 1,
-    BAM_CDEL        = 2,
-    BAM_CREF_SKIP   = 3,
-    BAM_CSOFT_CLIP  = 4,
-    BAM_CHARD_CLIP  = 5,
-    BAM_CPAD        = 6,
-    BAM_CEQUAL      = 7,
-    BAM_CDIFF       = 8,
-    BAM_CBACK       = 9
+    BAM_CMATCH      = 0,    /// CIGAR M, match
+    BAM_CINS        = 1,    /// CIGAR I, insertion
+    BAM_CDEL        = 2,    /// CIGAR D, deletion
+    BAM_CREF_SKIP   = 3,    /// CIGAR N, refskip
+    BAM_CSOFT_CLIP  = 4,    /// CIGAR S, soft clip
+    BAM_CHARD_CLIP  = 5,    /// CIGAR H, hard clip
+    BAM_CPAD        = 6,    /// CIGAR P, padding
+    BAM_CEQUAL      = 7,    /// CIGAR =, equal
+    BAM_CDIFF       = 8,    /// CIGAR X, differs
+    BAM_CBACK       = 9     /// CIGAR B, back(?)
 }
 
-auto BAM_CIGAR_STR       = "MIDNSHP=XB"c;
-enum int BAM_CIGAR_SHIFT = 4;
-enum int BAM_CIGAR_MASK  = 0xf;
-enum int BAM_CIGAR_TYPE  = 0x3C1A7;
+auto BAM_CIGAR_STR       = "MIDNSHP=XB"c;   /// internal
+enum int BAM_CIGAR_SHIFT = 4;       /// internal
+enum int BAM_CIGAR_MASK  = 0xf;     /// internal
+enum int BAM_CIGAR_TYPE  = 0x3C1A7; /// internal magic const for bam_cigar_type()
 
 pragma(inline, true)
 {
+/// CIGAR opcode for CIGAR uint (4 LSB)
 auto bam_cigar_op(uint c)    { return ( c & BAM_CIGAR_MASK); }
+/// CIGAR operation length for CIGAR uint (28 MSB >> 4)
 auto bam_cigar_oplen(uint c) { return ( c >> BAM_CIGAR_SHIFT ); }
 // Note that BAM_CIGAR_STR is padded to length 16 bytes below so that
 // the array look-up will not fall off the end.  '?' is chosen as the
 // padding character so it's easy to spot if one is emitted, and will
 // result in a parsing failure (in sam_parse1(), at least) if read.
-
-////#define bam_cigar_opchr(c) (BAM_CIGAR_STR "??????" [bam_cigar_op(c)])
+/// CIGAR opcode character for CIGAR uint
 auto bam_cigar_opchr(uint c)    { return (BAM_CIGAR_STR ~ "??????"[bam_cigar_op(c)]); }
-////#define bam_cigar_gen(l, o) ((l)<<BAM_CIGAR_SHIFT|(o))
-auto bam_cigar_gen(uint l, uint o) { return (l << BAM_CIGAR_SHIFT | o); } // TODO: Check operator precedence C vs D
+/// Generate CIGAR uint from length and operator
+auto bam_cigar_gen(uint l, uint o) { return (l << BAM_CIGAR_SHIFT | o); }
 
-/* bam_cigar_type returns a bit flag with:
+/** bam_cigar_type returns a bit flag with:
  *   bit 1 set if the cigar operation consumes the query
  *   bit 2 set if the cigar operation consumes the reference
  *
@@ -147,40 +147,39 @@ auto bam_cigar_gen(uint l, uint o) { return (l << BAM_CIGAR_SHIFT | o); } // TOD
  * BAM_CBACK       0      0
  * --------------------------------
  */
-////#define bam_cigar_type(o) (BAM_CIGAR_TYPE>>((o)<<1)&3) // bit 1: consume query; bit 2: consume reference
-auto bam_cigar_type(uint o) { return (BAM_CIGAR_TYPE >> (o << 1) & 3); }
-}
+auto bam_cigar_type(uint o) { return (BAM_CIGAR_TYPE >> (o << 1) & 3); }    // bit 1: consume query; bit 2: consume reference
+} // end pragma(inline)
 
-/*! @abstract the read is paired in sequencing, no matter whether it is mapped in a pair */
+/**! @abstract the read is paired in sequencing, no matter whether it is mapped in a pair */
 enum int BAM_FPAIRED       = 1;
-/*! @abstract the read is mapped in a proper pair */
+/**! @abstract the read is mapped in a proper pair */
 enum int BAM_FPROPER_PAIR  = 2;
-/*! @abstract the read itself is unmapped; conflictive with BAM_FPROPER_PAIR */
+/**! @abstract the read itself is unmapped; conflictive with BAM_FPROPER_PAIR */
 enum int BAM_FUNMAP        = 4;
-/*! @abstract the mate is unmapped */
+/**! @abstract the mate is unmapped */
 enum int BAM_FMUNMAP       = 8;
-/*! @abstract the read is mapped to the reverse strand */
+/**! @abstract the read is mapped to the reverse strand */
 enum int BAM_FREVERSE      =16;
-/*! @abstract the mate is mapped to the reverse strand */
+/**! @abstract the mate is mapped to the reverse strand */
 enum int BAM_FMREVERSE     =32;
-/*! @abstract this is read1 */
+/**! @abstract this is read1 */
 enum int BAM_FREAD1        =64;
-/*! @abstract this is read2 */
+/**! @abstract this is read2 */
 enum int BAM_FREAD2        =128;
-/*! @abstract not primary alignment */
+/**! @abstract not primary alignment */
 enum int BAM_FSECONDARY    =256;
-/*! @abstract QC failure */
+/**! @abstract QC failure */
 enum int BAM_FQCFAIL       =512;
-/*! @abstract optical or PCR duplicate */
+/**! @abstract optical or PCR duplicate */
 enum int BAM_FDUP          =1024;
-/*! @abstract supplementary alignment */
+/**! @abstract supplementary alignment */
 enum int BAM_FSUPPLEMENTARY=2048;
 
 /*************************
  *** Alignment records ***
  *************************/
 
-/*! @typedef
+/**! @typedef
  @abstract Structure for core alignment information.
  @field  tid     chromosome ID, defined by bam_hdr_t
  @field  pos     0-based leftmost coordinate
@@ -194,23 +193,23 @@ enum int BAM_FSUPPLEMENTARY=2048;
  @field  mtid    chromosome ID of next read in template, defined by bam_hdr_t
  @field  mpos    0-based leftmost coordinate of next read in template
  */
-struct bam1_core_t {
-    int32_t  tid;
-    int32_t  pos;
-    uint16_t bin;
-    uint8_t  qual;
-    uint8_t  l_qname;
-    uint16_t flag;
-    uint8_t  unused1;
-    uint8_t  l_extranul;
-    uint32_t n_cigar;
-    int32_t  l_qseq;
-    int32_t  mtid;
-    int32_t  mpos;
-    int32_t  isize;
-};
+struct bam1_core_t { // @suppress(dscanner.style.phobos_naming_convention)
+    int32_t  tid;       /// chromosome ID, defined by bam_hdr_t
+    int32_t  pos;       /// 0-based leftmost coordinate
+    uint16_t bin;       /// bin calculated by bam_reg2bin()
+    uint8_t  qual;      /// mapping quality
+    uint8_t  l_qname;   /// length of the query name
+    uint16_t flag;      /// bitwise flag
+    uint8_t  unused1;   /// padding
+    uint8_t  l_extranul;/// length of extra NULs between qname & cigar (for alignment)
+    uint32_t n_cigar;   /// number of CIGAR operations
+    int32_t  l_qseq;    /// length of the query sequence (read)
+    int32_t  mtid;      /// chromosome ID of next read in template, defined by bam_hdr_t
+    int32_t  mpos;      /// 0-based leftmost coordinate of next read in template (mate)
+    int32_t  isize;     /// ? template length
+}
 
-/*! @typedef
+/**! @typedef
  @abstract Structure for one alignment.
  @field  core       core information about the alignment
  @field  l_data     current length of bam1_t::data
@@ -227,34 +226,34 @@ struct bam1_core_t {
  3. cigar data is encoded 4 bytes per CIGAR operation.
  4. seq is nybble-encoded according to bam_nt16_table.
  */
-struct bam1_t {
-    bam1_core_t core;
-    int         l_data;
-    uint32_t    m_data;
-    uint8_t     *data;
-    uint64_t    id;
-};
+struct bam1_t { // @suppress(dscanner.style.phobos_naming_convention)
+    bam1_core_t core;   /// core information about the alignment
+    int         l_data; /// current length of bam1_t::data
+    uint32_t    m_data; /// maximum length of bam1_t::data
+    uint8_t     *data;  /// all variable-length data, concatenated; structure: qname-cigar-seq-qual-aux
+    uint64_t    id;     /// ???
+}
 
 pragma(inline, true) {
-/*! @function
+/**! @function
  @abstract  Get whether the query is on the reverse strand
  @param  b  pointer to an alignment
  @return    boolean true if query is on the reverse strand
  */
 bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
-/*! @function
+/**! @function
  @abstract  Get whether the query's mate is on the reverse strand
  @param  b  pointer to an alignment
  @return    boolean true if query's mate on the reverse strand
  */
 bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
-/*! @function
+/**! @function
  @abstract  Get the name of the query
  @param  b  pointer to an alignment
  @return    pointer to the name string, null terminated
  */
 auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
-/*! @function
+/**! @function
  @abstract  Get the CIGAR array
  @param  b  pointer to an alignment
  @return    pointer to the CIGAR array
@@ -264,7 +263,7 @@ auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
  length of a CIGAR.
  */
 auto bam_get_cigar(bam1_t *b) { return cast(uint *)((*b).data + (*b).core.l_qname); }
-/*! @function
+/**! @function
  @abstract  Get query sequence
  @param  b  pointer to an alignment
  @return    pointer to sequence
@@ -275,29 +274,38 @@ auto bam_get_cigar(bam1_t *b) { return cast(uint *)((*b).data + (*b).core.l_qnam
  recommended to use bam_seqi() macro to get the base.
  */
 auto bam_get_seq(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname); }
-/*! @function
+/**! @function
  @abstract  Get query quality
  @param  b  pointer to an alignment
  @return    pointer to quality string
  */
 ////#define bam_get_qual(b)  ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname + (((b)->core.l_qseq + 1)>>1))
-auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname + (((*b).core.l_qseq + 1)>>1); }
+auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + 
+                                    (*b).core.l_qname + 
+                                        (((*b).core.l_qseq + 1)>>1); }
 
-/*! @function
+/**! @function
  @abstract  Get auxiliary data
  @param  b  pointer to an alignment
  @return    pointer to the concatenated auxiliary data
  */
 ////#define bam_get_aux(b)   ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname + (((b)->core.l_qseq + 1)>>1) + (b)->core.l_qseq)
-auto bam_get_aux(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname + (((*b).core.l_qseq + 1)>>1) + (*b).core.l_qseq); }
-/*! @function
+auto bam_get_aux(bam1_t *b) { return ((*b).data + ((*b).core.n_cigar<<2) + 
+                                    (*b).core.l_qname + 
+                                        (((*b).core.l_qseq + 1)>>1) + 
+                                            (*b).core.l_qseq); }
+/**! @function
  @abstract  Get length of auxiliary data
  @param  b  pointer to an alignment
  @return    length of the concatenated auxiliary data
  */
 ////#define bam_get_l_aux(b) ((b)->l_data - ((b)->core.n_cigar<<2) - (b)->core.l_qname - (b)->core.l_qseq - (((b)->core.l_qseq + 1)>>1))
-auto bam_get_l_aux(bam1_t *b) { return ((*b).l_data - ((*b).core.n_cigar<<2) - (*b).core.l_qname - (*b).core.l_qseq - (((*b).core.l_qseq + 1)>>1)); }
-/*! @function
+auto bam_get_l_aux(bam1_t *b) { return ((*b).l_data - 
+                                ((*b).core.n_cigar<<2) - 
+                                    (*b).core.l_qname - 
+                                        (*b).core.l_qseq - 
+                                            (((*b).core.l_qseq + 1)>>1)); }
+/**! @function
  @abstract  Get a base on read
  @param  s  Query sequence returned by bam_get_seq()
  @param  i  The i-th position, 0-based
@@ -306,7 +314,7 @@ auto bam_get_l_aux(bam1_t *b) { return ((*b).l_data - ((*b).core.n_cigar<<2) - (
 ////#define bam_seqi(s, i) ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf)
 auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);   }
 //auto bam_seqi(char *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf); }
-}
+} // end pragma(inline)
 
 /**************************
  *** Exported functions ***
@@ -316,24 +324,38 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
      *** BAM I/O ***
      ***************/
 
+    /// init a BAM header
     bam_hdr_t *bam_hdr_init();
+    /// read BAM header from fp
     bam_hdr_t *bam_hdr_read(BGZF *fp);
+    /// write BAM header to fp
     int bam_hdr_write(BGZF *fp, const(bam_hdr_t) *h);
+    /// destroy a BAM header
     void bam_hdr_destroy(bam_hdr_t *h);
+    /// Get contig tid 
     int bam_name2id(bam_hdr_t *h, const(char) *_ref);
+    /// duplicate a BAM header
     bam_hdr_t* bam_hdr_dup(const(bam_hdr_t) *h0);
 
+    /// init a BAM record
     bam1_t *bam_init1();
+    /// destroy a BAM record
     void bam_destroy1(bam1_t *b);
+    /// read BAM record from fp
     int bam_read1(BGZF *fp, bam1_t *b);
+    /// write BAM record to fp
     int bam_write1(BGZF *fp, const(bam1_t) *b);
+    /// copy a BAM record from dst to src
     bam1_t *bam_copy1(bam1_t *bdst, const(bam1_t) *bsrc);
+    /// duplicate a BAM record
     bam1_t *bam_dup1(const(bam1_t) *bsrc);
 
-    int bam_cigar2qlen(int n_cigar, const uint32_t *cigar);
-    int bam_cigar2rlen(int n_cigar, const uint32_t *cigar);
+    /// How much query is consumed by CIGAR op(s)?
+    int bam_cigar2qlen(int n_cigar, const(uint32_t) *cigar);
+    /// How much reference is consumed by CIGAR op(s)?
+    int bam_cigar2rlen(int n_cigar, const(uint32_t) *cigar);
 
-    /*!
+    /**!
       @abstract Calculate the rightmost base position of an alignment on the
       reference genome.
 
@@ -346,7 +368,9 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
     */
     int32_t bam_endpos(const(bam1_t) *b);
 
+    /// returns negative value on error
     int   bam_str2flag(const(char) *str);    /** returns negative value on error */
+    /// The string must be freed by the user
     char *bam_flag2str(int flag);   /** The string must be freed by the user */
 
     /*************************
@@ -355,7 +379,8 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
 
     // These BAM iterator functions work only on BAM files.  To work with either
     // BAM or CRAM files use the sam_index_load() & sam_itr_*() functions.
-    deprecated("These BAM iterator functions work only on BAM files.  To work with either BAM or CRAM files use the sam_index_load() & sam_itr_*() functions.")
+    deprecated("These BAM iterator functions work only on BAM files. "
+        ~ "To work with either BAM or CRAM files use the sam_index_load() & sam_itr_*() functions.")
     {
     ////#define bam_itr_destroy(iter) hts_itr_destroy(iter)
     alias bam_itr_destroy = hts_itr_destroy;
@@ -364,12 +389,14 @@ auto bam_seqi(ubyte *s, uint i) { return ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf);  
     ////#define bam_itr_querys(idx, hdr, region) sam_itr_querys(idx, hdr, region)
     alias bam_itr_querys = sam_itr_querys;
     ////#define bam_itr_next(htsfp, itr, r) hts_itr_next((htsfp)->fp.bgzf, (itr), (r), 0)
-    pragma(inline, true) auto bam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, null); }
+    pragma(inline, true)
+    auto bam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, null); }
     }
 
 // Load/build .csi or .bai BAM index file.  Does not work with CRAM.
 // It is recommended to use the sam_index_* functions below instead.
-deprecated("Load/build .csi or .bai BAM index file.  Does not work with CRAM. It is recommended to use the sam_index_* functions below instead.")
+deprecated("Load/build .csi or .bai BAM index file.  Does not work with CRAM. "
+    ~ "It is recommended to use the sam_index_* functions below instead.")
 {
 ////#define bam_index_load(fn) hts_idx_load((fn), HTS_FMT_BAI)
 pragma(inline, true) auto bam_index_load(const(char) *fn) { return hts_idx_load(fn, HTS_FMT_BAI); }
@@ -409,16 +436,21 @@ int sam_index_build(const(char) *fn, int min_shift);
              sam_index_build for error codes)
 */
 int sam_index_build2(const(char) *fn, const(char) *fnidx, int min_shift);
+/// ditto
 int sam_index_build3(const(char) *fn, const(char) *fnidx, int min_shift, int nthreads);
 
     ////#define sam_itr_destroy(iter) hts_itr_destroy(iter)
     alias sam_itr_destroy = hts_itr_destroy;
+    /// SAM/BAM/CRAM iterator query by integer tid/start/end
     hts_itr_t *sam_itr_queryi(const(hts_idx_t) *idx, int tid, int beg, int end);
+    /// SAM/BAM/CRAM iterator query by string ("chr:start-end")
     hts_itr_t *sam_itr_querys(const(hts_idx_t) *idx, bam_hdr_t *hdr, const(char) *region);
+    /// SAM/BAM/CRAM iterator query by region list
     hts_itr_multi_t *sam_itr_regions(const(hts_idx_t) *idx, bam_hdr_t *hdr, hts_reglist_t *reglist, uint regcount);
 
     ////#define sam_itr_next(htsfp, itr, r) hts_itr_next((htsfp)->fp.bgzf, (itr), (r), (htsfp))
-    pragma(inline, true) auto sam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, htsfp); }
+    pragma(inline, true)
+    auto sam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_next(htsfp.fp.bgzf, itr, r, htsfp); }
     ////#define sam_itr_multi_next(htsfp, itr, r) hts_itr_multi_next((htsfp), (itr), (r))
     //auto sam_itr_multi_next(htsFile *htsfp, hts_itr_t *itr, void *r) { return hts_itr_multi_next(htsfp, itr, r); }
     alias sam_itr_multi_next = hts_itr_multi_next;
@@ -427,32 +459,43 @@ int sam_index_build3(const(char) *fn, const(char) *fnidx, int min_shift, int nth
      *** SAM I/O ***
      ***************/
 
-    ////#define sam_open(fn, mode) (hts_open((fn), (mode)))
-    ////#define sam_open_format(fn, mode, fmt) (hts_open_format((fn), (mode), (fmt)))
-    ////#define sam_close(fp) hts_close(fp)
+    //#define sam_open(fn, mode) (hts_open((fn), (mode)))
+    alias sam_open = hts_open;
+    //#define sam_open_format(fn, mode, fmt) (hts_open_format((fn), (mode), (fmt)))
+    alias sam_open_format = hts_open_format;
+    //#define sam_close(fp) hts_close(fp)
+    alias sam_close = hts_close;
 
+    /// open SAM/BAM/CRAM
     int sam_open_mode(char *mode, const(char) *fn, const(char) *format);
 
-    // A version of sam_open_mode that can handle ,key=value options.
-    // The format string is allocated and returned, to be freed by the caller.
-    // Prefix should be "r" or "w",
+    /// A version of sam_open_mode that can handle ,key=value options.
+    /// The format string is allocated and returned, to be freed by the caller.
+    /// Prefix should be "r" or "w",
     char *sam_open_mode_opts(const(char) *fn,
                              const(char) *mode,
                              const(char) *format);
 
-    alias htsFile samFile;
+    alias samFile = htsFile;
+    /// parse SAM/BAM/CRAM header from text
     bam_hdr_t *sam_hdr_parse(int l_text, const(char) *text);
+    /// read SAM/BAM/CRAM header frpm fp
     bam_hdr_t *sam_hdr_read(samFile *fp);
+    /// write SAM/BAM/CRAM header to fp
     int sam_hdr_write(samFile *fp, const(bam_hdr_t) *h);
+    /// edit SAM/BAM/CRAM header @HD line by key/value (see SAM specs section 1.3)
     int sam_hdr_change_HD(bam_hdr_t *h, const(char) *key, const(char) *val);
 
+    /// parse text SAM line
     int sam_parse1(kstring_t *s, bam_hdr_t *h, bam1_t *b);
+    /// emit text SAM line
     int sam_format1(const(bam_hdr_t) *h, const(bam1_t) *b, kstring_t *str);
 
-    /*!
+    /**!
      *  @return >= 0 on successfully reading a new record, -1 on end of stream, < -1 on error
      **/
     int sam_read1(samFile *fp, bam_hdr_t *h, bam1_t *b);
+    /// Return >= 0 on successfully writing a new record; <= -1 on error
     int sam_write1(samFile *fp, const(bam_hdr_t) *h, const(bam1_t) *b);
 
     /*************************************
@@ -476,7 +519,7 @@ uint8_t *bam_aux_get(const(bam1_t) *b, const ref char[2] tag);
     If the tag is not an integer type, errno is set to EINVAL.  This function
     will not return the value of floating-point tags.
 */
-int64_t bam_aux2i(const uint8_t *s);
+int64_t bam_aux2i(const(uint8_t) *s);
 
 /// Get an integer aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get()
@@ -484,28 +527,28 @@ int64_t bam_aux2i(const uint8_t *s);
     If the tag is not an numeric type, errno is set to EINVAL.  The value of
     integer flags will be returned cast to a double.
 */
-double bam_aux2f(const uint8_t *s);
+double bam_aux2f(const(uint8_t) *s);
 
 /// Get a character aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get().
     @return The value, or 0 if the tag was not a character ('A') type
     If the tag is not a character type, errno is set to EINVAL.
 */
-char bam_aux2A(const uint8_t *s);
+char bam_aux2A(const(uint8_t) *s);
 
 /// Get a string aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get().
     @return Pointer to the string, or NULL if the tag was not a string type
     If the tag is not a string type ('Z' or 'H'), errno is set to EINVAL.
 */
-char *bam_aux2Z(const uint8_t *s);
+char *bam_aux2Z(const(uint8_t) *s);
 
 /// Get the length of an array-type ('B') tag
 /** @param s Pointer to the tag data, as returned by bam_aux_get().
     @return The length of the array, or 0 if the tag is not an array type.
     If the tag is not an array type, errno is set to EINVAL.
  */
-uint32_t bam_auxB_len(const uint8_t *s);
+uint32_t bam_auxB_len(const(uint8_t) *s);
 
 /// Get an integer value from an array-type tag
 /** @param s   Pointer to the tag data, as returned by bam_aux_get().
@@ -515,7 +558,7 @@ uint32_t bam_auxB_len(const uint8_t *s);
     is greater than or equal to  the value returned by bam_auxB_len(s),
     errno is set to ERANGE.  In both cases, 0 will be returned.
  */
-int64_t bam_auxB2i(const uint8_t *s, uint32_t idx);
+int64_t bam_auxB2i(const(uint8_t) *s, uint32_t idx);
 
 /// Get a floating-point value from an array-type tag
 /** @param s   Pointer to the tag data, as returned by bam_aux_get().
@@ -526,7 +569,7 @@ int64_t bam_auxB2i(const uint8_t *s, uint32_t idx);
     idx is greater than or equal to  the value returned by bam_auxB_len(s),
     errno is set to ERANGE.  In both cases, 0.0 will be returned.
  */
-double bam_auxB2f(const uint8_t *s, uint32_t idx);
+double bam_auxB2f(const(uint8_t) *s, uint32_t idx);
 
 /// Append tag data to a bam record
 /* @param b    The bam record to append to.
@@ -539,7 +582,7 @@ If there is not enough space to store the additional tag, errno is set to
 ENOMEM.  If the type is invalid, errno may be set to EINVAL.  errno is
 also set to EINVAL if the bam record's aux data is corrupt.
 */
-int bam_aux_append(bam1_t *b, const ref char[2] tag, char type, int len, const uint8_t *data);
+int bam_aux_append(bam1_t *b, const ref char[2] tag, char type, int len, const(uint8_t) *data);
 
 /// Delete tag data from a bam record
 /* @param b The bam record to update
@@ -665,12 +708,12 @@ int bam_aux_update_array(bam1_t *b, const ref char[2] tag,
  data to be manipulated by the "client" (the caller of pileup).
 */
 union bam_pileup_cd {
-    void    *p;
-    int64_t i;
-    double  f;
-};
+    void    *p; /// data ptr
+    int64_t i;  /// ?
+    double  f;  /// ?
+}
 
-/*! @typedef
+/**! @typedef
  @abstract Structure for one alignment covering the pileup position.
  @field  b          pointer to the alignment
  @field  qpos       position of the read base at the pileup site, 0-based
@@ -689,30 +732,32 @@ union bam_pileup_cd {
  overhead.
  */
 struct bam_pileup1_t {
-    bam1_t  *b;
-    int32_t qpos;
+    bam1_t  *b;     /// bam record
+    int32_t qpos;   /// query position
+    /// ???
     int indel, level;
-    ///uint32_t is_del:1, is_head:1, is_tail:1, is_refskip:1, aux:28;
+    pragma(msg, "bam_pileup1_t: bitfield order assumed starting with LSB");
+    //uint32_t is_del:1, is_head:1, is_tail:1, is_refskip:1, aux:28;
     mixin(bitfields!(
         bool, "is_del",  1,
         bool, "is_head", 1,
         bool, "is_tail", 1,
         bool, "is_refskip", 1,
         uint, "aux", 28 ));
-    bam_pileup_cd cd; // generic per-struct data, owned by caller.
-};
+    bam_pileup_cd cd; /// generic per-struct data, owned by caller.
+}
 
 ///typedef int (*bam_plp_auto_f)(void *data, bam1_t *b);
 alias bam_plp_auto_f = int *function(void *data, bam1_t *b);
 
+/// opaque pileup data defined in sam.c
 struct __bam_plp_t;
 ///typedef struct __bam_plp_t *bam_plp_t;
-//alias __bam_plp_t *bam_plp_t;
 alias bam_plp_t = __bam_plp_t*;
 
+/// opaque mpileup data defined in sam.c
 struct __bam_mplp_t;
 ///typedef struct __bam_mplp_t *bam_mplp_t;
-//alias __bam_mplp_t *bam_mplp_t;
 alias bam_mplp_t = __bam_mplp_t*;
 
     /**
@@ -721,12 +766,21 @@ alias bam_mplp_t = __bam_mplp_t*;
      *              status: 0 on success, -1 on end, < -1 on non-recoverable errors
      *  @data:      user data to pass to @func
      */
+    /// NB: maxcnt records default is 8000
     bam_plp_t bam_plp_init(bam_plp_auto_f func, void *data);
+    /// destroy pileup iterator
     void bam_plp_destroy(bam_plp_t iter);
+    /// add bam record to pileup iterator
     int bam_plp_push(bam_plp_t iter, const(bam1_t) *b);
+    /// Prepares next pileup position in bam records collected by bam_plp_auto -> user func -> bam_plp_push. Returns
+    /// pointer to the piled records if next position is ready or NULL if there is not enough records in the
+    /// buffer yet (the current position is still the maximum position across all buffered reads).
     const(bam_pileup1_t)*bam_plp_next(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp);
+    /// ???
     const(bam_pileup1_t)*bam_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp);
+    /// set maximum pileup records returned (init default is 8000)
     void bam_plp_set_maxcnt(bam_plp_t iter, int maxcnt);
+    /// reset pileup
     void bam_plp_reset(bam_plp_t iter);
 
     /**
@@ -739,9 +793,11 @@ alias bam_mplp_t = __bam_mplp_t*;
      */
     void bam_plp_constructor(bam_plp_t plp,
                              int function(void *data, const(bam1_t) *b, bam_pileup_cd *cd) func);
+    /// per-pileup1_t field destructor (may be needed if used bam_plp_constructor())
     void bam_plp_destructor(bam_plp_t plp,
                             int function(void *data, const(bam1_t) *b, bam_pileup_cd *cd) func);
 
+    /// initialize new mpileup iterator
     bam_mplp_t bam_mplp_init(int n, bam_plp_auto_f func, void **data);
     /**
      *  bam_mplp_init_overlaps() - if called, mpileup will detect overlapping
@@ -752,12 +808,18 @@ alias bam_mplp_t = __bam_mplp_t*;
      *  it is multiplied by 0.8.
      */
     void bam_mplp_init_overlaps(bam_mplp_t iter);
+    /// destroy mpileup iterator
     void bam_mplp_destroy(bam_mplp_t iter);
+    /// set maximum mpileup records returned per subpileup (init default of each pileup in the mpileup is 8000)
     void bam_mplp_set_maxcnt(bam_mplp_t iter, int maxcnt);
+    /// ???
     int bam_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp);
+    /// reset mpileup
     void bam_mplp_reset(bam_mplp_t iter);
+    /// see bam_plp_constructor
     void bam_mplp_constructor(bam_mplp_t iter,
                               int function(void *data, const(bam1_t) *b, bam_pileup_cd *cd) func);
+    /// see bam_plp_destructor
     void bam_mplp_destructor(bam_mplp_t iter,
                              int function(void *data, const(bam1_t) *b, bam_pileup_cd *cd) func);
 
@@ -809,4 +871,3 @@ correct thing to do.  It would be wise to avoid this situation if possible.
 */
 
 int sam_prob_realn(bam1_t *b, const(char) *_ref, int ref_len, int flag);
-
