@@ -13,7 +13,6 @@ module dhtslib.htslib.regidx;
 import std.stdint : uint32_t;
 
 extern (C):
-
 /// @file htslib/regidx.h
 /// Region indexing.
 /*
@@ -67,18 +66,22 @@ extern (C):
 */
 
 /// struct defined in regidx.c, we will leave as opaque
-extern struct _regidx_t;   
+extern struct _regidx_t;    // @suppress(dscanner.style.phobos_naming_convention)
 alias regidx_t = _regidx_t;
-struct reg_t
+/// region (start, end)
+struct reg_t // @suppress(dscanner.style.phobos_naming_convention)
 {
+    /// (start, end) -- unclear if 0-based/open
     uint32_t start, end;
-};
-struct regitr_t
+}
+/// region iterator
+struct regitr_t // @suppress(dscanner.style.phobos_naming_convention)
 {
+    /// ???
     int i, n;
-    reg_t *reg;
-    void *payload;
-};
+    reg_t *reg;     /// ???
+    void *payload;  /// ???
+}
 
 /+
 #define REGITR_START(itr) (itr).reg[(itr).i].start
@@ -116,14 +119,15 @@ pragma(inline, true)
  *  Return value: 0 on success, -1 to skip a record, -2 on fatal error.
  */
 //typedef int  (*regidx_parse_f)(const char *line, char **chr_beg, char **chr_end, reg_t *reg, void *payload, void *usr);
-alias regidx_parse_f = int function(const(char) *line, char **chr_beg, char **chr_end, reg_t *reg, void *payload, void *usr);
+alias regidx_parse_f =
+    int function(const(char) *line, char **chr_beg, char **chr_end, reg_t *reg, void *payload, void *usr);
 //typedef void (*regidx_free_f)(void *payload);
 alias regidx_free_f = void function(void *payload);
 
 /// regidx_parse_f for BED, CHROM,FROM,TO (0-based,right-open)
-int regidx_parse_bed(const char*,char**,char**,reg_t*,void*,void*);   // CHROM,FROM,TO (0-based,right-open)
+int regidx_parse_bed(const(char)*, char**, char**, reg_t*, void*, void*);   // CHROM,FROM,TO (0-based,right-open)
 /// regidx_Parse_f for "TAB", CHROM,POS (1-based, inclusive)
-int regidx_parse_tab(const char*,char**,char**,reg_t*,void*,void*);   // CHROM,POS (1-based, inclusive)
+int regidx_parse_tab(const(char)*, char**, char**, reg_t*, void*, void*);   // CHROM,POS (1-based, inclusive)
 
 /**
  *  regidx_init() - creates new index
