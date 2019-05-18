@@ -27,9 +27,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
 
-import core.stdc.string : memcpy;
+import core.stdc.string : memcpy, strlen;
 
 //#include <sys/types.h>
+alias off_t = size_t;
+alias ssize_t = size_t;
 
 //#include "hts_defs.h"
 
@@ -52,10 +54,12 @@ struct hFILE { // @suppress(dscanner.style.phobos_naming_convention)
     const(hFILE_backend) *backend;      /// internal
     off_t offset;   /// file offset
     //unsigned at_eof:1, mobile:1, readonly:1;
+    pragma(msg, "hFile: bitfield order assumed starting with LSB");
     mixin(bitfields!(
     ubyte, "at_eof", 1,
     ubyte, "mobile", 1,
-    ubyte, "readonly", 1));
+    ubyte, "readonly", 1,
+    ubyte, "padding", 5));
     int has_errno;  /// zero or actual errno
     // @endcond
 }
@@ -223,7 +227,7 @@ ssize_t hread2(hFILE *, void *, size_t, size_t);
 pragma(inline, true)
 int hputc(int c, hFILE *fp)
 {
-    if (fp.begin < fp.limit) *(fp.begin++) = c;
+    if (fp.begin < fp.limit) *(fp.begin++) = cast(char) c;
     else c = hputc2(c, fp);
     return c;
 }
