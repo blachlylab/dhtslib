@@ -211,12 +211,58 @@ debug(dhtslib_unittest)
 unittest
 {
     writeln();
-    hts_log_info(__FUNCTION__, "Testing string2cigar");
-    hts_log_info(__FUNCTION__, "Loading test file");
+    hts_log_info(__FUNCTION__, "Testing is_query_consuming and is_reference_consuming");
     string c = "130M2D40M";
     auto cig = cigarFromString(c);
     hts_log_info(__FUNCTION__, "Cigar:" ~ cig.toString());
     assert(cig.toString() == c);
     assert(cig.ops[0].is_query_consuming && cig.ops[0].is_reference_consuming);
     assert(!cig.ops[1].is_query_consuming && cig.ops[1].is_reference_consuming);
+}
+
+/// Range-based iteration of a Cigar string
+/// Returns a range of Ops that is the length of all op lengths
+/// e.g. if the Cigar is 4M5D2I4M
+/// CigarItr will return a range of MMMMDDDDDIIMMMM
+/// Range is of the Ops enum not chars
+struct CigarItr
+{
+    Cigar cigar;
+
+    this(Cigar c)
+    {
+        // Copy the cigar
+        cigar.ops=c.ops.dup;
+    }
+    
+    Ops front()
+    {
+        return cigar.ops[0].op;
+    }
+    
+    void popFront()
+    {
+        cigar.ops[0].length=cigar.ops[0].length-1;
+        if(cigar.ops[0].length==0){
+            cigar.ops=cigar.ops[1..$];
+        }
+    }
+
+    bool empty()
+    {
+        return cigar.ops.length==0;
+    }
+}
+
+debug(dhtslib_unittest)
+unittest
+{
+    import std.algorithm:map;
+    writeln();
+    hts_log_info(__FUNCTION__, "Testing CigarItr");
+    string c = "7M2D4M";
+    auto cig = cigarFromString(c);
+    hts_log_info(__FUNCTION__, "Cigar:" ~ cig.toString());
+    auto itr=CigarItr(cig);
+    assert(itr.map!(x=>CIGAR_STR[x]).array.idup=="MMMMMMMDDMMMM");
 }

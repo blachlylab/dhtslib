@@ -408,6 +408,8 @@ class SAMRecord
     @nogc @safe nothrow
     @property void insertSize(int isize) { this.b.core.isize = isize; }
 }
+
+debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
@@ -467,6 +469,7 @@ unittest{
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
 }
 
+debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
@@ -1148,8 +1151,8 @@ unittest{
     sam = SAMFile("test.bam");
     readrange = sam.allRecords;
     read = readrange.front();
-    writeln(fromStringz(read.sequence));
-    assert(fromStringz(read.sequence)=="GCTAGCTCAG");
+    writeln(read.sequence);
+    assert(read.sequence=="GCTAGCTCAG");
     // destroy(sam2);
 }
 
