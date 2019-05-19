@@ -1046,7 +1046,8 @@ enum char bcf_str_missing = 0x07;   // #define bcf_str_missing      0x07
 extern __gshared uint32_t bcf_float_vector_end;   /// ditto
 extern __gshared uint32_t bcf_float_missing;      /// ditto
 
-pragma(inline, true):
+version(LDC) pragma(inline, true):
+version(GNU) pragma(inline, true):
 /** u wot */
 void bcf_float_set(float *ptr, uint32_t value)
 {

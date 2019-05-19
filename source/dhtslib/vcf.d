@@ -277,9 +277,11 @@ class VCFRecord
         TODO: some of these may be inefficent; since they may be used in hot inner loops, pls optimize
     */
     /// REF allele length
-    pragma(inline, true)
     @property int refLen()
     {
+        version(DigitalMars) pragma(inline);
+        version(LDC) pragma(inline, true);
+        version(GNU) pragma(inline, true);
         return this.line.rlen;
     }
     /// All alleles getter (array)
