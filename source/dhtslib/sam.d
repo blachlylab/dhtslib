@@ -36,6 +36,7 @@ import std.stdio : writeln, writefln, stderr, File;
 import std.string : fromStringz, toStringz;
 
 import dhtslib.htslib.hts : htsFile, hts_open, hts_close, hts_hopen;
+import dhtslib.htslib.hts : hts_idx_t;
 import dhtslib.htslib.hts : hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
 import dhtslib.htslib.hts : seq_nt16_str,seq_nt16_table;
 import dhtslib.htslib.hts : hts_set_threads;
