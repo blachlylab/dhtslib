@@ -124,6 +124,13 @@ class SAMRecord
     @nogc @safe nothrow
     @property void flag(ushort fl) { this.b.core.flag = fl; }
 
+    /// is read paired?
+    pragma(inline, true)
+    @property bool isPaired()
+    {
+        return (b.core.flag & BAM_FPAIRED);
+    }
+    
     /// is read reversed?
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
     pragma(inline, true)
@@ -139,6 +146,15 @@ class SAMRecord
             pragma(inline, true);
         }
         return (b.core.flag & BAM_FUNMAP) == 0;
+    }
+
+    /// is read mate mapped?
+    @property bool isMateMapped()
+    {
+        version(LDC){
+            pragma(inline, true);
+        }
+        return (b.core.flag & BAM_FMUNMAP) == 0;
     }
 
     /// is mate reversed?
