@@ -47,7 +47,7 @@
             "targetType": "sourceLibrary",
             "preBuildCommands": ["cd $PACKAGE_DIR;make"],
             "sourceFiles": ["htslib/libhts.a"],
-            "libs":["curl","crypto"]
+            "libs":["curl","crypto","lzma","bz2"]
         }
     ]
 }
