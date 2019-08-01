@@ -164,6 +164,28 @@ class SAMRecord
     {
         return bam_is_mrev(this.b);
     }
+    
+    /// is read secondary?
+    @property bool isSecondary()
+    {
+        version(LDC){
+            pragma(inline, true);
+        }
+        return cast(bool)(b.core.flag & BAM_FSECONDARY);
+    }
+
+    /// is read supplementary?
+    @property bool isSupplementary()
+    {
+        version(LDC){
+            pragma(inline, true);
+        }
+        return cast(bool)(b.core.flag & BAM_FSUPPLEMENTARY);
+    }
+
+    @property char strand(){
+        return ['+','-'][isReversed()];
+    }
 
     /// auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
     pragma(inline, true)
