@@ -48,8 +48,9 @@ struct TagValue{
     ubyte* data;
     this(bam1_t * b,char[2] tag){
         data=bam_aux_get(b,tag);
-        if(data==null)
-            hts_log_warning(__FUNCTION__,(tag~" doesn't exist for this record").idup);
+        debug {
+            if(data==null) hts_log_warning(__FUNCTION__,(tag~" doesn't exist for this record").idup);
+        }
     }
 
     string to(T:string)(){
