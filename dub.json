@@ -44,7 +44,10 @@
         },
         {
             "name": "source-static",
-            "targetType": "sourceLibrary"
+            "targetType": "sourceLibrary",
+            "preBuildCommands": ["cd $PACKAGE_DIR;make"],
+            "sourceFiles": ["htslib/libhts.a"],
+            "libs":["curl","crypto"]
         }
     ]
 }

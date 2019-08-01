@@ -1,6 +1,11 @@
-all: deps
-deps:
-	cd htslib;autoreconf;./configure CFLAGS="-DBGZF_MT" CPPFLAGS="-DBGZF_MT" --disable-bz2 --disable-lzma;make -j8;cd ..;
+all: htslib/libhts.a
+
+htslib/hts.c:
+	git submodule init
+	git submodule update
+
+htslib/libhts.a: htslib/hts.c
+	cd htslib;make
 
 clean:
 	rm bgzfreader tabix_gffreader vcfwriter output.vcf
