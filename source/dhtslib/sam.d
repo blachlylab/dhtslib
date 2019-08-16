@@ -133,9 +133,9 @@ class SAMRecord
     
     /// is read reversed?
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
-    pragma(inline, true)
     @property bool isReversed()
     {
+        version(LDC) pragma(inline, true);
         return bam_is_rev(this.b);
     }
 
