@@ -288,14 +288,12 @@ class VCFRecord
     @property string[] allelesAsArray()
     {
         string[] ret;
-        if (this.line.n_allele < 1) return ret; // n=0, no reference; n=1, ref but no alt
-        ret.length = this.line.n_allele;
+        ret.length = this.line.n_allele;        // n=0, no reference; n=1, ref but no alt
         foreach(int i; 0 .. this.line.n_allele) // ref allele is index 0
         {
             ret[i] = fromStringz(this.line.d.allele[i]).idup;
         }
         return ret;
-
     }
     /// Reference allele getter
     @property string refAllele()
