@@ -368,9 +368,7 @@ class VCFRecord
             if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
         }
         else {
-            // TODO: Optimize -- this looks potentially very allocat-y and slow
-            const(char)*[] allelesp;
-            allelesp.length = a.length;
+            const(char)*[64] allelesp;  // will fail if a locus has more than 63 ALT alleles :-O
             foreach(i; 0 .. a.length ) {
                 // In order to zero out all alleles, pass a zero-length allele to the string version,
                 // or a zero-length array to this version. Zero length string member of nonempty allele array is an error.
@@ -380,10 +378,33 @@ class VCFRecord
                 }
                 else allelesp[i] = toStringz(a[i]);
             }
-            bcf_update_alleles(this.vcfheader.hdr, this.line, allelesp.ptr, cast(int)a.length);
+            bcf_update_alleles(this.vcfheader.hdr, this.line, &allelesp[0], cast(int)a.length);
         }
     }
-    // TODO: Set REF allele only
+    /// Set REF allele only
+    /// param r is \0-term Cstring
+    /// TODO: UNTESTED
+    void setRefAllele(const(char)* r)
+    {
+        // first, get REF
+        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        // a valid record could have no ref (or alt) alleles
+        if (this.line.n_allele < 2) // if none or 1 (=REF only), just add the REF we receieved
+            bcf_update_alleles(this.vcfheader.hdr, this.line, &r, 1);
+        else {
+            // length of REF allele is allele[1] - allele[0], (minus one more for \0)
+            const auto reflen = (this.line.d.allele[1] - this.line.d.allele[0]) - 1;
+            if (strlen(r) <= reflen) {
+                memcpy(this.line.d.allele[0], r, reflen + 1);   // +1 -> copy a trailing \0 in case original REF was longer than new 
+                // TODO: do we need to call _sync ?
+            } else {
+                // slower way: replace allele[0] with r, but keep rest of pointers poitning at existing allele block,
+                // then call bcf_update_alleles; this will make complete new copy of this.line.d.allele, so forgive the casts
+                this.line.d.allele[0] = cast(char*) r;
+                bcf_update_alleles(this.vcfheader.hdr, this.line, cast( const(char)** ) this.line.d.allele, this.line.n_allele);
+            }
+        }
+    }
     /// Set alleles; alt can be comma separated
     void setAlleles(string _ref, string alt)
     {
