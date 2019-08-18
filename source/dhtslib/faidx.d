@@ -73,6 +73,24 @@ struct IndexedFastaFile {
             fai_destroy(this.faidx);
     }
 
+    /// Enable BGZF cacheing (size: bytes)
+    void setCacheSize(int size)
+    {
+        import dhtslib.htslib.bgzf : BGZF, bgzf_set_cache_size;
+        bgzf_set_cache_size(this.faidx.bgzf, size);
+    }
+
+    /// Enable multithreaded decompression of this FA/FQ
+    /// Reading fn body of bgzf_mt, this actually ADDS threads (rather than setting)
+    /// but we'll retain name for consistency with setCacheSize
+    /// NB: IN A REAL-WORLD TEST (swiftover) CALLING setThreads(1) doubled runtime(???)
+    void setThreads(int nthreads)
+    {
+        import dhtslib.htslib.bgzf : BGZF, bgzf_mt;
+        // third parameter, n_sub_blks is not used in htslib 1.9; .h suggests value 64-256
+        bgzf_mt(this.faidx.bgzf, nthreads, 64);
+    }
+
     /// Fetch sequence in region by assoc array-style lookup:
     /// `string sequence = fafile["chr2:20123-30456"]`
     auto opIndex(string region)

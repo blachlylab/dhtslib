@@ -1,6 +1,6 @@
 // htslib-1.9 faidx.h as D module
 module dhtslib.htslib.faidx;
-
+import dhtslib.htslib.bgzf : BGZF;
 extern (C):
 
 // @file htslib/faidx.h
@@ -61,7 +61,10 @@ extern (C):
  */
 
 /// Opaque structure representing FASTA index
-struct __faidx_t; // @suppress(dscanner.style.phobos_naming_convention)
+struct __faidx_t
+{
+    BGZF *bgzf;
+}; // @suppress(dscanner.style.phobos_naming_convention)
 /// ditto
 alias faidx_t = __faidx_t;
 
