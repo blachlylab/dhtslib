@@ -391,6 +391,7 @@ class VCFRecord
             bcf_update_alleles(this.vcfheader.hdr, this.line, &r, 1);
         else {
             // length of REF allele is allele[1] - allele[0], (minus one more for \0)
+            // TODO ** TODO ** : there is a property line.refLen already
             const auto reflen = (this.line.d.allele[1] - this.line.d.allele[0]) - 1;
             if (strlen(r) <= reflen) {
                 memcpy(this.line.d.allele[0], r, reflen + 1);   // +1 -> copy a trailing \0 in case original REF was longer than new 
