@@ -1046,9 +1046,13 @@ struct VCFReader
     /// MAX_UNPACK: setting alternate value could speed reading
     this(string fn, int MAX_UNPACK = BCF_UN_ALL)
     {
+        import dhtslib.htslib.hts : hts_set_threads;
+
         if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
         this.fp = vcf_open(toStringz(fn), "r"c.ptr);
         if (!this.fp) throw new Exception("Could not hts_open file");
+        
+        hts_set_threads(this.fp, 1);    // extra decoding thread
 
         this.vcfhdr = new VCFHeader( bcf_hdr_read(this.fp));
 
