@@ -289,10 +289,10 @@ class VCFRecord
     {
         string[] ret;
         if (this.line.n_allele < 1) return ret; // n=0, no reference; n=1, ref but no alt
-
+        ret.length = this.line.n_allele;
         foreach(int i; 0 .. this.line.n_allele) // ref allele is index 0
         {
-            ret ~= fromStringz(this.line.d.allele[i]).idup;
+            ret[i] = fromStringz(this.line.d.allele[i]).idup;
         }
         return ret;
 
