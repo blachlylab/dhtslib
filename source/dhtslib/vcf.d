@@ -208,7 +208,7 @@ class VCFRecord
     }
     /// Set chromosome (CHROM)
     @property
-    void chrom(string c)
+    void chrom(const(char)[] c)
     {
         auto rid = bcf_hdr_name2id(this.vcfheader.hdr, toStringz(c));
         if (rid == -1) {
@@ -916,10 +916,10 @@ struct VCFWriter
     
         other: "url=...,md5=...,etc."
     */
-    auto addTag(string tagType)(string id, const int length = 0, string other = "")
+    auto addTag(string tagType)(const(char)[] id, const int length = 0, string other = "")
     if(tagType == "contig" || tagType == "CONTIG")
     {
-        string contig = "##contig=<ID=" ~ id ~
+        const(char)[] contig = "##contig=<ID=" ~ id ~
             (length > 0  ? ",length=" ~ length.to!string : "") ~
             (other != "" ? "," ~ other : "") ~
             ">\0";
