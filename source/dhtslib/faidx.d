@@ -179,7 +179,7 @@ struct IndexedFastaFile {
     }
 
     /// Test whether the FASTA file/index contains string seqname
-    bool hasSeq(string seqname)
+    bool hasSeq(const(char)[] seqname)
     {
         // int faidx_has_seq(const faidx_t *fai, const char *seq);
         return cast(bool) faidx_has_seq(this.faidx, toStringz(seqname) );
@@ -202,7 +202,7 @@ struct IndexedFastaFile {
     }
 
     /// Return sequence length, -1 if not present
-    int seqLen(string seqname)
+    int seqLen(const(char)[] seqname)
     {
         // TODO should I check for -1 and throw exception or pass to caller?
         // int faidx_seq_len(const faidx_t *fai, const char *seq);
