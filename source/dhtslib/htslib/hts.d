@@ -49,7 +49,7 @@ import dhtslib.htslib.bgzf;
 struct cram_fd; // @suppress(dscanner.style.phobos_naming_convention)
 /// see hfile.d
 //struct hFILE; // @suppress(dscanner.style.phobos_naming_convention)
-public import dhtslib.htslib.hfile:hFILE;
+import dhtslib.htslib.hfile:hFILE;
 /// see thread_pool.d
 struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
 
