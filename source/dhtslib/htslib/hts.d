@@ -48,7 +48,8 @@ import dhtslib.htslib.bgzf;
 /// see cram.h, sam.h, sam.d
 struct cram_fd; // @suppress(dscanner.style.phobos_naming_convention)
 /// see hfile.d
-struct hFILE; // @suppress(dscanner.style.phobos_naming_convention)
+//struct hFILE; // @suppress(dscanner.style.phobos_naming_convention)
+import dhtslib.htslib.hfile: hFILE;
 /// see thread_pool.d
 struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
 
