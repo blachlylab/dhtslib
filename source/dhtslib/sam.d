@@ -1158,12 +1158,12 @@ struct SAMWriter
 
         bam_hdr_destroy(this.header);
 
-        if((this.fp !is null) && (this.f is null))
-        {
-            const auto ret = hts_close(fp);
-            if (ret < 0)
-                writefln("There was an error closing %s", fromStringz(this.fn));
-        }
+    }
+
+    void close(){
+        const auto ret = hts_close(this.fp);
+        if (ret < 0)
+            stderr.writefln("There was an error closing %s", fromStringz(this.fn));
     }
 
     void write(SAMRecord * rec){
