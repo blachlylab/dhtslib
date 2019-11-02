@@ -183,6 +183,7 @@ class SAMRecord
         return cast(bool)(b.core.flag & BAM_FSUPPLEMENTARY);
     }
 
+    /// Return read strand + or - (as char)
     @property char strand(){
         return ['+','-'][isReversed()];
     }
@@ -194,6 +195,7 @@ class SAMRecord
         return fromStringz(bam_get_qname(this.b));
     }
     
+    /// Set query name
     pragma(inline, true)
     @property void queryName(string qname)
     {
@@ -318,7 +320,7 @@ class SAMRecord
         return q;
     }
 
-    ///Adds qscore sequence given that it is the same length as the bam sequence
+    /// Add qscore sequence given that it is the same length as the bam sequence
     pragma(inline, true)
     void q_scores(bool phredScale=true)(const(char)[] seq)
     {
@@ -336,7 +338,7 @@ class SAMRecord
         b.data[l_prev..s.length+l_prev]=cast(ubyte[])s;
     }
 
-    ///Adds qscore sequence given that it is the same length as the bam sequence
+    /// Add qscore sequence given that it is the same length as the bam sequence
     pragma(inline, true)
     void qscores(ubyte[] seq)
     {
@@ -356,7 +358,7 @@ class SAMRecord
         return Cigar(bam_get_cigar(b), (*b).core.n_cigar);
     }
 
-    ///Assigns a cigar string
+    /// Assign a cigar string
     pragma(inline, true)
     @property void cigar(Cigar cigar)
     {
@@ -398,7 +400,7 @@ class SAMRecord
         return TagValue(b, val[0..2]);
     }
 
-    //Assign a tag key value pair
+    /// Assign a tag key value pair
     void opIndexAssign(T)(T value,string index)
     {
         import std.traits:isIntegral,isSomeString;
@@ -411,7 +413,7 @@ class SAMRecord
         }
     }
 
-    //Assign a tag key array pair
+    /// Assign a tag key array pair
     void opIndexAssign(T:T[])(T[] value,string index)
     {
         bam_aux_update_array(b,index[0..2],TypeChars[TypeIndex!T],value.length,value.ptr);
@@ -451,7 +453,7 @@ debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log;
+    import dhtslib.htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMRecord mutation");
@@ -511,7 +513,7 @@ debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log;
+    import dhtslib.htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMRecord mutation w/ realloc");
@@ -568,13 +570,13 @@ unittest{
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
 }
 
+alias SAMFile = SAMReader;
 /**
 Encapsulates a SAM/BAM file.
 
 Implements InputRange interface using htslib calls.
 If indexed, Random-access query via multidimensional slicing.
 */
-alias SAMFile=SAMReader;
 struct SAMReader
 {
     /// filename; as usable from D
@@ -1042,6 +1044,7 @@ private char* reverse(char* str)
     return str;
 }
 
+/// SAM/BAM/CRAM disk format
 enum SAMWriterTypes{
     BAM,
     UBAM,
@@ -1050,6 +1053,7 @@ enum SAMWriterTypes{
     DEDUCE
 }
 
+/// Encapsulates a SAM/BAM/CRAM, but as write-only
 struct SAMWriter
 {
     /// filename; as usable from D
@@ -1160,14 +1164,16 @@ struct SAMWriter
 
     }
 
+    /// close file
     void close(){
         const auto ret = hts_close(this.fp);
         if (ret < 0)
             stderr.writefln("There was an error closing %s", fromStringz(this.fn));
     }
 
+    /// write out to disk
     void write(SAMRecord * rec){
-        auto ret=sam_write1(this.fp,this.header,rec.b);
+        const auto ret = sam_write1(this.fp,this.header,rec.b);
         assert(ret>=0);
     }
 }
@@ -1175,7 +1181,7 @@ debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log;
+    import dhtslib.htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     import std.string:fromStringz;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
@@ -1236,7 +1242,7 @@ debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log;
+    import dhtslib.htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     import std.string:fromStringz;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
