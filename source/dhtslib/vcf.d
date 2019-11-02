@@ -15,7 +15,7 @@ import std.datetime;
 import std.format: format;
 import std.range: ElementType;
 import std.string: fromStringz, toStringz;
-import std.traits: isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
+import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 
 import dhtslib.htslib.hts_log;
 import dhtslib.htslib.kstring;
@@ -145,7 +145,7 @@ class VCFRecord
 
         // Now it must be unpacked
         // Protip: specifying alternate MAX_UNPACK can speed it tremendously
-        int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
+        immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
     }
     /// ditto
     this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
@@ -156,7 +156,7 @@ class VCFRecord
         
         this.chrom = chrom;
         this.pos = pos;
-        this.updateID(id);
+        this.id = id;
 
         this.setAlleles(_ref, alt);
 
@@ -243,20 +243,21 @@ class VCFRecord
 
 
     /* ID */
+    /// Get ID string
     @property string id()
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
         return fromStringz(this.line.d.id).idup;
     }
     /// Sets new ID string; comma-separated list allowed but no dup checking performed
-    @property int id(string id)
+    @property int id(const(char)[] id)
     {
         // bcf_update_id expects null pointer instead of empty string to mean "no value"
         if (id == "") return bcf_update_id(this.vcfheader.hdr, this.line, null);
         else return bcf_update_id(this.vcfheader.hdr, this.line, toStringz(id));
     }
     /// Append an ID (htslib performs duplicate checking)
-    int addID(string id)
+    int addID(const(char)[] id)
     {
         if(id == "") return 0;
         return bcf_add_id(this.vcfheader.hdr, this.line, toStringz(id));
@@ -400,7 +401,8 @@ class VCFRecord
                 // slower way: replace allele[0] with r, but keep rest of pointers poitning at existing allele block,
                 // then call bcf_update_alleles; this will make complete new copy of this.line.d.allele, so forgive the casts
                 this.line.d.allele[0] = cast(char*) r;
-                bcf_update_alleles(this.vcfheader.hdr, this.line, cast( const(char)** ) this.line.d.allele, this.line.n_allele);
+                bcf_update_alleles(this.vcfheader.hdr, this.line,
+                    cast( const(char)** ) this.line.d.allele, this.line.n_allele);
             }
         }
     }
@@ -509,7 +511,7 @@ class VCFRecord
     bool hasFilter(string filter)
     {
         char[] f = filter.dup ~ '\0';
-        auto id = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, f.ptr);
+        //const auto id = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, f.ptr);
         const auto ret = bcf_has_filter(this.vcfheader.hdr, this.line, f.ptr);
 
         if (ret > 0) return true;
@@ -549,7 +551,7 @@ class VCFRecord
             ret = bcf_update_info_flag(this.vcfheader.hdr, this.line, toStringz(tag), null, set);
         }
         
-        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s", data));
+        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
     /// ditto
     /// This handles a vector of values for the tag
@@ -568,12 +570,13 @@ class VCFRecord
             ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, data.length);
         }
         
-        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s", data));
+        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
 
     /* FORMAT (sample info) */
     /// bc_update_format_{int32,flat,string,flag}
     void addFormat(T)(string tag, T data)
+    if(!isArray!T)
     {
         int ret = -1;
 
@@ -604,12 +607,14 @@ class VCFRecord
 
         static if(isIntegral!T) {
             auto integer = cast(int[]) data;
-            ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), integer.ptr, cast(int)data.length);
+            ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag),
+                                            integer.ptr, cast(int)data.length);
         }
         
         else static if(isFloatingPoint!T) {
             auto flt = cast(float[]) data;    // simply passing "2.0" (or whatever) => data is a double
-            ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag), flt.ptr, cast(int)data.length);
+            ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag),
+                                            flt.ptr, cast(int)data.length);
         }
         
         if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add format (ignoring): %s", data));
@@ -618,7 +623,7 @@ class VCFRecord
 
     /// add INFO or FORMAT key:value pairs to a record
     /// add a single datapoint OR vector of values, OR, values to each sample (if tagType == FORMAT)
-    void add(string tagType, T)(string tag, T data)
+    void add(string tagType, T)(const(char)[] tag, T data)
     if((tagType == "INFO" || tagType == "FORMAT") &&
         (isIntegral!T || isIntegral!(ElementType!T) ||
         isFloatingPoint!T || isFloatingPoint!(ElementType!T) ||
@@ -636,9 +641,10 @@ class VCFRecord
             else static if (isBoolean!T) immutable int d = data ? 1 : 0; // if data == true, pass 1 to bcf_update_info_flag(n=); n=0 => clear flag
             else static assert(0);
 
-            auto ptr = &d;
+            const auto ptr = &d;
         }
         else static if (isDynamicArray!T) {
+            assert(data.length < int.max);
             len = cast(int) data.length;
             static if (isIntegral!(ElementType!T)) auto d = data.to!(int[]);
             else static if (isFloatingPoint!(ElementType!T)) auto d = data.to!(float[]);
@@ -656,7 +662,7 @@ class VCFRecord
                 }
             }
 
-            auto ptr = d.ptr;
+            const auto ptr = d.ptr;
         }
         else static assert(0);
 
@@ -672,11 +678,17 @@ class VCFRecord
             else static assert(0);
         }
         else static if (tagType == "FORMAT") {
-
+            static if (is(T == int) || is(ElementType!T == int))
+                ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
+            else static if (is(T == float) || is(ElementType!T == float))
+                ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
+            else static if (isSomeString!T || isSomeString!(ElementType!T))
+                ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
+            else static assert(0);
         }
         else static assert(0);
 
-        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s", data));
+        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
 
     override string toString() const
@@ -831,7 +843,12 @@ struct VCFWriter
     *   source:      Annotation source  (eg dbSNP)
     *   version:     Annotation version (eg 142)
     */
-    void addTag(string tagType, T)(string id, T number, string type, string description, string source="", string _version="")
+    void addTag(string tagType, T)( string id,
+                                    T number,
+                                    string type,
+                                    string description,
+                                    string source="",
+                                    string _version="")
     if((tagType == "INFO" || tagType == "FORMAT") && (isIntegral!T || isSomeString!T))
     {
         string line;    //  we'll suffix with \0, don't worry
@@ -965,7 +982,7 @@ struct VCFWriter
         {
             int[] filter_ids;
             foreach(f; filters) {
-                int fid = bcf_hdr_id2int(this.vcfhdr.hdr, BCF_DT_ID, toStringz(f));
+                const int fid = bcf_hdr_id2int(this.vcfhdr.hdr, BCF_DT_ID, toStringz(f));
                 if(fid == -1) hts_log_error(__FUNCTION__, format("filter not found (ignoring): ", f) );
                 else filter_ids ~= fid;
             }
@@ -1109,7 +1126,9 @@ struct VCFReader
         else static if (tagType == "contig") const int hlt= BCF_HL_CTG; // @suppress(dscanner.suspicious.label_var_same_name)
         else assert(0);
 
-        bcf_hrec_t *hrec = bcf_hdr_get_hrec(this.vcfhdr.hdr, hlt, toStringz(key), toStringz(value), toStringz(str_class));
+        bcf_hrec_t *hrec = bcf_hdr_get_hrec(this.vcfhdr.hdr, hlt,   toStringz(key),
+                                                                    toStringz(value),
+                                                                    toStringz(str_class));
 
         const int nkeys = hrec.nkeys;
         string[string] kv;
@@ -1179,7 +1198,7 @@ unittest
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
     vw.addTag!"INFO"("AF", "A", "Integer", "Number of Samples With Data");
-    vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>");
+    vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
 
     // Exercise header

@@ -683,9 +683,9 @@ struct bcf1_t { // @suppress(dscanner.style.phobos_naming_convention)
     int bcf_update_format(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(void) *values, int n, int type);
     // TODO: Write D template
     pragma(inline, true) {
-        auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, int *values, int n) // @suppress(dscanner.style.undocumented_declaration)
+        auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(int) *values, int n) // @suppress(dscanner.style.undocumented_declaration)
             { return bcf_update_format(hdr, line, key, values, n, BCF_HT_INT); }
-        auto bcf_update_format_float(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, float *values, int n) // @suppress(dscanner.style.undocumented_declaration)
+        auto bcf_update_format_float(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(float) *values, int n) // @suppress(dscanner.style.undocumented_declaration)
             { return bcf_update_format(hdr, line, key, values, n, BCF_HT_REAL); }
         auto bcf_update_format_char(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(char) **values, int n) // @suppress(dscanner.style.undocumented_declaration)
             { return bcf_update_format(hdr, line, key, values, n, BCF_HT_STR); }
