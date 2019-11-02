@@ -23,7 +23,7 @@ struct TabixIndexedFile {
 
     /// Initialize with a complete file path name to the tabix-indexed file
     /// The tabix index (.tbi) must already exist alongside
-    this(string fn,string fntbi="")
+    this(const(char)[] fn, const(char)[] fntbi = "")
     {
         debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
         this.fp = hts_open( toStringz(fn), "r");
@@ -32,7 +32,7 @@ struct TabixIndexedFile {
             throw new Exception("Couldn't read file");
         }
         //enum htsExactFormat format = hts_get_format(fp)->format;
-        if(fntbi!="") this.tbx = tbx_index_load2( toStringz(fn),toStringz(fntbi) );
+        if(fntbi!="") this.tbx = tbx_index_load2( toStringz(fn), toStringz(fntbi) );
         else this.tbx = tbx_index_load( toStringz(fn) );
         if (!this.tbx) { 
             writefln("Could not load .tbi index of %s\n", fn );
@@ -83,7 +83,7 @@ struct TabixIndexedFile {
     /** region(r)
      *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
      */
-    auto region(string r)
+    auto region(const(char)[] r)
     {
         struct Region {
 
@@ -100,7 +100,7 @@ struct TabixIndexedFile {
             // but first row was preloaded in this.next)
             private bool active;
 
-            this(htsFile *fp, tbx_t *tbx, string r)
+            this(htsFile *fp, tbx_t *tbx, const(char)[] r)
             {
                 this.fp = fp;
                 this.tbx= tbx;
