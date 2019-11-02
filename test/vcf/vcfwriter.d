@@ -39,10 +39,10 @@ int main()
     auto vcfhdr = w.getHeader();
 
     // for genotype/format tag value arrays
-    int x = 100;
-    int y = 200;
-    int z = 300;
-    int zz= 400;
+    const int x = 100;
+    const int y = 200;
+    const int z = 300;
+    const int zz= 400;
 
     //string[] filters = ["TRIALLELIC", "GOATS"];
     string[] filters = ["PASS", "triallelic", "nonex"];

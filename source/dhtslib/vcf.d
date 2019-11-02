@@ -16,6 +16,7 @@ import std.format: format;
 import std.range: ElementType;
 import std.string: fromStringz, toStringz;
 import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
+import std.traits: Unqual;
 
 import dhtslib.htslib.hts_log;
 import dhtslib.htslib.kstring;
@@ -551,7 +552,8 @@ class VCFRecord
             ret = bcf_update_info_flag(this.vcfheader.hdr, this.line, toStringz(tag), null, set);
         }
         
-        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
+        if (ret == -1)
+            hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
     /// ditto
     /// This handles a vector of values for the tag
@@ -570,7 +572,8 @@ class VCFRecord
             ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, data.length);
         }
         
-        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
+        if (ret == -1)
+            hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
 
     /* FORMAT (sample info) */
@@ -625,10 +628,10 @@ class VCFRecord
     /// add a single datapoint OR vector of values, OR, values to each sample (if tagType == FORMAT)
     void add(string tagType, T)(const(char)[] tag, T data)
     if((tagType == "INFO" || tagType == "FORMAT") &&
-        (isIntegral!T || isIntegral!(ElementType!T) ||
-        isFloatingPoint!T || isFloatingPoint!(ElementType!T) ||
-        isSomeString!T || isSomeString!(ElementType!T) ||
-        isBoolean!T || isBoolean!(ElementType!T)))
+        (isIntegral!T       || isIntegral!(ElementType!T)   ||
+        isFloatingPoint!T   || isFloatingPoint!(ElementType!T) ||
+        isSomeString!T      || isSomeString!(ElementType!T) ||
+        isBoolean!T         || isBoolean!(ElementType!T)))
     {
         int ret = -1;
         int len;
@@ -667,28 +670,29 @@ class VCFRecord
         else static assert(0);
 
         static if (tagType == "INFO") {
-            static if (is(T == int) || is(ElementType!T == int))
+            static if (is(Unqual!T == int) || is(Unqual!(ElementType!T) == int))
                 ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
-            else static if (is(T == float) || is(ElementType!T == float))
+            else static if (is(Unqual!T == float) || is(Unqual!(ElementType!T) == float))
                 ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static if (isSomeString!T || isSomeString!(ElementType!T))
                 ret = bcf_update_info_string(this.vcfheader.hdr, this.line, toStringz(tag), ptr);
             else static if (is(T == bool) || is(ElementType!T == bool))
                 ret = bcf_update_info_flag(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
-            else static assert(0);
+            else static assert(0, "Type not recognized for INFO tag");
         }
         else static if (tagType == "FORMAT") {
-            static if (is(T == int) || is(ElementType!T == int))
+            static if (is(Unqual!T == int) || is(Unqual!(ElementType!T) == int))
                 ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
-            else static if (is(T == float) || is(ElementType!T == float))
+            else static if (is(Unqual!T == float) || is(Unqual!(ElementType!T) == float))
                 ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static if (isSomeString!T || isSomeString!(ElementType!T))
                 ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
-            else static assert(0);
+            else static assert(0, "Type not recognized for FORMAT tag");
         }
         else static assert(0);
 
-        if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
+        if (ret == -1)
+            hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
 
     override string toString() const
