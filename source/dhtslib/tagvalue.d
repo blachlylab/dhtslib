@@ -63,35 +63,50 @@ struct TagValue
                 hts_log_warning(__FUNCTION__, (tag ~ " doesn't exist for this record").idup);
         }
     }
+
+    /// check if empty/exists/null
+    @property
+    bool exists()
+    {
+        if (this.data is null) return false;
+        return true;
+    }
+
     /// Convert tag value
     string to(T : string)()
     {
+        assert(this.data !is null);
         return fromStringz(cast(char*)&data[1]).idup;
     }
     /// Convert tag value
     T to(T)()
     {
+        assert(this.data !is null);
         return *cast(T*) data[1 .. T.sizeof + 1].ptr;
     }
     /// Convert tag value
     T[] to(T : T[])()
     {
+        assert(this.data !is null);
         int n = *cast(int*) data[2 .. 6].ptr;
         return (cast(T*)(data[6 .. T.sizeof + 6].ptr))[0 .. n];
     }
     /// Check if tag type is type T
     bool check(T)()
     {
+        assert(this.data !is null);
         return TypeChars[TypeIndex!T] == cast(char) data[0];
     }
     /// Check if tag type is type T
     bool check(T : string)()
     {
+        assert(this.data !is null);
         return TypeChars[TypeIndex!T] == cast(char) data[0];
     }
     /// Check if tag type is type T
     bool check(T : T[])()
     {
+        assert(this.data !is null);
         return (cast(char) data[0] == 'B') && (TypeChars[TypeIndex!T] == cast(char) data[1]);
     }
     /// Convert tag value to string
@@ -106,6 +121,7 @@ struct TagValue
     /// Convert tag value to integer
     long toInt()
     {
+        assert(this.data !is null);
         switch (cast(char) data[0])
         {
         case 'c':
@@ -127,6 +143,7 @@ struct TagValue
     /// Convert tag value to integer array
     long[] toIntArray()
     {
+        assert(this.data !is null);
         switch (cast(char) data[1])
         {
         case 'c':
@@ -148,6 +165,7 @@ struct TagValue
     /// Convert tag value to float array
     float[] toFloatArray()
     {
+        assert(this.data !is null);
         return to!(float[]);
     }
 }
