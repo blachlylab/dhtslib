@@ -35,15 +35,15 @@ import std.parallelism : totalCPUs;
 import std.stdio : writeln, writefln, stderr, File;
 import std.string : fromStringz, toStringz;
 
-import dhtslib.htslib.hts : htsFile, hts_open, hts_close, hts_hopen;
-import dhtslib.htslib.hts : hts_idx_t, hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
-import dhtslib.htslib.hts : seq_nt16_str,seq_nt16_table;
-import dhtslib.htslib.hts : hts_set_threads;
-import dhtslib.htslib.hfile : hdopen, hclose, hFILE;
+import htslib.hts : htsFile, hts_open, hts_close, hts_hopen;
+import htslib.hts : hts_idx_t, hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
+import htslib.hts : seq_nt16_str,seq_nt16_table;
+import htslib.hts : hts_set_threads;
+import htslib.hfile : hdopen, hclose, hFILE;
 
-import dhtslib.htslib.hts_log;
-import dhtslib.htslib.kstring;
-import dhtslib.htslib.sam;
+import htslib.hts_log;
+import htslib.kstring;
+import htslib.sam;
 import dhtslib.cigar;
 import dhtslib.tagvalue;
 
@@ -453,7 +453,7 @@ debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log : hts_log_info;
+    import htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMRecord mutation");
@@ -513,7 +513,7 @@ debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log : hts_log_info;
+    import htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMRecord mutation w/ realloc");
@@ -1181,7 +1181,7 @@ debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log : hts_log_info;
+    import htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     import std.string:fromStringz;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
@@ -1229,7 +1229,7 @@ bool cmpRegList(hts_reglist_t a, hts_reglist_t b)
 /// Parse text line of SAM; Used in unittest
 private int parseSam(string line, bam_hdr_t* header, bam1_t* b)
 {
-    import dhtslib.htslib.kstring : kstring_t;
+    import htslib.kstring : kstring_t;
     import std.utf : toUTFz;
 
     kstring_t k;
@@ -1242,7 +1242,7 @@ debug(dhtslib_unittest)
 unittest{
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log : hts_log_info;
+    import htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     import std.string:fromStringz;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
@@ -1262,7 +1262,7 @@ unittest
     import std.stdio : writeln;
     import std.range : drop;
     import std.utf : toUTFz;
-    import dhtslib.htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
+    import htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
     import std.path:buildPath,dirName;
     import std.conv:to;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);

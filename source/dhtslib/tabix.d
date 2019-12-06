@@ -4,10 +4,10 @@ import std.stdio;
 import std.string;
 import core.stdc.stdlib : malloc, free;
 
-import dhtslib.htslib.hts;
-import dhtslib.htslib.kstring;
-import dhtslib.htslib.tbx;
-//import dhtslib.htslib.regidx;
+import htslib.hts;
+import htslib.kstring;
+import htslib.tbx;
+//import htslib.regidx;
 
 /** Encapsulates a position-sorted record-oriented NGS flat file,
  *  indexed with Tabix, including BED, GFF3, VCF.

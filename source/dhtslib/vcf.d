@@ -18,9 +18,9 @@ import std.string: fromStringz, toStringz;
 import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 import std.traits: Unqual;
 
-import dhtslib.htslib.hts_log;
-import dhtslib.htslib.kstring;
-import dhtslib.htslib.vcf;
+import htslib.hts_log;
+import htslib.kstring;
+import htslib.vcf;
 
 alias BCFRecord = VCFRecord;
 alias BCFWriter = VCFWriter;
@@ -1053,7 +1053,7 @@ struct VCFReader
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
     bcf1_t* b;          /// record for use in iterator, will be recycled
 
-    int MAX_UNPACK;     /// see dhtslib.htslib.vcf
+    int MAX_UNPACK;     /// see htslib.vcf
 
     private static int refct;
 
@@ -1066,7 +1066,7 @@ struct VCFReader
     /// MAX_UNPACK: setting alternate value could speed reading
     this(string fn, int MAX_UNPACK = BCF_UN_ALL)
     {
-        import dhtslib.htslib.hts : hts_set_threads;
+        import htslib.hts : hts_set_threads;
 
         if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
         this.fp = vcf_open(toStringz(fn), "r"c.ptr);

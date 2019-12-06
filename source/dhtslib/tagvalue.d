@@ -3,8 +3,8 @@ module dhtslib.tagvalue;
 import std.stdio;
 import std.meta : AliasSeq, staticIndexOf;
 import std.string : fromStringz;
-import dhtslib.htslib.sam : bam_aux_get, bam1_t, bam_aux2i;
-import dhtslib.htslib.hts_log;
+import htslib.sam : bam_aux_get, bam1_t, bam_aux2i;
+import htslib.hts_log;
 import std.conv : to;
 
 alias Types = AliasSeq!(byte, ubyte, short, ushort, int, uint, float, string, char);
@@ -194,7 +194,7 @@ debug (dhtslib_unittest) unittest
 debug (dhtslib_unittest) unittest
 {
     import dhtslib.sam; // @suppress(dscanner.suspicious.local_imports)
-    import dhtslib.htslib.hts_log : hts_log_info;
+    import htslib.hts_log : hts_log_info;
     import std.path : buildPath, dirName;
 
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);

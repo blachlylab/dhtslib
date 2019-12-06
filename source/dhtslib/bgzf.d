@@ -5,8 +5,8 @@ import std.parallelism: totalCPUs;
 import std.stdio: writeln, writefln;
 import std.string: fromStringz, toStringz;
 
-import dhtslib.htslib.bgzf;
-import dhtslib.htslib.kstring;
+import htslib.bgzf;
+import htslib.kstring;
 
 /**
 Encapsulates a bgzipped (block gzipped) file.
