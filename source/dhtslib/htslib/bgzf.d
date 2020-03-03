@@ -51,6 +51,16 @@ import core.stdc.stdio;
 import etc.c.zlib;
 import core.sys.posix.sys.types;
 
+// ssize_t doesn't exist in core.sys.posix.sys.types for windows builds
+version(Windows){
+    version(Win32){
+        alias ssize_t = int;
+    }
+    version(Win64){
+        alias ssize_t = long;
+    }
+}
+
 enum int BGZF_BLOCK_SIZE =     0xff00;  /// make sure compressBound(BGZF_BLOCK_SIZE) < BGZF_MAX_BLOCK_SIZE
 enum int BGZF_MAX_BLOCK_SIZE = 0x10000; /// ditto
 
