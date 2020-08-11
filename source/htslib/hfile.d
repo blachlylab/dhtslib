@@ -1,4 +1,4 @@
-module dhtslib.htslib.hfile;
+module htslib.hfile;
 
 import std.bitmanip;
 

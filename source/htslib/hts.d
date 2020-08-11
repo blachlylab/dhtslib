@@ -5,7 +5,7 @@
 /*  *      aliased typedef'd function pointers */
 /*  *       changed C-style arrays (eg line 339, extern const char seq_nt16_str[];) to char[] seq_nt16_str */
 /*  *           as update to above, seq_nt16_str needs to be char[16], as C and D style char[] imply different things */
-module dhtslib.htslib.hts;
+module htslib.hts;
 
 import std.bitmanip;
 
@@ -56,18 +56,18 @@ else
     enum HTS_PATH_SEPARATOR_STR = ":";
 }
 
-import dhtslib.htslib.bgzf;
+import htslib.bgzf;
 
 /// see cram.h, sam.h, sam.d
 struct cram_fd; // @suppress(dscanner.style.phobos_naming_convention)
 /// see hfile.d
 //struct hFILE; // @suppress(dscanner.style.phobos_naming_convention)
-import dhtslib.htslib.hfile: hFILE;
+import htslib.hfile: hFILE;
 /// see thread_pool.d
 struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
 struct sam_hdr_t;
 
-import dhtslib.htslib.kstring: __kstring_t, kstring_t;
+import htslib.kstring: __kstring_t, kstring_t;
 
 /+
 #ifndef kroundup32

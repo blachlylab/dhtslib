@@ -2,7 +2,7 @@
 /// Copyright 2018 James S Blachly, MD
 /// Changes are MIT licensed
 /// Section numbers refer to VCF Specification v4.2: https://samtools.github.io/hts-specs/VCFv4.2.pdf
-module dhtslib.htslib.vcf;
+module htslib.vcf;
 
 import std.bitmanip;
 import std.string: toStringz;
@@ -45,10 +45,10 @@ import core.stdc.stdint;
 import core.stdc.limits;
 import core.stdc.assert_;
 import core.stdc.errno : errno, EINVAL;
-import dhtslib.htslib.hts;
-import dhtslib.htslib.kstring: __kstring_t, kstring_t, kputc, kputsn, kputw;
-import dhtslib.htslib.bgzf: BGZF; // normally typedefed as opaque struct in hts.h
-import dhtslib.htslib.hts_log;  // hts.h imports hts_log.h
+import htslib.hts;
+import htslib.kstring: __kstring_t, kstring_t, kputc, kputsn, kputw;
+import htslib.bgzf: BGZF; // normally typedefed as opaque struct in hts.h
+import htslib.hts_log;  // hts.h imports hts_log.h
 //#include "hts_defs.h"
 //#include "hts_endian.h"
 

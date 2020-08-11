@@ -1,4 +1,4 @@
-module dhtslib.htslib.thread_pool;
+module htslib.thread_pool;
 
 extern(C):
 // @file htslib/thread_pool.h

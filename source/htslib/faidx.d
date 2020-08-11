@@ -1,6 +1,6 @@
 // htslib-1.9 faidx.h as D module
-module dhtslib.htslib.faidx;
-import dhtslib.htslib.bgzf : BGZF;
+module htslib.faidx;
+import htslib.bgzf : BGZF;
 extern (C):
 
 // @file htslib/faidx.h

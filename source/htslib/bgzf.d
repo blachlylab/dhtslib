@@ -11,7 +11,7 @@
 // removed redundant struct declarations when declaring struct pointers
 // replace local definition with import kstring_t
 // const TYPE * to const(TYPE) *
-module dhtslib.htslib.bgzf;
+module htslib.bgzf;
 
 import std.bitmanip;
 

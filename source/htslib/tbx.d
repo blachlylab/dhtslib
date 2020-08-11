@@ -9,12 +9,12 @@
  *      In D, const on either LHS or RHS of function declaration applies to the function, not return value, unless parents included:
  *      changed ^const <type> <fnname> to ^const(<type>) <fnname>
  */
-module dhtslib.htslib.tbx;
+module htslib.tbx;
 
 import std.stdint : int32_t;
 
-import dhtslib.htslib.hts;
-import dhtslib.htslib.bgzf;
+import htslib.hts;
+import htslib.bgzf;
 
 extern (C):
 /// @file htslib/tbx.h

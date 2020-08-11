@@ -1,4 +1,4 @@
-module dhtslib.htslib.hts_log;
+module htslib.hts_log;
 import std.string: toStringz;
 
 /// \file htslib/hts_log.h

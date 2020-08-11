@@ -1,4 +1,4 @@
-module dhtslib.htslib.kstring;
+module htslib.kstring;
 
 extern (C):
 /* The MIT License
