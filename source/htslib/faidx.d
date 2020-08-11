@@ -67,7 +67,7 @@ import htslib.hts;
 struct __faidx_t
 {
     BGZF *bgzf;
-}; // @suppress(dscanner.style.phobos_naming_convention)
+}   // @suppress(dscanner.style.phobos_naming_convention)
 /// ditto
 alias faidx_t = __faidx_t;
 
@@ -250,7 +250,7 @@ char *faidx_fetch_qual(const(faidx_t) *fai, const(char) *c_name, int p_beg_i, in
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char *faidx_fetch_qual64(const(faidx_t) *fai, const(char) *c_name, hts_pos_t p_beg_i, hts_pos_t p_end_i, hts_pos_t *len);
+char *faidx_fetch_qual64(const(faidx_t) *fai, const(char) *c_name, hts_pos_t p_beg_i, hts_pos_t p_end_i, hts_pos_t *len); // @suppress(dscanner.style.long_line)
 
 /// Query if sequence is present
 /**   @param  fai  Pointer to the faidx_t struct
@@ -281,7 +281,7 @@ int faidx_seq_len(const(faidx_t) *fai, const(char) *seq);
     are reference names, quote using curly braces.
     Thus "{chr1}:100-200" and "{chr1:100-200}" disambiguate the above example.
 */
-const char *fai_parse_region(const(faidx_t) *fai, const(char) *s,
+const(char) *fai_parse_region(const(faidx_t) *fai, const(char) *s,
                              int *tid, hts_pos_t *beg, hts_pos_t *end,
                              int flags);
 

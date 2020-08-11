@@ -444,7 +444,7 @@ const(char) *hts_version();
 // Immediately after release, bump ZZ to 90 to distinguish in-development
 // Git repository builds from the release; you may wish to increment this
 // further when significant features are merged.
-enum HTS_VERSION = 101000;
+enum HTS_VERSION = 101000; // @suppress(dscanner.style.number_literals)
 
 /**!
   @abstract    Determine format by peeking at the start of a file
