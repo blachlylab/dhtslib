@@ -13,14 +13,14 @@ Add `dhtslib` as a dependency to `dub.json`:
 
 ```
     "dependencies": {
-        "dhtslib": "~>0.6.0",
+        "dhtslib": "~>0.10.0",
 ```
-(version number 0.6.0 is example; see https://dub.pm/package-format-json)
+(version number 0.10.0 is example; see https://dub.pm/package-format-json)
 
 # Requirements
 
 ## Dynamically linking to htslib (default)
-A system installation of htslib v1.9 or higher is required.
+A system installation of htslib v1.9 (1.10 compatibility in progress) is required.
 
 # Statically linking to htslib
 `libhts.a` needs to be added to your project's source files.
@@ -59,7 +59,8 @@ See the documentation for more details.
 Direct bindings to htslib C API are available as submodules under `dhtslib.htslib`. 
 Naming remains the same as the original `.h` include files.
 For example, `import dhtslib.htslib.faidx` for direct access to the C function calls.
-The current compatible versions are 1.7-1.9.
+The current compatible versions are 1.7-1.9
+(compatibility with htslib 1.10, which is ABI breaking/has API changes, is in development now)
 
 Currently implemented:
 
@@ -87,6 +88,7 @@ Missing or work-in-progress:
 # FAQ
 
 **Q**: Why not use [bioD](https://github.com/biod/BioD)
+
 **A**:
 bioD, as a more general bioinformatics framework, is more comparable to bio-python, bio-ruby, bio-rust, etc.
 bioD does have some excellent hts file format (BGZF and SAM) handling, and at one time sambamba, which relied on it, was faster than samtools.
@@ -95,15 +97,16 @@ However, the development resources poured into `htslib` overall are tremendous, 
 **Q**: Why were htslib bindings ported by hand instead of using a C header/bindings translator as in hts-nim or rust-htslib?
 
 **A**:
-Several reasons.
+Whereas dstep and dpp are incredibly convenient for binding creation, we created these by hand from htslib `.h` files for several reasons.
 First, this gave the authors of dhtslib a better familiarity with the htslib API including letting us get to know several lesser-known functions.
-Second, some elements (particuarlly `#define` macros) are difficult or impossible for machines to translate, or translate into efficient code; here we were sometimes able to replace these macros with smarter replacements than a simple macro-expansion-direct-translation.
+Second, some elements (particuarlly `#define` macros) are difficult or impossible in some cases for machines to translate, or translate into efficient code; here we were sometimes able to replace these macros with smarter replacements than a simple macro-expansion-direct-translation.
+Likewise, we were able to turn certain `#defines` and pseudo-generic functions into D templates, and to `pragma(inline, true)` them.
 Finally, instead of dumping all the bindings into an interface file, we left the structure of the file intact to make it easier for the D developer to read the source file as the htslib authors intended the C headers to be read. In addition, this leaves docstring/documentation comments intact, whereas in other projects the direct API has no comments and the developer must refer to the C headers.
-
 
 **Q**: Why am I getting a segfault?
 
-**A**: It's easy to get a segfault by using the direct C API incorrectly. We have tried to eliminate most of this (use after free, etc.) in the OOP wrappers. If you are getting a segfault you cannot understand when using purely the high-level D API, please post an issue.
+**A**:
+It's easy to get a segfault by using the direct C API incorrectly. We have tried to eliminate most of this (use after free, etc.) in the OOP wrappers. If you are getting a segfault you cannot understand when using purely the high-level D API, please post an issue.
 
 
 # Bugs and Warnings
