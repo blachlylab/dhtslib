@@ -26,7 +26,9 @@ extern (C):
    SOFTWARE.
 */
 
+import core.stdc.stdlib : realloc;
 import core.stdc.stdint;
+import core.stdc.stdio : EOF;
 /+
 #include <stdlib.h>
 #include <string.h>
@@ -39,17 +41,24 @@ import core.stdc.stdint;
 #define kroundup32(x) (--(x), (x)|=(x)>>1, (x)|=(x)>>2, (x)|=(x)>>4, (x)|=(x)>>8, (x)|=(x)>>16, ++(x))
 #endif
 
-#ifndef kroundup_size_t
-#define kroundup_size_t(x) (--(x),                                       \
-                            (x)|=(x)>>(sizeof(size_t)/8), /*  0 or  1 */ \
-                            (x)|=(x)>>(sizeof(size_t)/4), /*  1 or  2 */ \
-                            (x)|=(x)>>(sizeof(size_t)/2), /*  2 or  4 */ \
-                            (x)|=(x)>>(sizeof(size_t)),   /*  4 or  8 */ \
-                            (x)|=(x)>>(sizeof(size_t)*2), /*  8 or 16 */ \
-                            (x)|=(x)>>(sizeof(size_t)*4), /* 16 or 32 */ \
-                            ++(x))
-#endif
++/
+/// round 32 or 64 bit (u)int x to power of 2 that is equal or greater
+pragma(inline, true)
+void kroundup_size_t(ref size_t x) {
+	x -= 1;
+	x |= (x >> 1);
+	x |= (x >> 2);
+	x |= (x >> 4);
+	x |= (x >> 8);
+	x |= (x >> 16);
 
+	static if (sizeof(size_t) == 8)
+        x |= (x >> 32);
+
+	return ++x;
+}
+
+/+
 #if defined __GNUC__ && (__GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4))
 #define KS_ATTR_PRINTF(fmt, arg) __attribute__((__format__ (__printf__, fmt, arg)))
 #else
@@ -101,21 +110,24 @@ struct ks_tokaux_t { // @suppress(dscanner.style.phobos_naming_convention)
 	 * EOF or on error (determined by querying fp, as per fgets()). */
 	typedef char *kgets_func(char *, int, void *);
 	int kgetline(kstring_t *s, kgets_func *fgets, void *fp);
++/
 
-static inline int ks_resize(kstring_t *s, size_t size)
+pragma(inline, true)
+int ks_resize(kstring_t *s, size_t size)
 {
-	if (s->m < size) {
+	if (s.m < size) {
 		char *tmp;
 		kroundup_size_t(size);
-		tmp = (char*)realloc(s->s, size);
+		tmp = cast(char*)realloc(s.s, size);
 		if (!tmp)
 			return -1;
-		s->s = tmp;
-		s->m = size;
+		s.s = tmp;
+		s.m = size;
 	}
 	return 0;
 }
 
+/+
 static inline char *ks_str(kstring_t *s)
 {
 	return s->s;
@@ -152,16 +164,19 @@ static inline int kputs(const char *p, kstring_t *s)
 {
 	return kputsn(p, strlen(p), s);
 }
++/
 
-static inline int kputc(int c, kstring_t *s)
+pragma(inline, true)
+int kputc(int c, kstring_t *s)
 {
-	if (ks_resize(s, s->l + 2) < 0)
+	if (ks_resize(s, s.l + 2) < 0)
 		return EOF;
-	s->s[s->l++] = c;
-	s->s[s->l] = 0;
+	s.s[s.l++] = c;
+	s.s[s.l] = 0;
 	return c;
 }
 
+/+
 static inline int kputc_(int c, kstring_t *s)
 {
 	if (ks_resize(s, s->l + 1) < 0)
@@ -178,22 +193,25 @@ static inline int kputsn_(const void *p, size_t l, kstring_t *s)
 	s->l += l;
 	return l;
 }
++/
 
-static inline int kputw(int c, kstring_t *s)
+pragma(inline, true)
+int kputw(int c, kstring_t *s)
 {
-	char buf[16];
+	char[16] buf;
 	int i, l = 0;
-	unsigned int x = c;
+	uint x = c;
 	if (c < 0) x = -x;
 	do { buf[l++] = x%10 + '0'; x /= 10; } while (x > 0);
 	if (c < 0) buf[l++] = '-';
-	if (ks_resize(s, s->l + l + 2) < 0)
+	if (ks_resize(s, s.l + l + 2) < 0)
 		return EOF;
-	for (i = l - 1; i >= 0; --i) s->s[s->l++] = buf[i];
-	s->s[s->l] = 0;
+	for (i = l - 1; i >= 0; --i) s.s[s.l++] = buf[i];
+	s.s[s.l] = 0;
 	return 0;
 }
 
+/+
 static inline int kputuw(unsigned c, kstring_t *s)
 {
 	char buf[16];
