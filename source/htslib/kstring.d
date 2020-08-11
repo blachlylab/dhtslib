@@ -27,16 +27,13 @@ extern (C):
 */
 
 import core.stdc.stdlib : realloc;
+import core.stdc.string : memcpy, strlen;
+// import core.stdc.stdarg;
 import core.stdc.stdint;
 import core.stdc.stdio : EOF;
-/+
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <limits.h>
+// import core.stdc.limits;
 
+/+
 #ifndef kroundup32
 #define kroundup32(x) (--(x), (x)|=(x)>>1, (x)|=(x)>>2, (x)|=(x)>>4, (x)|=(x)>>8, (x)|=(x)>>16, ++(x))
 #endif
@@ -149,22 +146,24 @@ static inline char *ks_release(kstring_t *s)
 	s->s = NULL;
 	return ss;
 }
++/
 
-static inline int kputsn(const char *p, size_t l, kstring_t *s)
+pragma(inline, true)
+int kputsn(const(char) *p, size_t l, kstring_t *s)
 {
-    if (l > SIZE_MAX - 2 - s->l || ks_resize(s, s->l + l + 2) < 0)
+    if (l > SIZE_MAX - 2 - s.l || ks_resize(s, s.l + l + 2) < 0)
 		return EOF;
-	memcpy(s->s + s->l, p, l);
-	s->l += l;
-	s->s[s->l] = 0;
+	memcpy(s.s + s.l, p, l);
+	s.l += l;
+	s.s[s.l] = 0;
 	return l;
 }
 
-static inline int kputs(const char *p, kstring_t *s)
+pragma(inline, true)
+int kputs(const(char) *p, kstring_t *s)
 {
 	return kputsn(p, strlen(p), s);
 }
-+/
 
 pragma(inline, true)
 int kputc(int c, kstring_t *s)
