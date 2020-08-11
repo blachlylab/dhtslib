@@ -169,13 +169,6 @@ enum HTS_RESIZE_CLEAR = 1;
  * be cleared.
  */
 
-#define hts_resize(type_t, num, size_ptr, ptr, flags)       \
-    ((num) > (*(size_ptr))                                  \
-     ? hts_resize_array_(sizeof(type_t), (num),             \
-                         sizeof(*(size_ptr)), (size_ptr),   \
-                         (void **)(ptr), (flags), __func__) \
-     : 0)
-
 pragma(inline,true)
 int hts_resize(T)(size_t num, ref size_t size, T* ptr, int flags)
 {
@@ -643,7 +636,7 @@ enum int HTS_FMT_CRAI= 3;   /// CRAM index (not sure if superceded by CSI?)
 // Almost INT64_MAX, but when cast into a 32-bit int it's
 // also INT_MAX instead of -1.  This avoids bugs with old code
 // using the new hts_pos_t data type.
-enum HTS_POS_MAX = (((cast(int64_t)int.max)<<32)|int.max)
+enum HTS_POS_MAX = (((cast(int64_t)int.max)<<32)|int.max);
 enum HTS_POS_MIN = int64.min;
 //enum PRIhts_pos = PRId64;
 alias hts_pos_t = int64_t;
@@ -1161,7 +1154,8 @@ int hts_itr_multi_cram(const(hts_idx_t) *idx, hts_itr_t *iter);
     The iterator struct returned by a successful call should be freed
     via hts_itr_destroy() when it is no longer needed.
  */
-hts_itr_t *hts_itr_regions(const(hts_idx_t) *idx, hts_reglist_t *reglist, int count, hts_name2id_f getid, void *hdr, hts_itr_multi_query_func itr_specific, hts_readrec_func readrec, hts_seek_func seek, hts_tell_func tell);
+hts_itr_t *hts_itr_regions(const(hts_idx_t) *idx, hts_reglist_t *reglist, int count, hts_name2id_f getid, void *hdr,
+            hts_itr_multi_query_func itr_specific, hts_readrec_func readrec, hts_seek_func seek, hts_tell_func tell);
 
 /// Return the next record from an iterator
 /** @param fp      Input file handle
