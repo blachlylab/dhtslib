@@ -1031,7 +1031,7 @@ private char* reverse(char* str)
 {
     import core.stdc.string : strlen;
 
-    ulong i = strlen(str) - 1, j = 0;
+    auto i = strlen(str) - 1, j = 0;
     char ch;
     while (i > j)
     {

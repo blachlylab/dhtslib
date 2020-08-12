@@ -248,12 +248,12 @@ struct bcf1_t { // @suppress(dscanner.style.phobos_naming_convention)
     float qual;   /// QUAL
 
     mixin(bitfields!(
-        uint32_t, "n_info", 16,
-        uint32_t, "n_allele", 16));
+        uint, "n_info", 16,     /// For whatever reason, windows doesn't like uint32_t
+        uint, "n_allele", 16));
 
     mixin(bitfields!(
-        uint32_t, "n_fmt", 8,
-        uint32_t, "n_sample", 24));
+        uint, "n_fmt", 8,       /// For whatever reason, windows doesn't like uint32_t
+        uint, "n_sample", 24));
 
     kstring_t _shared;      /// ??? (name mangled due to D reserved keyword shared)
     kstring_t indiv;        /// ???

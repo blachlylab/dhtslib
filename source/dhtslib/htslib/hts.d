@@ -335,18 +335,42 @@ The input character may be either an IUPAC ambiguity code, '=' for 0, or
 '0'/'1'/'2'/'3' for a result of 1/2/4/8.  The result is encoded as 1/2/4/8
 for A/C/G/T or combinations of these bits for ambiguous bases.
 */
-extern const(char)[256] seq_nt16_table;
+
+version(Windows){
+    const (char)[256] seq_nt16_table = [
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        1, 2, 4, 8, 15,15,15,15, 15,15,15,15, 15, 0 /*=*/,15,15,
+        15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+        15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+        15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+        15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
+    ];
+}else{
+    extern const(char)[256] seq_nt16_table;
+}
 
 /**! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
 ambiguity code letter (or '=' when given 0).
 */
-extern __gshared const(char)[16] seq_nt16_str;
 
+version(Windows) __gshared const (char)[16] seq_nt16_str = ['=','A','C','M','G','R','S','V','T','W','Y','H','K','D','B','N'];
+else extern __gshared const(char)[16] seq_nt16_str;
 /**! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
 Returns 0/1/2/3 for 1/2/4/8 (i.e., A/C/G/T), or 4 otherwise (0 or ambiguous).
 */
-extern const int[] seq_nt16_int;
-
+version(Windows) const (int)[16] seq_nt16_int = [ 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 ];
+else extern const int[] seq_nt16_int;
 /**!
   @abstract  Get the htslib version number
   @return    For released versions, a string like "N.N[.N]"; or git describe
