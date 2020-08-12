@@ -14,6 +14,7 @@
 module htslib.bgzf;
 
 import std.bitmanip;
+import htslib.kstring;
 
 extern (C):
 
@@ -64,7 +65,7 @@ struct hFILE; // @suppress(dscanner.style.phobos_naming_convention)
 /// see thread_pool.d
 struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
 /// klib kstring
-struct kstring_t; // @suppress(dscanner.style.phobos_naming_convention)
+// struct kstring_t; // @suppress(dscanner.style.phobos_naming_convention)
 /// Memory pool for bgzf_job structs, to avoid many malloc/free, see htslib/bgzf.c
 struct bgzf_mtaux_t; // @suppress(dscanner.style.phobos_naming_convention)
 /// BGZF index
@@ -104,7 +105,7 @@ struct BGZF {
     bgzf_mtaux_t *mt;   /// only used for multi-threading
     bgzidx_t *idx;      /// BGZF index
     int idx_build_otf;  /// build index on the fly, set by bgzf_index_build_init()
-    z_stream *gz_stream;/// for gzip-compressed files
+    z_stream_s *gz_stream;/// for gzip-compressed files
     int64_t seeked;     /// virtual offset of last seek
 }
 

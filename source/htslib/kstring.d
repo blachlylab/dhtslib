@@ -49,10 +49,10 @@ void kroundup_size_t(ref size_t x) {
 	x |= (x >> 8);
 	x |= (x >> 16);
 
-	static if (sizeof(size_t) == 8)
+	static if (size_t.sizeof == 8)
         x |= (x >> 32);
 
-	return ++x;
+	++x;
 }
 
 /+
@@ -149,7 +149,7 @@ static inline char *ks_release(kstring_t *s)
 +/
 
 pragma(inline, true)
-int kputsn(const(char) *p, size_t l, kstring_t *s)
+auto kputsn(const(char) *p, size_t l, kstring_t *s)
 {
     if (l > SIZE_MAX - 2 - s.l || ks_resize(s, s.l + l + 2) < 0)
 		return EOF;
@@ -160,19 +160,19 @@ int kputsn(const(char) *p, size_t l, kstring_t *s)
 }
 
 pragma(inline, true)
-int kputs(const(char) *p, kstring_t *s)
+auto kputs(const(char) *p, kstring_t *s)
 {
 	return kputsn(p, strlen(p), s);
 }
 
 pragma(inline, true)
-int kputc(int c, kstring_t *s)
+int kputc(char c, kstring_t *s)
 {
 	if (ks_resize(s, s.l + 2) < 0)
 		return EOF;
 	s.s[s.l++] = c;
 	s.s[s.l] = 0;
-	return c;
+	return cast(int) c;
 }
 
 /+

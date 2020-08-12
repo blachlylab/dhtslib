@@ -27,7 +27,7 @@ Updated parameter function pointers:
 
 Functions returning const must be rewritten as const(type)*func_name
 */
-module dhtslib.htslib.sam;
+module htslib.sam;
 
 import std.bitmanip;
 
@@ -59,9 +59,9 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
 
 import core.stdc.stdint;
-import dhtslib.htslib.hts;
-import dhtslib.htslib.bgzf:BGZF;
-import dhtslib.htslib.kstring: __kstring_t, kstring_t;
+import htslib.hts;
+import htslib.bgzf: BGZF;
+import htslib.kstring: __kstring_t, kstring_t;
 
 /// Highest SAM format version supported by this library
 auto SAM_FORMAT_VERSION = "1.6"c;

@@ -637,7 +637,7 @@ enum int HTS_FMT_CRAI= 3;   /// CRAM index (not sure if superceded by CSI?)
 // also INT_MAX instead of -1.  This avoids bugs with old code
 // using the new hts_pos_t data type.
 enum HTS_POS_MAX = (((cast(int64_t)int.max)<<32)|int.max);
-enum HTS_POS_MIN = int64.min;
+enum HTS_POS_MIN = int64_t.min;
 //enum PRIhts_pos = PRId64;
 alias hts_pos_t = int64_t;
 
@@ -1306,7 +1306,7 @@ int probaln_glocal(const uint8_t *ref, int l_ref, const uint8_t *query, int l_qu
 +/
 
 pragma(inline,true)
-int hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls)
+long hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls)
 {
     int l, s = min_shift, t = ((1<<((n_lvls<<1) + n_lvls)) - 1) / 7;
     for (--end, l = n_lvls; l > 0; --l, s += 3, t -= 1<<((l<<1)+l))

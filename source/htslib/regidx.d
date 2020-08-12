@@ -8,7 +8,7 @@
  *      aliased typedef'd function pointers
  *)
  */
-module dhtslib.htslib.regidx;
+module htslib.regidx;
 
 import std.stdint : uint32_t;
 

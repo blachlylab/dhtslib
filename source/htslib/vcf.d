@@ -67,7 +67,7 @@ enum {
     BCF_HT_INT  = 1, /// header type: INTEGER
     BCF_HT_REAL = 2, /// header type: REAL
     BCF_HT_STR  = 3, /// header type: STRING
-    BCF_HT_LONG = (BCF_HT_INT | 0x100)  /// BCF_HT_INT, but for int64_t values; VCF only!
+    BCF_HT_LONG = (BCF_HT_INT | 0x100),  /// BCF_HT_INT, but for int64_t values; VCF only!
 
     BCF_VL_FIXED=  0, /// variable length: fixed (?)
     BCF_VL_VAR  =  1, /// variable length: variable
@@ -1167,9 +1167,9 @@ pragma(inline, true) {
     /// TODO: attempt to define parameter r as bcf1_t *, which is what I think it should be
     int bcf_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r) {
         if (htsfp.is_bgzf)
-            return hts_itr_next(htsfp.fp.bgzf, itr, r, 0);
+            return hts_itr_next(htsfp.fp.bgzf, itr, r, null);
 
-        hts_log_error("Only bgzf compressed files can be used with iterators");
+        hts_log_error(__FUNCTION__,"Only bgzf compressed files can be used with iterators");
         errno = EINVAL;
         return -2;
     }
@@ -1318,7 +1318,7 @@ enum int16_t bcf_int16_missing = (-32_767-1);           /* INT16_MIN */
 /// ditto
 enum int32_t bcf_int32_missing = (-2_147_483_647-1);    /* INT32_MIN */
 /// ditto
-#define bcf_int64_missing = (-9_223_372_036_854_775_807L - 1L); /* INT64_MIN */
+enum int64_t bcf_int64_missing = (-9_223_372_036_854_775_807L - 1L); /* INT64_MIN */
 /// ditto
 enum char bcf_str_missing = 0x07;   // #define bcf_str_missing      0x07
 

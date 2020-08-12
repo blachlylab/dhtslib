@@ -47,7 +47,7 @@ DEALINGS IN THE SOFTWARE.  */
  * thread_pool.c.
  */
 
-import htslib.hts_defs;
+// import htslib.hts_defs;
 
 /*-----------------------------------------------------------------------------
  * Opaque data types.

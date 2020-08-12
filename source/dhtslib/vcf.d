@@ -224,7 +224,7 @@ class VCFRecord
     /// Get position (POS)
     // NB: internally BCF is uzing 0 based coordinates; we only show +1 when printing a VCF line with toString (which calls vcf_format)
     @property
-    int pos()
+    long pos()
     out(coord) { assert(coord >= 0); }
     do
     {
@@ -233,7 +233,7 @@ class VCFRecord
     }
     /// Set position (POS)
     @property
-    void pos(int p)
+    void pos(long p)
     in { assert(p >= 0); }
     do
     {
@@ -279,7 +279,7 @@ class VCFRecord
         TODO: some of these may be inefficent; since they may be used in hot inner loops, pls optimize
     */
     /// REF allele length
-    @property int refLen()
+    @property long refLen()
     {
         version(DigitalMars) pragma(inline);
         version(LDC) pragma(inline, true);
