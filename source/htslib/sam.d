@@ -28,6 +28,7 @@ module htslib.sam;
 
 import core.stdc.stdint;
 import htslib.hts;
+import htslib.hts_log;
 import htslib.bgzf: BGZF;
 import htslib.kstring: __kstring_t, kstring_t;
 
@@ -432,9 +433,9 @@ sam_hdr_t* sam_hdr_dup(const(sam_hdr_t)* h0);
 /*!
  * @abstract Old names for compatibility with existing code.
  */
-sam_hdr_t* bam_hdr_init();
-void bam_hdr_destroy(sam_hdr_t* h);
-sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0);
+sam_hdr_t* bam_hdr_init() { return sam_hdr_init(); }
+void bam_hdr_destroy(sam_hdr_t* h) { sam_hdr_destroy(h); }
+sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0) { return sam_hdr_dup(h0); }
 
 alias samFile = htsFile;
 
@@ -827,7 +828,7 @@ hts_pos_t sam_hdr_tid2len(const(sam_hdr_t)* h, int tid);
  *             -1 if unknown reference,
  *             -2 if the header could not be parsed
  */
-int bam_name2id(sam_hdr_t* h, const(char)* ref_);
+int bam_name2id(sam_hdr_t* h, const(char)* ref_) { return sam_hdr_name2tid(h, ref_); }
 
 /// Generate a unique \@PG ID: value
 /*!
@@ -1006,14 +1007,18 @@ enum BAM_USER_OWNS_DATA = 2;
 
    \endcode
 */
-void bam_set_mempolicy(bam1_t* b, uint policy);
+void bam_set_mempolicy(bam1_t* b, uint policy) {
+    b.mempolicy = policy;
+}
 
 /// Get alignment record memory policy
 /** @param b    Alignment record
 
     See bam_set_mempolicy()
  */
-uint bam_get_mempolicy(bam1_t* b);
+uint bam_get_mempolicy(bam1_t* b) {
+    return b.mempolicy;
+}
 
 /// Read a BAM format alignment record
 /**
@@ -1351,7 +1356,21 @@ hts_itr_t* sam_itr_regarray(
     @param r           Pointer to a bam1_t struct
     @return >= 0 on success; -1 when there is no more data; < -1 on error
  */
-int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r);
+int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r) {
+    if (!htsfp.is_bgzf && !htsfp.is_cram) {
+        hts_log_error("%s not BGZF compressed", htsfp.fn ? htsfp.fn : "File");
+        return -2;
+    }
+    if (!itr) {
+        hts_log_error("Null iterator");
+        return -2;
+    }
+
+    if (itr.multi)
+        return hts_itr_multi_next(htsfp, itr, r);
+    else
+        return hts_itr_next(htsfp.is_bgzf ? htsfp.fp.bgzf : NULL, itr, r, htsfp);
+}
 
 /// Get the next read from a BAM/CRAM multi-iterator
 /** @param htsfp       Htsfile pointer for the input file
