@@ -96,11 +96,11 @@ class SAMRecord
     /// 0-based leftmost coordinate
     pragma(inline, true)
     @nogc @safe nothrow
-    @property int pos() { return this.b.core.pos; }
+    @property long pos() { return this.b.core.pos; }
     /// ditto
     pragma(inline, true)
     @nogc @safe nothrow
-    @property void pos(int pos) { this.b.core.pos = pos; }
+    @property void pos(long pos) { this.b.core.pos = pos; }
 
     // TODO: @field  bin     bin calculated by bam_reg2bin()
 
@@ -431,22 +431,22 @@ class SAMRecord
     /// 0-based leftmost coordinate of next read in template
     pragma(inline, true)
     @nogc @safe nothrow
-    @property int matePos() { return this.b.core.mpos; }
+    @property long matePos() { return this.b.core.mpos; }
     /// ditto
     pragma(inline, true)
     @nogc @safe nothrow
-    @property void matePos(int mpos) { this.b.core.mpos = mpos; }
+    @property void matePos(long mpos) { this.b.core.mpos = mpos; }
 
     /// Presumably Insert size, but is undocumented.
     /// Per samtools source, is measured 5' to 5'
     /// https://github.com/samtools/samtools/blob/bd1a409aa750d25d70a093405d174db8709a3f2c/bam_mate.c#L320
     pragma(inline, true)
     @nogc @safe nothrow
-    @property int insertSize() { return this.b.core.isize; }
+    @property long insertSize() { return this.b.core.isize; }
     /// ditto
     pragma(inline, true)
     @nogc @safe nothrow
-    @property void insertSize(int isize) { this.b.core.isize = isize; }
+    @property void insertSize(long isize) { this.b.core.isize = isize; }
 }
 
 debug(dhtslib_unittest)
