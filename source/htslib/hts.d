@@ -65,7 +65,7 @@ struct cram_fd; // @suppress(dscanner.style.phobos_naming_convention)
 import htslib.hfile: hFILE;
 /// see thread_pool.d
 struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
-struct sam_hdr_t;
+import htslib.sam : sam_hdr_t;
 
 import htslib.kstring: __kstring_t, kstring_t;
 
