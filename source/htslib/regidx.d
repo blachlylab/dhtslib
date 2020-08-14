@@ -62,6 +62,7 @@
 */
 
 module htslib.regidx;
+import htslib.hts : hts_pos_t;
 
 extern (C):
 
@@ -113,7 +114,8 @@ extern (D) auto REGITR_END(T)(auto ref T itr)
  *
  *  Return value: 0 on success, -1 to skip a record, -2 on fatal error.
  */
-alias regidx_parse_f = int function(const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end, void* payload, void* usr);
+alias regidx_parse_f = int function(const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end,
+    void* payload, void* usr);
 alias regidx_free_f = void function(void* payload);
 
 /*
