@@ -900,6 +900,13 @@ extern (D) auto sam_hdr_find_tag_hd(T0, T1, T2)(auto ref T0 h, auto ref T1 key, 
 }
 
 /// Adds or updates tags on the header \@HD line
+extern (D) auto sam_hdr_update_hd(T, A...)(auto ref T h, auto ref A a)
+{
+    // NOTE: This macro was dropped by dstep due to variadic args
+    static assert (a.length %2 == 0);   // K-V pairs => even number of variadic args
+    return sam_hdr_update_line(h, "HD", null, null, a, null);
+}
+
 /// Removes the \@HD line tag with the given key
 extern (D) auto sam_hdr_remove_tag_hd(T0, T1)(auto ref T0 h, auto ref T1 key)
 {
@@ -1142,6 +1149,7 @@ alias bam_itr_destroy = hts_itr_destroy;
 alias bam_itr_queryi = sam_itr_queryi;
 alias bam_itr_querys = sam_itr_querys;
 
+pragma(inline, true)
 extern (D) auto bam_itr_next(T0, T1, T2)(auto ref T0 htsfp, auto ref T1 itr, auto ref T2 r)
 {
     return hts_itr_next(htsfp.fp.bgzf, itr, r, 0);
@@ -1149,11 +1157,13 @@ extern (D) auto bam_itr_next(T0, T1, T2)(auto ref T0 htsfp, auto ref T1 itr, aut
 
 // Load/build .csi or .bai BAM index file.  Does not work with CRAM.
 // It is recommended to use the sam_index_* functions below instead.
+pragma(inline, true)
 extern (D) auto bam_index_load(T)(auto ref T fn)
 {
     return hts_idx_load(fn, HTS_FMT_BAI);
 }
 
+pragma(inline, true)
 extern (D) auto bam_index_build(T0, T1)(auto ref T0 fn, auto ref T1 min_shift)
 {
     return sam_index_build(fn, min_shift);
@@ -1399,16 +1409,8 @@ const(char)* sam_parse_region(
  *** SAM I/O ***
  ***************/
 
-extern (D) auto sam_open(T0, T1)(auto ref T0 fn, auto ref T1 mode)
-{
-    return hts_open(fn, mode);
-}
-
-extern (D) auto sam_open_format(T0, T1, T2)(auto ref T0 fn, auto ref T1 mode, auto ref T2 fmt)
-{
-    return hts_open_format(fn, mode, fmt);
-}
-
+alias sam_open = hts_open;
+alias sam_open_format = hts_open_format;
 alias sam_close = hts_close;
 
 int sam_open_mode(char* mode, const(char)* fn, const(char)* format);
