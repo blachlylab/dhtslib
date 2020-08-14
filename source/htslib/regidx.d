@@ -1,22 +1,7 @@
-/** htslib-1.9 regidx.h as D module
- *
- *  Changes include:
- *$(LIST
- *      Removed if(n)defs
- *      Changed ^typedef struct {...} <name>$ to ^struct <name> {...}$
- *      Commented out the REGITR_{START,END,PAYLOAD,OVERLAP} #define macros
- *      aliased typedef'd function pointers
- *)
- */
-module htslib.regidx;
-
-import std.stdint : uint32_t;
-
-extern (C):
 /// @file htslib/regidx.h
 /// Region indexing.
 /*
-    Copyright (C) 2014 Genome Research Ltd.
+    Copyright (C) 2014-2019 Genome Research Ltd.
 
     Author: Petr Danecek <pd3@sanger.ac.uk>
 
@@ -40,8 +25,7 @@ extern (C):
 */
 
 /*
-    Regions indexing with an optional payload. Inspired by samtools/bedidx.c.
-    This code is intended as future replacement of bcf_sr_regions_t.
+    Region indexing with an optional payload.
 
     Example of usage:
 
@@ -51,86 +35,129 @@ extern (C):
         // and for working example see test/test-regidx.c.
         regidx_t *idx = regidx_init(in_fname,parse_custom,free_custom,sizeof(char*),NULL);
 
-        // Query overlap with chr:from-to
-        regitr_t itr;
-        if ( regidx_overlap(idx, chr,from,to, &itr) ) printf("There is an overlap!\n");
+        // Query overlap with chr:beg-end (beg,end are 1-based coordinates)
+        regitr_t *itr = regitr_init(idx);
+        if ( regidx_overlap(idx, chr,beg-1,end-1, itr) ) printf("There is an overlap!\n");
 
-        while ( REGITR_OVERLAP(itr,from,to) )
+        while ( regitr_overlap(itr) )
         {
-            printf("[%d,%d] overlaps with [%d,%d], payload=%s\n", from,to,
-                REGITR_START(itr), REGITR_END(itr), REGITR_PAYLOAD(itr,char*));
-            itr.i++;
+            printf("[%"PRIhts_pos",%"PRIhts_pos"] overlaps with [%"PRIhts_pos",%"PRIhts_pos"], payload=%s\n",
+                   beg, end, itr->beg+1, itr->end+1, regitr_payload(itr,char*));
         }
 
-        regidx_destroy(regs);
+        regidx_destroy(idx);
+        regitr_destroy(itr);
+
+
+    Another example, loop over all regions:
+
+        regidx_t *idx = regidx_init(in_fname,NULL,NULL,0,NULL);
+        regitr_t *itr = regitr_init(idx);
+
+        while ( regitr_loop(itr) )
+            printf("chr=%s  beg=%d  end=%d\n", itr->seq, itr->beg+1, itr->end+1);
+
+        regidx_destroy(idx);
+        regitr_destroy(itr);
 */
 
-/// struct defined in regidx.c, we will leave as opaque
-extern struct _regidx_t;    // @suppress(dscanner.style.phobos_naming_convention)
-alias regidx_t = _regidx_t;
-/// region (start, end)
-struct reg_t // @suppress(dscanner.style.phobos_naming_convention)
+module htslib.regidx;
+
+extern (C):
+
+// maximum regidx position (0-based).  Used to represent the end point of
+// regions which do not explicitly set one.  regidx_push() also limits
+// positions passed to it to be no bigger than this.
+
+// Limit is set to ensure some internal values used by regidx keep within 32
+// bits and to stop the index from getting too big.
+
+enum REGIDX_MAX = 1UL << 35;
+
+struct regidx_t;
+
+struct regitr_t
 {
-    /// (start, end) -- unclear if 0-based/open
-    uint32_t start, end;
-}
-/// region iterator
-struct regitr_t // @suppress(dscanner.style.phobos_naming_convention)
-{
-    /// ???
-    int i, n;
-    reg_t *reg;     /// ???
-    void *payload;  /// ???
+    hts_pos_t beg;
+    hts_pos_t end;
+    void* payload;
+    char* seq;
+    void* itr;
 }
 
-/+
-#define REGITR_START(itr) (itr).reg[(itr).i].start
-#define REGITR_END(itr)   (itr).reg[(itr).i].end
-#define REGITR_PAYLOAD(itr,type_t) ((type_t*)(itr).payload)[(itr).i]
-#define REGITR_OVERLAP(itr,from,to) (itr.i < itr.n && REGITR_START(itr)<=to && REGITR_END(itr)>=from )
-+/
-pragma(inline, true)
+// Old API for backwards compatibility
+extern (D) auto REGITR_START(T)(auto ref T itr)
 {
-    /// Get the start or end coordinate of the region iterator's current region
-    uint32_t regitr_start(regitr_t *itr){ return itr.reg[itr.i].start; }
-    /// ditto
-    uint32_t regitr_end(regitr_t *itr)  { return itr.reg[itr.i].end;   }
-
-    /// Get the payload of the region iterator's current region
-    auto regitr_payload(T)(regitr_t *itr)   { return cast(T*)itr.payload[itr.i]; }  // looks super unsafe
-
-    /// Does the given (from, to) overlap the region?    
-    auto regitr_overlap(T)(regitr_t *itr, T from, T to)
-    {
-        return itr.i < itr.n && regitr_start(itr) <= to && regitr_end(itr) >= from;
-    }
+    return itr.beg;
 }
+
+extern (D) auto REGITR_END(T)(auto ref T itr)
+{
+    return itr.end;
+}
+
+/* Omitted due to symbol collission -- dstep does not recognize case sensitivity
+#define REGITR_PAYLOAD(itr,type_t) ((type_t*)(itr).payload)
+#define REGITR_OVERLAP(itr,from,to) regidx_overlap((itr));
+*/
 
 /*
  *  regidx_parse_f - Function to parse one input line, such as regidx_parse_bed
  *  or regidx_parse_tab below. The function is expected to set `chr_from` and
  *  `chr_to` to point to first and last character of chromosome name and set
- *  coordinates `reg->start` and `reg->end` (0-based, inclusive). If
- *  regidx_init() was called with non-zero payload_size, the `payload` points
- *  to a memory location of the payload_size and `usr` is data passed to
- *  regidx_init(). Any memory allocated by the function will be freed by
- *  regidx_free_f on regidx_destroy().
+ *  coordinates `beg` and `end` (0-based, inclusive). If regidx_init() was
+ *  called with non-zero payload_size, the `payload` points to a memory
+ *  location of the payload_size and `usr` is the data passed to regidx_init().
+ *  Any memory allocated by the function will be freed by regidx_free_f called
+ *  by regidx_destroy().
  *
  *  Return value: 0 on success, -1 to skip a record, -2 on fatal error.
  */
-//typedef int  (*regidx_parse_f)(const char *line, char **chr_beg, char **chr_end, reg_t *reg, void *payload, void *usr);
-alias regidx_parse_f =
-    int function(const(char) *line, char **chr_beg, char **chr_end, reg_t *reg, void *payload, void *usr);
-//typedef void (*regidx_free_f)(void *payload);
-alias regidx_free_f = void function(void *payload);
+alias regidx_parse_f = int function(const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end, void* payload, void* usr);
+alias regidx_free_f = void function(void* payload);
 
-/// regidx_parse_f for BED, CHROM,FROM,TO (0-based,right-open)
-int regidx_parse_bed(const(char)*, char**, char**, reg_t*, void*, void*);   // CHROM,FROM,TO (0-based,right-open)
-/// regidx_Parse_f for "TAB", CHROM,POS (1-based, inclusive)
-int regidx_parse_tab(const(char)*, char**, char**, reg_t*, void*, void*);   // CHROM,POS (1-based, inclusive)
+/*
+ *  A note about the parsers:
+ *      - leading spaces are ignored
+ *      - lines starting with "#" are ignored
+ */
+int regidx_parse_bed(
+    const(char)*,
+    char**,
+    char**,
+    hts_pos_t*,
+    hts_pos_t*,
+    void*,
+    void*); // CHROM or whitespace-sepatated CHROM,FROM,TO (0-based,right-open)
+int regidx_parse_tab(
+    const(char)*,
+    char**,
+    char**,
+    hts_pos_t*,
+    hts_pos_t*,
+    void*,
+    void*); // CHROM or whitespace-separated CHROM,POS (1-based, inclusive)
+int regidx_parse_reg(
+    const(char)*,
+    char**,
+    char**,
+    hts_pos_t*,
+    hts_pos_t*,
+    void*,
+    void*); // CHROM, CHROM:POS, CHROM:FROM-TO, CHROM:FROM- (1-based, inclusive)
+int regidx_parse_vcf(
+    const(char)*,
+    char**,
+    char**,
+    hts_pos_t*,
+    hts_pos_t*,
+    void*,
+    void*);
 
-/**
+/*
  *  regidx_init() - creates new index
+ *  regidx_init_string() - creates new index, from a string rather than from a file
+ *
  *  @param fname:  input file name or NULL if regions will be added one-by-one via regidx_insert()
  *  @param parsef: regidx_parse_bed, regidx_parse_tab or see description of regidx_parse_f. If NULL,
  *                 the format will be autodected, currently either regidx_parse_tab (the default) or
@@ -141,43 +168,103 @@ int regidx_parse_tab(const(char)*, char**, char**, reg_t*, void*, void*);   // C
  *  @param usr:    optional user data passed to regidx_parse_f
  *
  *  Returns index on success or NULL on error.
+ *
+ *  The regidx_t index struct returned by a successful call should be freed
+ *  via regidx_destroy() when it is no longer needed.
  */
-regidx_t *regidx_init(const(char) *fname, regidx_parse_f parsef, regidx_free_f freef, size_t payload_size, void *usr);
+regidx_t* regidx_init(
+    const(char)* fname,
+    regidx_parse_f parsef,
+    regidx_free_f freef,
+    size_t payload_size,
+    void* usr);
+regidx_t* regidx_init_string(
+    const(char)* string,
+    regidx_parse_f parsef,
+    regidx_free_f freef,
+    size_t payload_size,
+    void* usr);
 
-/**
+/*
  *  regidx_destroy() - free memory allocated by regidx_init
  */
-void regidx_destroy(regidx_t *idx);
+void regidx_destroy(regidx_t* idx);
 
-/**
+/*
  *  regidx_overlap() - check overlap of the location chr:from-to with regions
- *  @param start,end:   0-based start, end coordinate (inclusive)
- *  @param itr:         pointer to iterator, can be NULL if not needed
+ *  @param beg,end:     0-based start, end coordinate (inclusive)
+ *  @param itr:         pointer to iterator, can be NULL if regidx_loop not needed
  *
  *  Returns 0 if there is no overlap or 1 if overlap is found. The overlapping
  *  regions can be iterated as shown in the example above.
  */
-int regidx_overlap(regidx_t *idx, const(char) *chr, uint32_t start, uint32_t end, regitr_t *itr);
+int regidx_overlap(
+    regidx_t* idx,
+    const(char)* chr,
+    hts_pos_t beg,
+    hts_pos_t end,
+    regitr_t* itr);
 
-/**
+/*
  *  regidx_insert() - add a new region.
- *
- *  After last region has been added, call regidx_insert(idx,NULL) to
- *  build the index.
+ *  regidx_insert_list() - add new regions from a list
+ *  regidx_push() - low level insertion of a new region
  *
  *  Returns 0 on success or -1 on error.
  */
-int regidx_insert(regidx_t *idx, char *line);
+int regidx_insert(regidx_t* idx, char* line);
+int regidx_insert_list(regidx_t* idx, char* line, char delim);
+int regidx_push(
+    regidx_t* idx,
+    char* chr_beg,
+    char* chr_end,
+    hts_pos_t beg,
+    hts_pos_t end,
+    void* payload);
 
-/**
+/*
  *  regidx_seq_names() - return list of all sequence names
  */
-char **regidx_seq_names(regidx_t *idx, int *n);
+char** regidx_seq_names(regidx_t* idx, int* n);
 
-/**
+/*
  *  regidx_seq_nregs() - number of regions
  *  regidx_nregs()  - total number of regions
  */
-int regidx_seq_nregs(regidx_t *idx, const(char) *seq);
-/// ditto
-int regidx_nregs(regidx_t *idx);
+int regidx_seq_nregs(regidx_t* idx, const(char)* seq);
+
+int regidx_nregs(regidx_t* idx);
+
+/*
+ *  regitr_init() - initialize an iterator. The idx parameter is required only
+ *                  with regitr_loop. If only regitr_overlap is called, NULL
+ *                  can be given.
+ *
+ *                  The regitr_t struct returned by a successful regitr_init()
+ *                  call should be freed via regitr_destroy() when it is no
+ *                  longer needed.
+ *
+ *  regitr_reset() - initialize an iterator for a repeated regitr_loop cycle.
+ *                  Not required with regitr_overlap.
+ */
+regitr_t* regitr_init(regidx_t* idx);
+void regitr_destroy(regitr_t* itr);
+void regitr_reset(regidx_t* idx, regitr_t* itr);
+
+/*
+ *  regitr_overlap() - next overlapping region
+ *  Returns 0 when done or 1 when itr is set to next region
+ */
+int regitr_overlap(regitr_t* itr);
+
+/*
+ *  regitr_loop() - loop over all regions
+ *  Returns 0 when done or 1 when itr is set to next region
+ */
+int regitr_loop(regitr_t* itr);
+
+/*
+ *  regitr_copy() - create a copy of an iterator for a repeated iteration with regitr_loop
+ */
+void regitr_copy(regitr_t* dst, regitr_t* src);
+
