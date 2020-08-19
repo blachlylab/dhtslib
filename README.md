@@ -60,19 +60,20 @@ Direct bindings to htslib C API are available as submodules under `dhtslib.htsli
 Naming remains the same as the original `.h` include files.
 For example, `import dhtslib.htslib.faidx` for direct access to the C function calls.
 The current compatible versions are 1.7-1.9
-(compatibility with htslib 1.10, which is ABI breaking/has API changes, is in development now)
+(compatibility with htslib 1.10, which is ABI breaking/has API changes, is in development now
+in the htslib-110 branch)
 
 Currently implemented:
 
 * bgzf
 * faidx
 * hts
-* hts_log
+* hts\_log
 * kstring
 * regidx
 * sam
 * tbx
-* thread_pool (untested)
+* thread\_pool (untested)
 * vcf
 
 Missing or work-in-progress:
@@ -80,12 +81,17 @@ Missing or work-in-progress:
 * Some CRAM specific functions, although much CRAM functionality works with `sam_` functions
 * hfile
 * kbitset, kfunc, khash, klist, knetfile, kseq, ksort (mostly used internally anyway)
-* synced_bcf_reader
-* vcf_sweep
+* synced\_bcf\_reader
+* vcf\_sweep
 * vcfutils
 
 
 # FAQ
+
+**Q**: Does this work with the latest htslib?
+
+**A**:
+Almost: the current release works with htslib-1.9. htslib-1.10 included large number of breaking ABI changes and many new API functions. in the `htslib-110` branch we have a work in progress which works well with htslib-1.10, and we hope to merge this in to master soon.
 
 **Q**: Why not use [bioD](https://github.com/biod/BioD)
 
@@ -94,19 +100,26 @@ bioD, as a more general bioinformatics framework, is more comparable to bio-pyth
 bioD does have some excellent hts file format (BGZF and SAM) handling, and at one time sambamba, which relied on it, was faster than samtools.
 However, the development resources poured into `htslib` overall are tremendous, and we with to leverage that rather than writing VCF, tabix, etc. code from scratch.
 
+**Q**: How does this compare to bio-Rust's htslib bindings?
+
+**A**: We love Rust, but dhtslib has way more complete bindings and more and better high level constructs :smile:
+
 **Q**: Why were htslib bindings ported by hand instead of using a C header/bindings translator as in hts-nim or rust-htslib?
 
 **A**:
 Whereas dstep and dpp are incredibly convenient for binding creation, we created these by hand from htslib `.h` files for several reasons.
-First, this gave the authors of dhtslib a better familiarity with the htslib API including letting us get to know several lesser-known functions.
-Second, some elements (particuarlly `#define` macros) are difficult or impossible in some cases for machines to translate, or translate into efficient code; here we were sometimes able to replace these macros with smarter replacements than a simple macro-expansion-direct-translation.
+First, this gave the authors of dhtslib a better familiarity with the htslib API including letting us get to know several lesser-known and internal functions.
+Second, some elements (particuarlly `#define` macros) are difficult or impossible in some cases for machines to translate, or translate into efficient code; here we were sometimes able to replace these macros with smarter replacements than a simple macro-expansion-direct-translation. (**see 2020 update below -- dstep translates simple #defines into templates**)
 Likewise, we were able to turn certain `#defines` and pseudo-generic functions into D templates, and to `pragma(inline, true)` them.
 Finally, instead of dumping all the bindings into an interface file, we left the structure of the file intact to make it easier for the D developer to read the source file as the htslib authors intended the C headers to be read. In addition, this leaves docstring/documentation comments intact, whereas in other projects the direct API has no comments and the developer must refer to the C headers.
+
+**(2020 UPDATE)** [dstep](https://github.com/jacob-carlborg/dstep) has matured and is an incredibly powerful tool for machine-assisted C-to-D translation. We've used dstep for the majority of bindings in the new `htslib-110` branch. After dstep translation, we still need to port inline functions by hand (done), tweak some macros into templates (done although dstep already does an amazing job on simple `#define` macros translating to D templates!), backport some fixes for Windows platforms and update the documentation comments to ddoc format.
+
 
 **Q**: Why am I getting a segfault?
 
 **A**:
-It's easy to get a segfault by using the direct C API incorrectly. We have tried to eliminate most of this (use after free, etc.) in the OOP wrappers. If you are getting a segfault you cannot understand when using purely the high-level D API, please post an issue.
+It's easy to get a segfault by using the direct C API incorrectly. Or possibly correctly. We have tried to eliminate most of this (use after free, etc.) in the OOP wrappers. If you are getting a segfault you cannot understand when using purely the high-level D API, please post an issue.
 
 
 # Bugs and Warnings
@@ -115,8 +128,10 @@ Zero-based versus one-based coordinates. Zero-based coordinates are used interna
 The `fadix` C API expects one-based coordinates; we have built this as a template for the user to specify the coordinate system.
 See documentation for more details.
 
-Do not call hts_log hts_log_* from a destructor, as it is potentialy allocating via `toStringz`
+Do not call `hts_log_*` from a destructor, as it is potentialy allocating via `toStringz`
+
 
 # See Also
 
 1. [gff3d](https://github.com/blachlylab/gff3d) GFF3 record reader/writer
+2. [dklib](https://github.com/blachlylab/dklib) Templatized port of attractivechaos' klib, used extensively in htslib
