@@ -447,6 +447,25 @@ class SAMRecord
     pragma(inline, true)
     @nogc @safe nothrow
     @property void insertSize(int isize) { this.b.core.isize = isize; }
+
+    struct AlignedPair(bool refSeq){
+        int qpos, rpos;
+        Ops cigar_op;
+        char readAllele; 
+        static if(refSeq) char refAllele;
+    }
+    /// get a range of aligned read and reference positions
+    /// this is meant to recreate functionality from pysam:
+    /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
+    auto getAlignedPairs(bool withRefSeq)(){
+        struct AlignedPairs(bool refSeq){
+            CigarItr itr;
+            this(Cigar cigar){
+                itr = CigarItr(cigar);
+
+            }
+        }
+    }
 }
 
 debug(dhtslib_unittest)
