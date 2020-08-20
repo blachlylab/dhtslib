@@ -41,6 +41,9 @@ struct Cigar
     {
         return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
     }
+
+    /// return the alignment length expressed by this Cigar
+    /// TODO: use CIGAR_TYPE to get rid of switch statement for less branching
     @property int ref_bases_covered(){
         int len;
         foreach(op;this.ops){
@@ -59,32 +62,10 @@ struct Cigar
         }
         return len;
     }
-    /// return the alignment length expressed by this Cigar
-    int alignedLength()
-    {
-        int length = 0;
-        foreach (op; ops)
-        {
-            switch (op.op)
-            {
-            default:
-                {
-                    break;
-                }
-
-            case Ops.MATCH:
-            case Ops.EQUAL:
-            case Ops.DIFF:
-            case Ops.DEL:
-            case Ops.INS:
-                {
-                    length += op.length;
-                    break;
-                }
-            }
-        }
-        return length;
-    }
+    
+    /// previous alignedLength function had a bug and 
+    /// it is just a duplicate of ref_bases_covered
+    alias alignedLength = ref_bases_covered;
 }
 
 // Each pair of bits has first bit set iff the operation is query consuming,
