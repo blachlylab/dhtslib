@@ -3,7 +3,7 @@ module dhtslib.faidx;
 import std.string;
 import core.stdc.stdlib : malloc, free;
 
-import dhtslib.htslib.faidx;
+import htslib.faidx;
 
 /** Coodinate Systems, since htslib sequence fetching methods surprisingly use zero-based, closed */
 enum CoordSystem
@@ -76,7 +76,7 @@ struct IndexedFastaFile {
     /// Enable BGZF cacheing (size: bytes)
     void setCacheSize(int size)
     {
-        import dhtslib.htslib.bgzf : BGZF, bgzf_set_cache_size;
+        import htslib.bgzf : BGZF, bgzf_set_cache_size;
         bgzf_set_cache_size(this.faidx.bgzf, size);
     }
 
@@ -86,7 +86,7 @@ struct IndexedFastaFile {
     /// NB: IN A REAL-WORLD TEST (swiftover) CALLING setThreads(1) doubled runtime(???)
     void setThreads(int nthreads)
     {
-        import dhtslib.htslib.bgzf : BGZF, bgzf_mt;
+        import htslib.bgzf : BGZF, bgzf_mt;
         // third parameter, n_sub_blks is not used in htslib 1.9; .h suggests value 64-256
         bgzf_mt(this.faidx.bgzf, nthreads, 64);
     }

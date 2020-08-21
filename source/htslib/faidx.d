@@ -1,12 +1,12 @@
 // htslib-1.9 faidx.h as D module
-module dhtslib.htslib.faidx;
-import dhtslib.htslib.bgzf : BGZF;
+module htslib.faidx;
+import htslib.bgzf : BGZF;
 extern (C):
 
 // @file htslib/faidx.h
 // FASTA random access.
 /*
-   Copyright (C) 2008, 2009, 2013, 2014, 2016, 2017-2018 Genome Research Ltd.
+   Copyright (C) 2008, 2009, 2013, 2014, 2016, 2017-2019 Genome Research Ltd.
 
    Author: Heng Li <lh3@sanger.ac.uk>
 
@@ -30,6 +30,9 @@ extern (C):
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 */
+
+import core.stdc.stdint;
+import htslib.hts;
 
 /** @file
 
@@ -64,7 +67,7 @@ extern (C):
 struct __faidx_t
 {
     BGZF *bgzf;
-}; // @suppress(dscanner.style.phobos_naming_convention)
+}   // @suppress(dscanner.style.phobos_naming_convention)
 /// ditto
 alias faidx_t = __faidx_t;
 
@@ -116,6 +119,9 @@ The bgzip index is only needed if fn is compressed.
 
 If (flags & FAI_CREATE) is true, the index files will be built using
 fai_build3() if they are not already present.
+
+The struct returned by a successful call should be freed via fai_destroy()
+when it is no longer needed.
 */
 faidx_t *fai_load3(const(char) *fn, const(char) *fnfai, const(char) *fngzi,
                    int flags);
@@ -142,6 +148,9 @@ The bgzip index is only needed if fn is compressed.
 
 If (flags & FAI_CREATE) is true, the index files will be built using
 fai_build3() if they are not already present.
+
+The struct returned by a successful call should be freed via fai_destroy()
+when it is no longer needed.
 */
 faidx_t *fai_load3_format(const(char) *fn, const(char) *fnfai, const(char) *fngzi,
                    int flags, fai_format_options format);
@@ -163,8 +172,13 @@ faidx_t *fai_load_format(const(char) *fn, fai_format_options format);
 
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
+
+To work around ambiguous parsing issues, eg both "chr1" and "chr1:100-200"
+are reference names, quote using curly braces.
+Thus "{chr1}:100-200" and "{chr1:100-200}" disambiguate the above example.
 */
 char *fai_fetch(const(faidx_t) *fai, const(char) *reg, int *len);
+char *fai_fetch64(const(faidx_t) *fai, const(char) *reg, hts_pos_t *len);
 
 /// Fetch the quality string for a region for FASTQ files
 /** @param  fai  Pointer to the faidx_t struct
@@ -172,10 +186,13 @@ char *fai_fetch(const(faidx_t) *fai, const(char) *reg, int *len);
     @param  len  Length of the region; -2 if seq not present, -1 general error
     @return      Pointer to the quality string; null on failure
 
-The returned quality string is allocated by `malloc()` family and should be destroyed
-by end users by calling `free()` on it.
+The returned quality string is allocated by `malloc()` family and should be
+destroyed by end users by calling `free()` on it.
+
+Region names can be quoted with curly braces, as for fai_fetch().
 */
 char *fai_fetchqual(const(faidx_t) *fai, const(char) *reg, int *len);
+char *fai_fetchqual64(const(faidx_t) *fai, const(char) *reg, hts_pos_t *len);
 
 /// Fetch the number of sequences
 /** @param  fai  Pointer to the faidx_t struct
@@ -196,6 +213,19 @@ by end users by calling `free()` on it.
 */
 char *faidx_fetch_seq(const(faidx_t) *fai, const(char) *c_name, int p_beg_i, int p_end_i, int *len);
 
+/// Fetch the sequence in a region
+/** @param  fai  Pointer to the faidx_t struct
+    @param  c_name Region name
+    @param  p_beg_i  Beginning position number (zero-based)
+    @param  p_end_i  End position number (zero-based)
+    @param  len  Length of the region; -2 if c_name not present, -1 general error
+    @return      Pointer to the sequence; null on failure
+
+The returned sequence is allocated by `malloc()` family and should be destroyed
+by end users by calling `free()` on it.
+*/
+char *faidx_fetch_seq64(const(faidx_t) *fai, const(char) *c_name, hts_pos_t p_beg_i, hts_pos_t p_end_i, hts_pos_t *len);
+
 /// Fetch the quality string in a region for FASTQ files
 /** @param  fai  Pointer to the faidx_t struct
     @param  c_name Region name
@@ -208,6 +238,19 @@ The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
 char *faidx_fetch_qual(const(faidx_t) *fai, const(char) *c_name, int p_beg_i, int p_end_i, int *len);
+
+/// Fetch the quality string in a region for FASTQ files
+/** @param  fai  Pointer to the faidx_t struct
+    @param  c_name Region name
+    @param  p_beg_i  Beginning position number (zero-based)
+    @param  p_end_i  End position number (zero-based)
+    @param  len  Length of the region; -2 if c_name not present, -1 general error
+    @return      Pointer to the sequence; null on failure
+
+The returned sequence is allocated by `malloc()` family and should be destroyed
+by end users by calling `free()` on it.
+*/
+char *faidx_fetch_qual64(const(faidx_t) *fai, const(char) *c_name, hts_pos_t p_beg_i, hts_pos_t p_end_i, hts_pos_t *len); // @suppress(dscanner.style.long_line)
 
 /// Query if sequence is present
 /**   @param  fai  Pointer to the faidx_t struct
@@ -224,3 +267,27 @@ const(char) *faidx_iseq(const(faidx_t) *fai, int i);
 
 /// Return sequence length, -1 if not present
 int faidx_seq_len(const(faidx_t) *fai, const(char) *seq);
+
+/// Parses a region string.
+/** @param  fai   Pointer to the faidx_t struct
+    @param  s     Region string
+    @param  tid   Returns which i-th sequence is described in the region.
+    @param  beg   Returns the start of the region (0 based)
+    @param  end   Returns the one past last of the region (0 based)
+    @param  flags Parsing method, see HTS_PARSE_* in hts.h.
+    @return      pointer to end of parsed s if successs, NULL if not.
+
+    To work around ambiguous parsing issues, eg both "chr1" and "chr1:100-200"
+    are reference names, quote using curly braces.
+    Thus "{chr1}:100-200" and "{chr1:100-200}" disambiguate the above example.
+*/
+const(char) *fai_parse_region(const(faidx_t) *fai, const(char) *s,
+                             int *tid, hts_pos_t *beg, hts_pos_t *end,
+                             int flags);
+
+/// Sets the cache size of the underlying BGZF compressed file
+/** @param  fai         Pointer to the faidx_t struct
+ *  @param  cache_size  Selected cache size in bytes
+ */
+void fai_set_cache_size(faidx_t *fai, int cache_size);
+

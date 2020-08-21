@@ -11,7 +11,7 @@ import std.algorithm.iteration : each;
 import std.conv : to;
 import std.range : array;
 
-import dhtslib.htslib.hts_log;
+import htslib.hts_log;
 
 /// Represents a CIGAR string
 /// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
@@ -153,7 +153,7 @@ unittest
 {
     writeln();
     import dhtslib.sam;
-    import dhtslib.htslib.hts_log;
+    import htslib.hts_log;
     import std.path:buildPath,dirName;
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing cigar");

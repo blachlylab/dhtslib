@@ -11,9 +11,10 @@
 // removed redundant struct declarations when declaring struct pointers
 // replace local definition with import kstring_t
 // const TYPE * to const(TYPE) *
-module dhtslib.htslib.bgzf;
+module htslib.bgzf;
 
 import std.bitmanip;
+import htslib.kstring;
 
 extern (C):
 
@@ -22,8 +23,7 @@ extern (C):
 /*
    Copyright (c) 2008 Broad Institute / Massachusetts Institute of Technology
                  2011, 2012 Attractive Chaos <attractor@live.co.uk>
-   Copyright (C) 2009, 2013, 2014,2017 Genome Research Ltd
-
+   Copyright (C) 2009, 2013, 2014, 2017, 2018-2019 Genome Research Ltd
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
    in the Software without restriction, including without limitation the rights
@@ -48,7 +48,6 @@ extern (C):
 
 import core.stdc.stdint;
 import core.stdc.stdio;
-import etc.c.zlib;
 import core.sys.posix.sys.types;
 
 // ssize_t doesn't exist in core.sys.posix.sys.types for windows builds
@@ -75,6 +74,8 @@ enum int BGZF_ERR_CRC    = 32;  /// returned by inflate_block() when bgzf_uncomp
 struct hFILE; // @suppress(dscanner.style.phobos_naming_convention)
 /// see thread_pool.d
 struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
+/// klib kstring
+// struct kstring_t; // @suppress(dscanner.style.phobos_naming_convention)
 /// Memory pool for bgzf_job structs, to avoid many malloc/free, see htslib/bgzf.c
 struct bgzf_mtaux_t; // @suppress(dscanner.style.phobos_naming_convention)
 /// BGZF index
@@ -82,6 +83,8 @@ struct __bgzidx_t; // @suppress(dscanner.style.phobos_naming_convention)
 alias bgzidx_t = __bgzidx_t;
 /// bgzf cache
 struct bgzf_cache_t; // @suppress(dscanner.style.phobos_naming_convention)
+/// replaces zlib::z_stream?
+struct z_stream_s; // @suppress(dscanner.style.phobos_naming_convention)
 
 /// Block Gzipped File
 struct BGZF {
@@ -112,10 +115,9 @@ struct BGZF {
     bgzf_mtaux_t *mt;   /// only used for multi-threading
     bgzidx_t *idx;      /// BGZF index
     int idx_build_otf;  /// build index on the fly, set by bgzf_index_build_init()
-    z_stream *gz_stream;/// for gzip-compressed files
+    z_stream_s *gz_stream;/// for gzip-compressed files
+    int64_t seeked;     /// virtual offset of last seek
 }
-
-import dhtslib.htslib.kstring: __kstring_t, kstring_t;
 
     /******************
      * Basic routines *
@@ -195,6 +197,15 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
     ssize_t bgzf_block_write(BGZF *fp, const(void) *data, size_t length);
 
     /**
+     * Returns the next byte in the file without consuming it.
+     * @param fp     BGZF file handler
+     * @return       -1 on EOF,
+     *               -2 on error,
+     *               otherwise the unsigned byte value.
+     */
+    int bgzf_peek(BGZF *fp);
+
+    /**
      * Read up to _length_ bytes directly from the underlying stream without
      * decompressing.  Bypasses BGZF blocking, so must be used with care in
      * specialised circumstances only.
@@ -242,6 +253,9 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @param pos    virtual file offset returned by bgzf_tell()
      * @param whence must be SEEK_SET
      * @return       0 on success and -1 on error
+     * 
+     * @note It is not permitted to seek on files open for writing,
+     * or files compressed with gzip (as opposed to bgzip).
      */
     int64_t bgzf_seek(BGZF *fp, int64_t pos, int whence);
 
@@ -359,11 +373,14 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      *
      *  @param fp           BGZF file handler; must be opened for reading
      *  @param uoffset      file offset in the uncompressed data
-     *  @param where        SEEK_SET supported atm
+     *  @param where        must be SEEK_SET
      *
      *  Returns 0 on success and -1 on error.
+     *
+     *  @note It is not permitted to seek on files open for writing,
+     *  or files compressed with gzip (as opposed to bgzip).
      */
-    int bgzf_useek(BGZF *fp, long uoffset, int where);
+    int bgzf_useek(BGZF *fp, off_t uoffset, int where);
 
     /**
      *  Position in uncompressed BGZF
@@ -372,7 +389,7 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      *
      *  Returns the current offset on success and -1 on error.
      */
-    long bgzf_utell(BGZF *fp);
+    off_t bgzf_utell(BGZF *fp);
 
     /**
      * Tell BGZF to build index while compressing.
@@ -380,6 +397,11 @@ import dhtslib.htslib.kstring: __kstring_t, kstring_t;
      * @param fp          BGZF file handler; can be opened for reading or writing.
      *
      * Returns 0 on success and -1 on error.
+     *
+     * @note This function must be called before any data has been read or
+     * written, and in particular before calling bgzf_mt() on the same
+     * file handle (as threads may start reading data before the index
+     * has been set up).
      */
     int bgzf_index_build_init(BGZF *fp);
 

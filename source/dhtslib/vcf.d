@@ -18,9 +18,9 @@ import std.string: fromStringz, toStringz;
 import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 import std.traits: Unqual;
 
-import dhtslib.htslib.hts_log;
-import dhtslib.htslib.kstring;
-import dhtslib.htslib.vcf;
+import htslib.hts_log;
+import htslib.kstring;
+import htslib.vcf;
 
 alias BCFRecord = VCFRecord;
 alias BCFWriter = VCFWriter;
@@ -224,7 +224,7 @@ class VCFRecord
     /// Get position (POS)
     // NB: internally BCF is uzing 0 based coordinates; we only show +1 when printing a VCF line with toString (which calls vcf_format)
     @property
-    int pos()
+    long pos()
     out(coord) { assert(coord >= 0); }
     do
     {
@@ -233,7 +233,7 @@ class VCFRecord
     }
     /// Set position (POS)
     @property
-    void pos(int p)
+    void pos(long p)
     in { assert(p >= 0); }
     do
     {
@@ -279,7 +279,7 @@ class VCFRecord
         TODO: some of these may be inefficent; since they may be used in hot inner loops, pls optimize
     */
     /// REF allele length
-    @property int refLen()
+    @property long refLen()
     {
         version(DigitalMars) pragma(inline);
         version(LDC) pragma(inline, true);
@@ -1053,7 +1053,7 @@ struct VCFReader
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
     bcf1_t* b;          /// record for use in iterator, will be recycled
 
-    int MAX_UNPACK;     /// see dhtslib.htslib.vcf
+    int MAX_UNPACK;     /// see htslib.vcf
 
     private static int refct;
 
@@ -1066,7 +1066,7 @@ struct VCFReader
     /// MAX_UNPACK: setting alternate value could speed reading
     this(string fn, int MAX_UNPACK = BCF_UN_ALL)
     {
-        import dhtslib.htslib.hts : hts_set_threads;
+        import htslib.hts : hts_set_threads;
 
         if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
         this.fp = vcf_open(toStringz(fn), "r"c.ptr);
