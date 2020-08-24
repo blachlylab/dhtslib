@@ -75,18 +75,6 @@ auto getMDPairs(SAMRecord rec){
     return MDPairs(tag.toString);
 }
 
-// debug(dhtslib_unittest) 
-unittest
-{
-    import std.stdio;
-    import dhtslib.sam;
-    import std.path:buildPath,dirName;
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","range.bam"), 0);
-    auto read=bam.all_records.front;
-    read["MD"] = "2G11^GATC7T6^A11";
-    writeln(getMDPairs(read));
-}
-
 struct MDItr {
     ReturnType!getMDPairs mdPairs;
     int currentlen;
@@ -124,6 +112,7 @@ struct MDItr {
 
 }
 
+debug(dhtslib_unittest) 
 unittest
 {
     import std.stdio;
@@ -132,6 +121,5 @@ unittest
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","range.bam"), 0);
     auto read=bam.all_records.front;
     read["MD"] = "2G11^GATC7T6^A11";
-    auto mdPairs = MDItr(read);
-    writeln(mdPairs);
+    writeln(MDItr(read));
 }

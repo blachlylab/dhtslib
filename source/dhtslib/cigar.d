@@ -6,7 +6,7 @@ module dhtslib.cigar;
 import std.stdio;
 import std.bitmanip : bitfields;
 import std.array : join;
-import std.algorithm : map, filter;
+import std.algorithm : map;
 import std.algorithm.iteration : each;
 import std.conv : to;
 import std.range : array;
@@ -217,6 +217,7 @@ struct CigarItr
         // Copy the cigar
         cigar.ops=c.ops.dup;
         current = cigar.ops[0];
+        current.length=current.length-1;
     }
     
     Ops front()
@@ -257,41 +258,33 @@ struct AlignedCoordinate{
     Ops cigar_op;
 }
 
-auto getAlignedCoordinates(SAMRecord rec){
-    struct AlignedCoordinates{
-        CigarItr itr;
-        AlignedCoordinate current;
 
-        this(Cigar cigar){ 
-            itr = CigarItr(cigar);
-            current.qpos = current.rpos = -1;
-            current.cigar_op = itr.front;
-            current.qpos += ((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 1);
-            current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
-        }
+struct AlignedCoordinatesItr{
+    CigarItr itr;
+    AlignedCoordinate current;
 
-        AlignedCoordinate front(){
-            return current;
-        }
-
-        void popFront(){
-            itr.popFront;
-            current.cigar_op = itr.front;
-            current.qpos += ((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 1);
-            current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
-        }
-
-        bool empty(){
-            return itr.empty;
-        }
+    this(Cigar cigar){ 
+        itr = CigarItr(cigar);
+        current.qpos = current.rpos = -1;
+        current.cigar_op = itr.front;
+        current.qpos += ((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 1);
+        current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
     }
-    return AlignedCoordinates(rec.cigar);
-}
 
-auto getAlignedCoordinates(SAMRecord rec, int start, int end){
-    assert(start >= rec.pos);
-    assert(end <= rec.pos + rec.cigar.ref_bases_covered);
-    return getAlignedCoordinates(rec).filter!(x=> rec.pos + x.rpos >= start).filter!(x=> rec.pos + x.rpos < end);
+    AlignedCoordinate front(){
+        return current;
+    }
+
+    void popFront(){
+        itr.popFront;
+        current.cigar_op = itr.front;
+        current.qpos += ((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 1);
+        current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
+    }
+
+    bool empty(){
+        return itr.empty;
+    }
 }
 
 unittest
@@ -307,5 +300,5 @@ unittest
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto read = readrange.front();
-    writeln(getAlignedCoordinates(read, read.pos + 77, read.pos + 82));   
+    writeln(read.getAlignedCoordinates(read.pos + 77, read.pos + 82));   
 }
