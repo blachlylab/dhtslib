@@ -516,6 +516,7 @@ class SAMRecord
                 
                 static if(refSeq){
                     if(!CigarOp(0, current.cigar_op).is_reference_consuming) current.refBase = '-';
+                    else if(mdItr.front == '=') current.refBase = current.queryBase;
                     else current.refBase = mdItr.front;
                 }
             }
@@ -678,16 +679,15 @@ unittest
     import dhtslib.sam;
     import dhtslib.md : MDItr;
     import std.algorithm: map;
+    import std.array: array;
     import std.path:buildPath,dirName;
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","range.bam"), 0);
     auto read=bam.all_records.front;
-    writeln(read.cigar.toString);
-    writeln(read["MD"].toString);
-    writeln(MDItr(read));
-    writeln(CigarItr(read.cigar).map!(x => CIGAR_STR[x]));
-    writeln(read.sequence);
-    writeln(read.getAlignedPairs!true(read.pos, read.pos + read.cigar.ref_bases_covered));
-    writeln(read.getAlignedPairs!true(read.pos + 77, read.pos + 77 + 5));
+    auto pairs = read.getAlignedPairs!true(read.pos + 77, read.pos + 77 + 5);
+    assert(pairs.map!(x => x.qpos).array == [77,77,78,79,80]);
+    assert(pairs.map!(x => x.rpos).array == [77,78,79,80,81]);
+    assert(pairs.map!(x => x.refBase).array == "GAAAA");
+    assert(pairs.map!(x => x.queryBase).array == "G-AAA");
 }
 
 alias SAMFile = SAMReader;

@@ -117,9 +117,10 @@ unittest
 {
     import std.stdio;
     import dhtslib.sam;
+    import std.array: array;
     import std.path:buildPath,dirName;
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","range.bam"), 0);
     auto read=bam.all_records.front;
     read["MD"] = "2G11^GATC7T6^A11";
-    writeln(MDItr(read));
+    assert(MDItr(read).array == "==G===========GATC=======T======A===========");
 }
