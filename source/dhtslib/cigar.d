@@ -6,12 +6,13 @@ module dhtslib.cigar;
 import std.stdio;
 import std.bitmanip : bitfields;
 import std.array : join;
-import std.algorithm : map;
+import std.algorithm : map, filter;
 import std.algorithm.iteration : each;
 import std.conv : to;
 import std.range : array;
 
 import dhtslib.htslib.hts_log;
+import dhtslib.sam: SAMRecord;
 
 /// Represents a CIGAR string
 /// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
@@ -209,24 +210,27 @@ unittest
 struct CigarItr
 {
     Cigar cigar;
+    CigarOp current;
 
     this(Cigar c)
     {
         // Copy the cigar
         cigar.ops=c.ops.dup;
+        current = cigar.ops[0];
     }
     
     Ops front()
     {
-        return cigar.ops[0].op;
+        return current.op;
     }
     
     void popFront()
     {
-        cigar.ops[0].length=cigar.ops[0].length-1;
-        if(cigar.ops[0].length==0){
+        if(current.length==0){
             cigar.ops=cigar.ops[1..$];
+            if(!empty) current = cigar.ops[0];
         }
+        if(current.length != 0) current.length=current.length-1;
     }
 
     bool empty()
@@ -246,4 +250,62 @@ unittest
     hts_log_info(__FUNCTION__, "Cigar:" ~ cig.toString());
     auto itr=CigarItr(cig);
     assert(itr.map!(x=>CIGAR_STR[x]).array.idup=="MMMMMMMDDMMMM");
+}
+
+struct AlignedCoordinate{
+    int qpos, rpos;
+    Ops cigar_op;
+}
+
+auto getAlignedCoordinates(SAMRecord rec){
+    struct AlignedCoordinates{
+        CigarItr itr;
+        AlignedCoordinate current;
+
+        this(Cigar cigar){ 
+            itr = CigarItr(cigar);
+            current.qpos = current.rpos = -1;
+            current.cigar_op = itr.front;
+            current.qpos += ((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 1);
+            current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
+        }
+
+        AlignedCoordinate front(){
+            return current;
+        }
+
+        void popFront(){
+            itr.popFront;
+            current.cigar_op = itr.front;
+            current.qpos += ((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 1);
+            current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
+        }
+
+        bool empty(){
+            return itr.empty;
+        }
+    }
+    return AlignedCoordinates(rec.cigar);
+}
+
+auto getAlignedCoordinates(SAMRecord rec, int start, int end){
+    assert(start >= rec.pos);
+    assert(end <= rec.pos + rec.cigar.ref_bases_covered);
+    return getAlignedCoordinates(rec).filter!(x=> rec.pos + x.rpos >= start).filter!(x=> rec.pos + x.rpos < end);
+}
+
+unittest
+{
+    writeln();
+    import dhtslib.sam;
+    import dhtslib.htslib.hts_log;
+    import std.path:buildPath,dirName;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Testing cigar");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","range.bam"), 0);
+    auto readrange = bam["CHROMOSOME_I", 914];
+    hts_log_info(__FUNCTION__, "Getting read 1");
+    auto read = readrange.front();
+    writeln(getAlignedCoordinates(read, read.pos + 77, read.pos + 82));   
 }

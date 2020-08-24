@@ -34,6 +34,7 @@ import std.format;
 import std.parallelism : totalCPUs;
 import std.stdio : writeln, writefln, stderr, File;
 import std.string : fromStringz, toStringz;
+import std.traits : ReturnType;
 
 import dhtslib.htslib.hts : htsFile, hts_open, hts_close, hts_hopen;
 import dhtslib.htslib.hts : hts_idx_t, hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
@@ -448,21 +449,27 @@ class SAMRecord
     @nogc @safe nothrow
     @property void insertSize(int isize) { this.b.core.isize = isize; }
 
-    struct AlignedPair(bool refSeq){
+    struct AlignedPair(bool refSeq)
+    {
         int qpos, rpos;
-        Ops cigar_op;
-        char readAllele; 
-        static if(refSeq) char refAllele;
+        CigarOp cigar_op;
+        char queryBase;
+        static if(refSeq) char refBase;
     }
+
     /// get a range of aligned read and reference positions
     /// this is meant to recreate functionality from pysam:
     /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
-    auto getAlignedPairs(bool withRefSeq)(){
-        struct AlignedPairs(bool refSeq){
-            CigarItr itr;
-            this(Cigar cigar){
-                itr = CigarItr(cigar);
-
+    auto getAlignedPairs(bool withRefSeq)(int start, int end)
+    {
+        import dhtslib.md : getMDPairs;
+        struct AlignedPairs(bool refSeq)
+        {
+            ReturnType!getAlignedCoordinates coords;
+            static if(refSeq) ReturnType!getMDPairs mdPairs;
+            
+            this(SAMRecord rec, int start, int end){
+                
             }
         }
     }
