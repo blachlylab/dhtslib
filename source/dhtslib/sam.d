@@ -550,6 +550,12 @@ class SAMRecord
         }
         return AlignedPairs!withRefSeq(this,start,end);
     }
+    /// get a range of aligned read and reference positions
+    /// this is meant to recreate functionality from pysam:
+    /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
+    auto getAlignedPairs(bool withRefSeq)(){
+        return getAlignedPairs!withRefSeq(this.pos, this.pos + this.cigar.ref_bases_covered);
+    }
 }
 
 debug(dhtslib_unittest)
