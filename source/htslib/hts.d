@@ -67,7 +67,7 @@ import htslib.hfile: hFILE;
 struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
 import htslib.sam : sam_hdr_t;
 
-import htslib.kstring: __kstring_t, kstring_t;
+import htslib.kstring: kstring_t;
 
 /+
 #ifndef kroundup32

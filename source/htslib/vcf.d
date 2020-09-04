@@ -46,7 +46,7 @@ import core.stdc.limits;
 import core.stdc.assert_;
 import core.stdc.errno : errno, EINVAL;
 import htslib.hts;
-import htslib.kstring: __kstring_t, kstring_t, kputc, kputsn, kputw;
+import htslib.kstring: kstring_t, kputc, kputsn, kputw;
 import htslib.bgzf: BGZF; // normally typedefed as opaque struct in hts.h
 import htslib.hts_log;  // hts.h imports hts_log.h
 //#include "hts_defs.h"

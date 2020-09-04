@@ -21,7 +21,7 @@ struct Cigar
     CigarOp[] ops;
 
     /// Construct Cigar from raw data
-    this(uint* cigar, int length)
+    this(uint* cigar, uint length)
     {
         ops=(cast(CigarOp *)cigar)[0..length];
     }
@@ -164,6 +164,7 @@ unittest
     auto read = readrange.front();
     writeln(read.queryName);
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
+    writeln(read.cigar.toString());
     assert(read.cigar.toString() == "78M1D22M");
 }
 

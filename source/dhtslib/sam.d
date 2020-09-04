@@ -1193,6 +1193,7 @@ unittest{
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto read = readrange.front();
     sam2.write(&read);
+    sam2.close;
     destroy(sam2);
     sam = SAMFile("test.bam");
     readrange = sam.allRecords;

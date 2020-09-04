@@ -30,7 +30,7 @@ import core.stdc.stdint;
 import htslib.hts;
 import htslib.hts_log;
 import htslib.bgzf: BGZF;
-import htslib.kstring: __kstring_t, kstring_t;
+import htslib.kstring: kstring_t;
 import std.format: format;
 
 extern (C):
@@ -312,9 +312,9 @@ extern (D) auto bam_get_qname(T)(auto ref T b)
  lower 4 bits gives a CIGAR operation and the higher 28 bits keep the
  length of a CIGAR.
  */
-extern (D) auto bam_get_cigar(T)(auto ref T b)
+extern (D) auto bam_get_cigar(bam1_t * b)
 {
-    return cast(uint*) b.data + b.core.l_qname;
+    return cast(uint*) ((*b).data + (*b).core.l_qname);
 }
 
 /*! @function
