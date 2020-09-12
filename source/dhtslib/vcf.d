@@ -1120,7 +1120,7 @@ struct VCFReader
     // TODO: Memory leak. We are never freeing the bcf_hrec_t, but, it escapes as pointer inside key/value string
     // TODO: handle structured and general lines
     string[string] getTagByKV(string tagType, T)(string key, string value, string str_class)
-    if((tagType == "FILTER" || tagType == "INFO" || tagType == "FORMAT" && tagType == "contig") &&
+    if((tagType == "FILTER" || tagType == "INFO" || tagType == "FORMAT" || tagType == "contig") &&
         (isIntegral!T || isSomeString!T))
     {
         // hlt : header line type
