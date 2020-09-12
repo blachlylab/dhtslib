@@ -19,7 +19,7 @@ Authors: James S Blachly, MD <james.blachly@gmail.com> ; Thomas Gregory <charles
 Bugs: SAMRecord and SAMFile function only as readers, rather than writers (i.e, cannot build SAMFile)
 Bugs: (*CRAM functionality is limited and untested)
 
-Date: 2019-01-27
+Date: 2020-09-12
 
 License: Apache 2.0
 
@@ -27,6 +27,8 @@ Standards: Sequence Alignment/Map Format Specification v1 14 Dec 2018 http://sam
 
 */
 module dhtslib.sam;
+
+public import dhtslib.sam.header;
 
 import core.stdc.stdlib : calloc, free,realloc;
 import core.stdc.string:memset;
