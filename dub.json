@@ -39,15 +39,14 @@
         },
         {
             "name": "source",
-            "targetType": "sourceLibrary",
+            "targetType": "library",
             "libs": ["hts"]
         },
         {
             "name": "source-static",
-            "targetType": "sourceLibrary",
-            "preBuildCommands": ["cd $PACKAGE_DIR;make"],
-            "sourceFiles": ["htslib/libhts.a"],
-            "libs":["curl","crypto","lzma","bz2"]
+            "targetType": "library",
+            "sourceFiles": ["../htslib/libhts.a"],
+            "libs": [ ]
         }
     ]
 }
