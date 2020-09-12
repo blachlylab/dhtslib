@@ -6,16 +6,13 @@ import htslib.kstring;
 import core.stdc.stdlib : free;
 import core.stdc.string : memcpy;
 
+import std.conv : to;
 import std.string : toStringz;
 import std.traits : isSomeString;
 
 /// SAM specifications Section 1.3
 /// Each header line begins with the character '@' followed by one of the
 /// two-letter header record type codes defined in this section.
-///
-/// (leftover from when was char(3) -- the allocator evidently always puts \0 at end of char[] also, not just string
-/// Note that it could also be char[2] because the compiler inserts implicit \0
-/// in statically defined strings, but char[3] lets us be safer and surer.
 enum RecordType : immutable(char)[2]
 {
     HD = "HD",
@@ -47,7 +44,8 @@ struct SAMHeader
     }
 
     /// For position-based lookups of key,
-    /// e.g. a sample-name lookup in Pysam is ["RG"][0]["SN"] , while in dhtslib:
+    /// e.g. a sample-name lookup in Pysam is ["RG"][0]["SM"] ,
+    /// while in dhtslib:
     /// [RecordType.RG, 0, "SN"]
     const(char)[] opIndex(RecordType rt, size_t pos, const(char)[] key)
     {
@@ -70,19 +68,36 @@ struct SAMHeader
     }
 
     /// Add a single line to an existing header
-    /// parameter kvargs is a typesafe variadic arg 
-    /// https://dlang.org/spec/function.html#typesafe_variadic_functions
-    auto addLine(RecordType type, const(char)[][] kvargs ...)
+    auto addLine(T...)(RecordType type, T kvargs)
+    if(kvargs.length > 0 && isSomeString!(T[0]))
     {
-        assert (kvargs.length %2 == 0);   // K-V pairs => even number of variadic args
-
+        static assert (kvargs.length %2 == 0);   // K-V pairs => even number of variadic args
+/*
+        // NOTE: both (runtime) type safe variadic params, and compile-time variadic templates
+        // use dynamic arrays, which cannot be passed to C variadic functions no matter what.
+        // complicating this, we also need to convert to char*. The below won't work period;
+        // the analogous variadic template won't work either without the mixin foolishness below.
         const(char)*[] varargs;
         varargs.length = kvargs.length + 1;
         for(int i=0; i < kvargs.length; i++)
             varargs[i] = kvargs[i].ptr;
         varargs[$-1] = null;  // last vararg param null signals to sam_hdr_add_line end of list
-
+        
         return sam_hdr_add_line(this.h, type.ptr, varargs.ptr);
+*/
+        string varargMagic(size_t len)
+        {
+            string args = "sam_hdr_add_line(this.h, type.ptr, ";
+            for(int i=0; i<len; i++)
+                args ~= "toStringz(kvargs[" ~ i.to!string ~ "]), ";
+            args ~= "null)";
+            return args;
+        }
+
+        // if mixin result is "toStringz(kvargs[0], ..." error is:
+        // Error: Using the result of a comma expression is not allowed
+        //return sam_hdr_add_line(this.h, type.ptr, mixin(varargMagic(kvargs.length)) );
+        return mixin(varargMagic(kvargs.length));
     }
 
     /// Return a complete line of formatted text for a given type and ID,
@@ -92,7 +107,6 @@ struct SAMHeader
     ///     * type      - enum
     ///     * id_key    - may be empty, in which case the first line matching type is returned
     ///     * id_val    - may be empty IFF id_key empty; otherwise must be value for key
-    deprecated("rewrite  like valueByPos")
     const(char)[] lineById(RecordType type, string id_key = "", string id_val = "")
     in (id_key.length == 0 ? id_val.length == 0 : id_val.length > 0)
     {
@@ -175,4 +189,11 @@ unittest
     hdr.addLine(RecordType.RG, "ID", "001", "SM", "sample1");
 
     assert(RecordType.RG in hdr);
+
+    auto line = hdr.lineById(RecordType.RG, "ID", "001");
+    assert(line == "@RG	ID:001	SM:sample1");
+
+    auto val = hdr.valueByPos(RecordType.RG, 0, "SM");
+    assert(val == "sample1");
+    assert(hdr[RecordType.RG, 0, "SM"] == "sample1");
 }
