@@ -46,7 +46,7 @@ struct Cigar
 
     /// return the alignment length expressed by this Cigar
     /// TODO: use CIGAR_TYPE to get rid of switch statement for less branching
-    @property int ref_bases_covered()
+    @property int refBasesCovered()
     {
         int len;
         foreach (op; this.ops)
@@ -67,9 +67,10 @@ struct Cigar
         return len;
     }
 
+    alias ref_bases_covered = refBasesCovered;
     /// previous alignedLength function had a bug and 
     /// it is just a duplicate of ref_bases_covered
-    alias alignedLength = ref_bases_covered;
+    alias alignedLength = refBasesCovered;
 }
 
 // Each pair of bits has first bit set iff the operation is query consuming,
@@ -102,28 +103,33 @@ union CigarOp
     /// Credit to Biod for this code below
     /// https://github.com/biod/BioD from their bam.cigar module
     /// True iff operation is one of M, =, X, I, S
-    bool is_query_consuming() @property const nothrow @nogc
+    bool isQueryConsuming() @property const nothrow @nogc
     {
         return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 1) != 0;
     }
 
     /// True iff operation is one of M, =, X, D, N
-    bool is_reference_consuming() @property const nothrow @nogc
+    bool isReferenceConsuming() @property const nothrow @nogc
     {
         return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 2) != 0;
     }
 
     /// True iff operation is one of M, =, X
-    bool is_match_or_mismatch() @property const nothrow @nogc
+    bool isMatchOrMismatch() @property const nothrow @nogc
     {
         return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 3) == 3;
     }
 
     /// True iff operation is one of 'S', 'H'
-    bool is_clipping() @property const nothrow @nogc
+    bool isClipping() @property const nothrow @nogc
     {
         return ((raw & 0xF) >> 1) == 2; // 4 or 5
     }
+
+    alias is_query_consuming = isQueryConsuming;
+    alias is_reference_consuming = isReferenceConsuming;
+    alias is_match_or_mismatch = isMatchOrMismatch;
+    alias is_clipping = isClipping;
 }
 
 /**
