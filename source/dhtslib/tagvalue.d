@@ -13,21 +13,28 @@ enum TypeIndex(T) = staticIndexOf!(T, Types);
 char[9] TypeChars = ['c', 'C', 's', 'S', 'i', 'I', 'f', 'Z', 'A'];
 
 /**
-This represents a tag value from a bam record
-This should be to the bam specification.
-It stores only a pointer to the tag and from there
-can be parsed into any of the tag types but only if
-the tag matches that type.
-c byte
-C ubyte
-s short
-S ushort
-i int
-I uint
-f float
-Bc array of type byte
-Z char array
-H hex?
+
+This represents a SAM/BAM record tag value, as outlined in the SAM specs §1.5.
+
+The struct itself stores only a pointer to the tag, and has member functions
+to parse into any of the tag types (but only if the tag matches that type) (TODO: is this true?)
+
+Primary Types:
+A   Printable character
+i   Signed integer (see specs §1.5 footnote on size)
+f   Single-precision float
+Z   Printable string, including space
+H   Byte array in the Hex format (network byte order / big-endian)
+B   Integer or numeric array
+
+Byte-array (B) types:
+c   byte
+C   ubyte
+s   short
+S   ushort
+i   int32
+I   uint32
+f   float (spec does not indicate precision)
 
 Memory layout
 pipes delimit byte boundaries in an array
@@ -59,7 +66,7 @@ struct TagValue
         data = bam_aux_get(b, tag);
         debug
         {
-            if (data == null)
+            if (data is null)
                 hts_log_warning(__FUNCTION__, (tag ~ " doesn't exist for this record").idup);
         }
     }
