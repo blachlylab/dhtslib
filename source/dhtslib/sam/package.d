@@ -117,7 +117,15 @@ class SAMRecord
     @nogc @safe nothrow
     @property void qual(ubyte q) { this.b.core.qual = q; }
 
-    // TODO:  @field  l_qname length of the query name
+    /// length of query name. Terminated by 1-4 \0, see l_extranul. Never set directly.
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int l_qname() { return this.b.core.l_qname; }
+
+    /// number of EXTRA trailing \0 in qname; 0 <= l_extranul <= 3, see l_qname. Never set directly.
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property int l_extranul() { return this.b.core.l_extranul; }
 
     /// bitwise flag
     pragma(inline, true)
