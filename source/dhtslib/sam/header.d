@@ -196,4 +196,5 @@ unittest
     auto val = hdr.valueByPos(RecordType.RG, 0, "SM");
     assert(val == "sample1");
     assert(hdr[RecordType.RG, 0, "SM"] == "sample1");
+    assert(hdr[RecordType.RG, 0, "XX"] == "");
 }
