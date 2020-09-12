@@ -459,7 +459,7 @@ class SAMRecord
 
     /// get aligned coordinates per each cigar op within range
     /// range is 0-based half open using chromosomal coordinates
-    auto getAlignedCoordinates(int start, int end){
+    auto getAlignedCoordinates(long start, long end){
         assert(start >= this.pos);
         assert(end <= this.pos + this.cigar.ref_bases_covered);
         return this.getAlignedCoordinates.filter!(x=> this.pos + x.rpos >= start).filter!(x=> this.pos + x.rpos < end);
@@ -467,7 +467,7 @@ class SAMRecord
 
     struct AlignedPair(bool refSeq)
     {
-        int qpos, rpos;
+        long qpos, rpos;
         Ops cigar_op;
         char queryBase;
         static if(refSeq) char refBase;
@@ -483,7 +483,7 @@ class SAMRecord
     /// this is meant to recreate functionality from pysam:
     /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
     /// range is 0-based half open using chromosomal coordinates
-    auto getAlignedPairs(bool withRefSeq)(int start, int end)
+    auto getAlignedPairs(bool withRefSeq)(long start, long end)
     {
         import dhtslib.md : MDItr;
         import std.range : dropExactly;
@@ -494,11 +494,11 @@ class SAMRecord
             AlignedPair!refSeq current;
             const(char)[] qseq;
 
-            auto getAlignedCoordinates(SAMRecord rec, int start, int end){
+            auto getAlignedCoordinates(SAMRecord rec, long start, long end){
                 return rec.getAlignedCoordinates(start,end);
             }
             
-            this(SAMRecord rec, int start, int end){
+            this(SAMRecord rec, long start, long end){
                 assert(start < end);
                 assert(start >= rec.pos);
                 assert(end <= rec.pos + rec.cigar.ref_bases_covered);
@@ -855,7 +855,7 @@ struct SAMReader
 
     /** Query a region and return matching alignments as an InputRange */
     /// Query by chr, start, end
-    auto query(string chrom, int start, int end)
+    auto query(string chrom, long start, long end)
     {
         string q = format("%s:%d-%d", chrom, start, end);
         return query(q);
@@ -869,7 +869,7 @@ struct SAMReader
     }
 
     /// Query by contig id, start, end
-    auto query(int tid, int start, int end)
+    auto query(int tid, long start, long end)
     {
         auto itr = sam_itr_queryi(this.idx, tid, start, end);
         return RecordRange(this.fp, itr);

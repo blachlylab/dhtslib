@@ -2,7 +2,7 @@ module dhtslib.md;
 
 import dhtslib.sam: SAMRecord;
 import dhtslib.cigar;
-import dhtslib.htslib.hts_log;
+import htslib.hts_log;
 import std.regex;
 import std.traits: ReturnType;
 import std.conv: to;
