@@ -1,3 +1,9 @@
+/**
+This module provides a wrapper, BGZFile, over an htslib BGZF compressed file/stream.
+The wrapper acts as a linewise ForwardRange over the file or stream.
+*/
+
+
 module dhtslib.bgzf;
 
 import core.stdc.stdlib: malloc, free;

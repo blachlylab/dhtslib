@@ -1,5 +1,5 @@
 /**
-    This module simplifies working with CIGAR strings/ops in SAM/BAM/CRAM format.
+This module simplifies working with CIGAR strings/ops from SAM/BAM/CRAM alignment records.
 */
 module dhtslib.cigar;
 

@@ -1,3 +1,8 @@
+/**
+Module provides a parser for SAM/BAM record auxillary tags.
+
+Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
+*/
 module dhtslib.tagvalue;
 
 import std.stdio;

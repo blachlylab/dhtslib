@@ -1,3 +1,13 @@
+/**
+Module to deal with SAM records' `MD` auxillary tag.
+
+This tag is a string encoding mismatched and deleted reference bases,
+used in conjunction with CIGAR and SEQ fields to reconstruct the bases
+of the reference sequence interval to which the alignment has been mapped.
+This can enable variant calling without require access to the entire original reference.
+
+Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
+*/
 module dhtslib.md;
 
 import dhtslib.sam : SAMRecord;

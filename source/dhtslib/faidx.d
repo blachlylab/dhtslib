@@ -1,4 +1,14 @@
+/**
+This module provides a wrapper, `IndexedFastaFile` over a FASTA.
+If an index exists, it will be used for rapid random access.
+If an index does not exist, one will be built.
+
+The wrapper provides the ability to list sequence names (i.e., chromosomes/contigs)
+in the FASTA, efficiently retrieve sequences (by contig, start, end)
 module dhtslib.faidx;
+
+Sequence caching and multithreaded BGZF decompression are supported.
+*/
 
 import std.string;
 import core.stdc.stdlib : malloc, free;
