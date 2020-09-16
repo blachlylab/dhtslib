@@ -5,10 +5,11 @@ If an index does not exist, one will be built.
 
 The wrapper provides the ability to list sequence names (i.e., chromosomes/contigs)
 in the FASTA, efficiently retrieve sequences (by contig, start, end)
-module dhtslib.faidx;
 
 Sequence caching and multithreaded BGZF decompression are supported.
 */
+
+module dhtslib.faidx;
 
 import std.string;
 import core.stdc.stdlib : malloc, free;
