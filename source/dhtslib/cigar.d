@@ -35,7 +35,7 @@ struct Cigar
 
     bool is_null()
     {
-        return ops.length == 1 && ops[0].raw == '*';
+        return this.ops.length == 0;
     }
 
     /// Format Cigar struct as CIGAR string in accordance with SAM spec
