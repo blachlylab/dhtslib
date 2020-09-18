@@ -271,8 +271,91 @@ int kputsn_(const(void)* p, size_t l, kstring_t* s)
 // htslib 1.10 replaced this function with a higher performance
 // version using BSR/CTLZ intrinsics . this diverges from klib's
 // kstring implementation. other functions may have also changed.
-deprecated("TODO -- need to write or pull in ")
-int kputuw(uint x, kstring_t* s);
+int kputuw(uint x, kstring_t* s){
+	version(LDC){
+		static uint[32] kputuw_num_digits = [
+			10, 10, 10,  9,  9,  9,  8,  8,
+			8,   7,  7,  7,  7,  6,  6,  6,
+			5,   5,  5,  4,  4,  4,  4,  3,
+			3,   3,  2,  2,  2,  1,  1,  1
+		];
+		static uint[32] kputuw_thresholds = [
+			0,        0, 1000000000U, 0,       0, 100000000U,   0,      0,
+			10000000, 0,          0,  0, 1000000,         0,    0, 100000,
+			0,        0,      10000,  0,       0,         0, 1000,      0,
+			0,      100,          0,  0,      10,         0,    0,      0
+		];
+	}else{
+		ulong m;
+	}
+    static string kputuw_dig2r =
+        "00010203040506070809" ~
+        "10111213141516171819" ~
+        "20212223242526272829" ~
+        "30313233343536373839" ~
+        "40414243444546474849" ~
+        "50515253545556575859" ~
+        "60616263646566676869" ~
+        "70717273747576777879" ~
+        "80818283848586878889" ~
+        "90919293949596979899";
+    uint l, j;
+    char * cp;
+
+    // Trivial case - also prevents __builtin_clz(0), which is undefined
+    if (x < 10) {
+        if (ks_resize(s, s.l + 2) < 0)
+            return EOF;
+        s.s[s.l++] = cast(char)('0'+x);
+        s.s[s.l] = 0;
+        return 0;
+    }
+
+    // Find out how many digits are to be printed.
+	version(LDC){
+			/*
+		* Table method - should be quick if clz can be done in hardware.
+		* Find the most significant bit of the value to print and look
+		* up in a table to find out how many decimal digits are needed.
+		* This number needs to be adjusted by 1 for cases where the decimal
+		* length could vary for a given number of bits (for example,
+		* a four bit number could be between 8 and 15).
+		*/
+		import ldc.intrinsics;
+
+		// ldc version of __builtin_clz
+		l = llvm_ctlz(x,true);
+		l = kputuw_num_digits[l] - (x < kputuw_thresholds[l]);
+	}else{
+	// Fallback for when clz is not available
+		m = 1;
+		l = 0;
+		do {
+			l++;
+			m *= 10;
+		} while (x >= m);
+	}
+
+    if (ks_resize(s, s.l + l + 2) < 0)
+        return EOF;
+
+    // Add digits two at a time
+    j = l;
+    cp = s.s + s.l;
+    while (x >= 10) {
+        const char *d = &kputuw_dig2r[2*(x%100)];
+        x /= 100;
+        memcpy(&cp[j-=2], d, 2);
+    }
+
+    // Last one (if necessary).  We know that x < 10 by now.
+    if (j == 1)
+        cp[0] = cast(char)(x + '0');
+
+    s.l += l;
+    s.s[s.l] = 0;
+    return 0;
+}
 
 int kputw(int c, kstring_t* s)
 {
