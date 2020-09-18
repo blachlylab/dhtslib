@@ -861,6 +861,8 @@ struct SAMReader
         return bam_name2id(this.header, toStringz(name));
     }
 
+    alias fetch = query;
+
     /** Query a region and return matching alignments as an InputRange */
     /// Query by chr, start, end
     auto query(string chrom, long start, long end)
