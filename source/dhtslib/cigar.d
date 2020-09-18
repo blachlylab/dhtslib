@@ -71,6 +71,21 @@ struct Cigar
     /// previous alignedLength function had a bug and 
     /// it is just a duplicate of ref_bases_covered
     alias alignedLength = refBasesCovered;
+
+    /// allow foreach on Cigar
+    int opApply(int delegate(ref CigarOp) dg) {
+        int result = 0;
+
+        foreach (op; ops) {
+            result = dg(op);
+
+            if (result) {
+                break;
+            }
+        }
+
+        return result;
+    }
 }
 
 // Each pair of bits has first bit set iff the operation is query consuming,
@@ -177,10 +192,11 @@ debug (dhtslib_unittest) unittest
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto read = readrange.front();
+    auto cigar = read.cigar;
     writeln(read.queryName);
-    hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
-    writeln(read.cigar.toString());
-    assert(read.cigar.toString() == "78M1D22M");
+    hts_log_info(__FUNCTION__, "Cigar:" ~ cigar.toString());
+    writeln(cigar.toString());
+    assert(cigar.toString() == "78M1D22M");
 }
 
 /// return Cigar struct for a given CIGAR string (e.g. from SAM line)
