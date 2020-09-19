@@ -1310,9 +1310,9 @@ struct SAMWriter
             stderr.writefln("There was an error closing %s", fromStringz(this.fn));
     }
 
-    /// write out to disk
-    void write(SAMRecord * rec){
-        const auto ret = sam_write1(this.fp,this.header,rec.b);
+    /// Write a SAMRecord to disk
+    void write(SAMRecord rec){
+        const auto ret = sam_write1(this.fp, this.header, rec.b);
         assert(ret>=0);
     }
 }
