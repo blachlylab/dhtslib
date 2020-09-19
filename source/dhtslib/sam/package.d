@@ -202,7 +202,7 @@ class SAMRecord
 
     /// auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
     pragma(inline, true)
-    @property char[] queryName()
+    @property const(char)[] queryName()
     {
         return fromStringz(bam_get_qname(this.b));
     }
