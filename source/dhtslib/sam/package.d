@@ -116,6 +116,7 @@ class SAMRecord
     pragma(inline, true)
     @property const(char)[] referenceName()
     {
+        assert(this.h !is null);
         return fromStringz( sam_hdr_tid2name(this.h, this.b.core.tid) );
     }
  
