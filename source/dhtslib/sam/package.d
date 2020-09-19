@@ -223,14 +223,16 @@ class SAMRecord
         return ['+','-'][isReversed()];
     }
 
-    /// auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
+    /// Get query name (read name)
+    /// -- wraps bam_get_qname(bam1_t *b)
     pragma(inline, true)
     @property const(char)[] queryName()
     {
+        // auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
         return fromStringz(bam_get_qname(this.b));
     }
     
-    /// Set query name
+    /// Set query name (read name)
     pragma(inline, true)
     @property void queryName(string qname)
     {
@@ -904,14 +906,14 @@ struct SAMReader
     auto query(string q)
     {
         auto itr = sam_itr_querys(this.idx, this.header, toStringz(q));
-        return RecordRange(this.fp, itr);
+        return RecordRange(this.fp, this.header, itr);
     }
 
     /// Query by contig id, start, end
     auto query(int tid, long start, long end)
     {
         auto itr = sam_itr_queryi(this.idx, tid, start, end);
-        return RecordRange(this.fp, itr);
+        return RecordRange(this.fp, this.header, itr);
     }
 
     /// Query by ["chr1:1-2","chr1:1000-1001"]
@@ -971,19 +973,20 @@ struct SAMReader
     }
 
     /// Return an InputRange representing all recods in the SAM/BAM/CRAM
-    AllRecordsRange all_records()
+    AllRecordsRange allRecords()
     {
         auto range = AllRecordsRange(this.fp, this.header, bam_init1());
         range.popFront();
         return range;
     }
-    alias allRecords = all_records;
+    deprecated("Avoid snake_case names")
+    alias all_records = allRecords;
 
     /// Iterate through all records in the SAM/BAM/CRAM
     struct AllRecordsRange
     {
         private htsFile*    fp;     // belongs to parent; shared
-        private bam_hdr_t*  header; // belongs to parent; shared
+        private sam_hdr_t*  header; // belongs to parent; shared
         private bam1_t*     b;
         private int success;
         ~this()
@@ -1026,16 +1029,18 @@ struct SAMReader
     struct RecordRange
     {
         private htsFile* fp;
+        private sam_hdr_t* h;
         private hts_itr_t* itr;
         private bam1_t* b;
 
         private int r;
 
         ///
-        this(htsFile* fp, hts_itr_t* itr)
+        this(htsFile* fp, sam_hdr_t* header, hts_itr_t* itr)
         {
-            this.itr = itr;
             this.fp = fp;
+            this.h = header;
+            this.itr = itr;
             b = bam_init1();
             //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
             hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int) itr == 0));
@@ -1055,7 +1060,7 @@ struct SAMReader
         /// ditto
         SAMRecord front()
         {
-            return new SAMRecord(bam_dup1(b));
+            return new SAMRecord(bam_dup1(b), this.h);
         }
     }
 
@@ -1063,16 +1068,18 @@ struct SAMReader
     struct RecordRangeMulti
     {
         private htsFile* fp;
+        private sam_hdr_t* h;
         private hts_itr_multi_t* itr;
         private bam1_t* b;
         private hts_reglist_t[] rlist;
         private int r;
 
         ///
-        this(htsFile* fp, hts_idx_t* idx, bam_hdr_t* header, SAMFile* sam, string[] regions)
+        this(htsFile* fp, hts_idx_t* idx, sam_hdr_t* header, SAMFile* sam, string[] regions)
         {
             rlist = RegionList(sam, regions).getRegList();
             this.fp = fp;
+            this.h = header;
             b = bam_init1();
             itr = sam_itr_regions(idx, header, rlist.ptr, cast(uint) rlist.length);
             //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
@@ -1093,7 +1100,7 @@ struct SAMReader
         /// ditto
         SAMRecord front()
         {
-            return new SAMRecord(bam_dup1(b));
+            return new SAMRecord(bam_dup1(b), this.h);
         }
     }
 
@@ -1407,6 +1414,7 @@ private int parseSam(string line, bam_hdr_t* header, bam1_t* b)
     k.l = line.length + 1;
     return sam_parse1(&k, header, b);
 }
+
 debug(dhtslib_unittest)
 unittest{
     writeln();
