@@ -58,29 +58,44 @@ and the htslib helper functions for speed.
 **/
 class SAMRecord
 {
-    ///
+    /// Backing SAM/BAM row record
     bam1_t* b;
 
+    /// Corresponding SAM/BAM header data
+    sam_hdr_t* h;
+
     /// Construct blank SAMRecord with empty backing bam1_t
+    deprecated("Construct with sam_hdr_t* for mapped contig (tid) name support")
     this()
     {
-        //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "ctor()"); /// This line triggers memory error when __FUNCTION__, but not when "Other string"
-        //test_log(__FUNCTION__, "ctor()");   /// This line will also trigger the memory error when __FUNCTION__, but not other strings
-        //writeln(__FUNCTION__);    // this will not trigger the memory error
         this.b = bam_init1();
-        //assert(0);                // This will elide(?) the memory error
-        //assert(1 == 2);           // This will elide(?) the memory error
+        this.h = null;
     }
-    
+   
+    /// ditto
+    this(sam_hdr_t* h)
+    {
+        this.b = bam_init1();
+        this.h = h;
+    }
+ 
     /// Construct SAMRecord from supplied bam1_t
+    deprecated("Construct with sam_hdr_t* for mapped contig (tid) name support")
     this(bam1_t* b)
     {
-        //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "ctor(bam1_t *b)");
         this.b = b;
+    }
+
+    /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
+    this(bam1_t* b, sam_hdr_t* h)
+    {
+        this.b = b;
+        this.h = h;
     }
 
     ~this()
     {
+        // TODO: should we only free this if we created b via bam_init1? i.e., if received through ctor, don't free?
         //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
         bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
     }
@@ -88,7 +103,7 @@ class SAMRecord
 
     /* bam1_core_t fields */
 
-    /// chromosome ID, defined by bam_hdr_t
+    /// chromosome ID, defined by sam_hdr_t
     pragma(inline, true)
     @nogc @safe nothrow
     @property int tid() { return this.b.core.tid; }
@@ -97,6 +112,13 @@ class SAMRecord
     @nogc @safe nothrow
     @property void tid(int tid) { this.b.core.tid = tid; }
 
+    /// mapped contig (tid) name, defined by sam_hdr_t* h
+    pragma(inline, true)
+    @property const(char)[] referenceName()
+    {
+        return fromStringz( sam_hdr_tid2name(this.h, this.b.core.tid) );
+    }
+ 
     /// 0-based leftmost coordinate
     pragma(inline, true)
     @nogc @safe nothrow
