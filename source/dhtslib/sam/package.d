@@ -337,22 +337,28 @@ class SAMRecord
         b.core.l_qseq=cast(int)(seq.length);
     }
 
-    /// Return char array of the qscores
+    /// Return array of the quality scores
     /// see samtools/sam_view.c: get_quality
-    const(char)[] qscores(bool phredScale=true)()
+    /// TODO: Discussion -- should we return const(ubyte[]) or const(ubyte)[] instead?
+    ubyte[] qscores(bool phredScale=false)()
     {
+        static assert(phredScale==false, "qscores needs rewrite/discussion for phredScale=true");
+
+        auto slice = bam_get_qual(this.b)[0 .. this.b.core.l_qseq];
+        return slice;
+        /+
         // calloc fills with \0; +1 len for Cstring
         // char* q = cast(char*) calloc(1, this.b.core.l_qseq + 1);
-        char[] q;
+        ubyte[] q;
         q.length = this.b.core.l_qseq;
 
-        // auto bam_get_qual(bam1_t *b) { return (*b).data + ((*b).core.n_cigar<<2) + (*b).core.l_qname + (((*b).core.l_qseq + 1)>>1); }
-        char* qualdata = cast(char*) bam_get_qual(this.b);
+        auto qualdata = bam_get_qual(this.b);
 
         for (int i; i < this.b.core.l_qseq; i++)
             static if(phredScale) q[i] = cast(char)(qualdata[i] + 33);
             else q[i] = cast(char)(qualdata[i]);
         return q;
+        +/
     }
 
     /// Add qscore sequence given that it is the same length as the bam sequence
