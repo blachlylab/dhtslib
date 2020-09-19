@@ -1011,7 +1011,7 @@ struct SAMReader
         /// ditto
         SAMRecord front()
         {
-            return new SAMRecord(bam_dup1(this.b));
+            return new SAMRecord(bam_dup1(this.b), this.header);
         }
 
     }
