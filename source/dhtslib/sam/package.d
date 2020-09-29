@@ -121,9 +121,12 @@ class SAMRecord
     }
  
     /// 0-based leftmost coordinate
-    pragma(inline, true)
     @nogc @safe nothrow
-    @property long pos() { return this.b.core.pos; }
+    @property long pos() { 
+        version(LDC) pragma(inline, true);
+        version(DigitalMars) pragma(inline);
+        return this.b.core.pos; 
+        }
     /// ditto
     pragma(inline, true)
     @nogc @safe nothrow
@@ -271,9 +274,10 @@ class SAMRecord
     }
 
     /// query (and quality string) length
-    pragma(inline, true)
     @property int length()
     {
+        version(LDC) pragma(inline, true);
+        version(DigitalMars) pragma(inline);
         return this.b.core.l_qseq;
     }
 
@@ -518,84 +522,88 @@ class SAMRecord
         }
     }
 
+    struct AlignedPairs(bool refSeq, bool filtered)
+    {
+        import dhtslib.md : MDItr;
+        import std.range : dropExactly;
+        ReturnType!getCoordinates coords;
+        static if(refSeq) MDItr mdItr;
+        AlignedPair!refSeq current;
+        const(char)[] qseq;
+
+        auto getCoordinates(SAMRecord rec, long start = -1, long end = -1){
+            static if(filtered) return rec.getAlignedCoordinates(start,end);
+            else return rec.getAlignedCoordinates();
+        }
+        
+        this(SAMRecord rec, long start = -1, long end = -1){
+
+            static if(filtered) coords = getCoordinates(rec, start, end);
+            else coords = getCoordinates(rec);
+
+            qseq = rec.sequence;
+            static if(refSeq){
+                assert(rec["MD"].exists,"MD tag must exist for record");
+                mdItr = MDItr(rec);
+                mdItr = mdItr.dropExactly(start - rec.pos);
+            } 
+            current.qpos = coords.front.qpos;
+            current.rpos = coords.front.rpos;
+            current.cigar_op = coords.front.cigar_op;
+            if(!CigarOp(0, current.cigar_op).is_query_consuming) current.queryBase = '-';
+            else current.queryBase = qseq[current.qpos];
+            
+            static if(refSeq){
+                if(!CigarOp(0, current.cigar_op).is_reference_consuming) current.refBase = '-';
+                else if(mdItr.front == '=') current.refBase = current.queryBase;
+                else current.refBase = mdItr.front;
+            }
+        }
+
+        AlignedPair!refSeq front(){
+            return current;
+        }
+
+        void popFront(){
+            coords.popFront;
+            if(coords.empty) return;
+            current.qpos = coords.front.qpos;
+            current.rpos = coords.front.rpos;
+            current.cigar_op = coords.front.cigar_op;
+            if(!CigarOp(0, current.cigar_op).is_query_consuming) current.queryBase = '-';
+            else current.queryBase = qseq[current.qpos];
+            
+            static if(refSeq){
+                if(CigarOp(0, current.cigar_op).is_reference_consuming) mdItr.popFront;
+                if(!CigarOp(0, current.cigar_op).is_reference_consuming) current.refBase = '-';
+                else if(mdItr.front == '=') current.refBase = current.queryBase;
+                else current.refBase = mdItr.front;
+            }
+
+        }
+
+        bool empty(){
+            return coords.empty;
+        }
+
+    }
+
     /// get a range of aligned read and reference positions
     /// this is meant to recreate functionality from pysam:
     /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
     /// range is 0-based half open using chromosomal coordinates
     auto getAlignedPairs(bool withRefSeq)(long start, long end)
     {
-        import dhtslib.md : MDItr;
-        import std.range : dropExactly;
-        struct AlignedPairs(bool refSeq)
-        {
-            ReturnType!getAlignedCoordinates coords;
-            static if(refSeq) MDItr mdItr;
-            AlignedPair!refSeq current;
-            const(char)[] qseq;
-
-            auto getAlignedCoordinates(SAMRecord rec, long start, long end){
-                return rec.getAlignedCoordinates(start,end);
-            }
-            
-            this(SAMRecord rec, long start, long end){
-                assert(start < end);
-                assert(start >= rec.pos);
-                assert(end <= rec.pos + rec.cigar.ref_bases_covered);
-                
-                coords = getAlignedCoordinates(rec, start, end);
-                qseq = rec.sequence;
-                static if(refSeq){
-                    assert(rec["MD"].exists,"MD tag must exist for record");
-                    mdItr = MDItr(rec);
-                    mdItr = mdItr.dropExactly(start - rec.pos);
-                } 
-                current.qpos = coords.front.qpos;
-                current.rpos = coords.front.rpos;
-                current.cigar_op = coords.front.cigar_op;
-                if(!CigarOp(0, current.cigar_op).is_query_consuming) current.queryBase = '-';
-                else current.queryBase = qseq[current.qpos];
-                
-                static if(refSeq){
-                    if(!CigarOp(0, current.cigar_op).is_reference_consuming) current.refBase = '-';
-                    else if(mdItr.front == '=') current.refBase = current.queryBase;
-                    else current.refBase = mdItr.front;
-                }
-            }
-
-            AlignedPair!refSeq front(){
-                return current;
-            }
-
-            void popFront(){
-                coords.popFront;
-                if(coords.empty) return;
-                current.qpos = coords.front.qpos;
-                current.rpos = coords.front.rpos;
-                current.cigar_op = coords.front.cigar_op;
-                if(!CigarOp(0, current.cigar_op).is_query_consuming) current.queryBase = '-';
-                else current.queryBase = qseq[current.qpos];
-                
-                static if(refSeq){
-                    if(CigarOp(0, current.cigar_op).is_reference_consuming) mdItr.popFront;
-                    if(!CigarOp(0, current.cigar_op).is_reference_consuming) current.refBase = '-';
-                    else if(mdItr.front == '=') current.refBase = current.queryBase;
-                    else current.refBase = mdItr.front;
-                }
-
-            }
-
-            bool empty(){
-                return coords.empty;
-            }
-
-        }
-        return AlignedPairs!withRefSeq(this,start,end);
+        assert(start < end);
+        assert(start >= this.pos);
+        assert(end <= this.pos + this.cigar.ref_bases_covered);
+        return AlignedPairs!(withRefSeq,true)(this,start,end);
     }
     /// get a range of aligned read and reference positions
     /// this is meant to recreate functionality from pysam:
     /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
     auto getAlignedPairs(bool withRefSeq)(){
-        return getAlignedPairs!withRefSeq(this.pos, this.pos + this.cigar.ref_bases_covered);
+        return AlignedPairs!(withRefSeq,false)(this);
     }
 /+ END CHERRY-PICK +/
 }
