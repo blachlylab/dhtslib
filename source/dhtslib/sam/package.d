@@ -1046,7 +1046,7 @@ struct SAMReader
         // supports e.g. $ - x
         OffsetType opBinary(string s, T)(T val)
         {
-            mixin("return FromEnd(offset " ~ s ~ " val);");
+            mixin("return OffsetType(offset " ~ s ~ " val);");
         }
 
         invariant
