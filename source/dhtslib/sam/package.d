@@ -856,25 +856,32 @@ struct SAMReader
     }
 
     /// number of reference sequences; from bam_hdr_t
-    @property int n_targets() const
+    @property int nTargets() const
     {
         return this.header.n_targets;
     }
+    alias n_targets = nTargets;
 
-    /// length of specific reference sequence (by number)
-    uint target_len(int target) const
+    /// length of specific reference sequence by number (`tid`)
+    uint targetLength(int target) const
+    in (target >= 0)
+    in (target < this.nTargets)
     {
         return this.header.target_len[target];
     }
+    alias targetLen = targetLength;
+    alias target_len = targetLength;
 
     /// lengths of the reference sequences
-    @property uint[] target_lens() const
+    @property uint[] targetLengths() const
     {
         return this.header.target_len[0 .. this.n_targets].dup;
     }
+    alias targetLens = targetLengths;
+    alias target_lens = targetLengths;
 
     /// names of the reference sequences
-    @property string[] target_names() const
+    @property string[] targetNames() const
     {
         string[] names;
         names.length = this.n_targets;
@@ -884,13 +891,15 @@ struct SAMReader
         }
         return names;
     }
+    alias target_names = targetNames;
 
     /// reference contig name to integer id
-    /// Calls int bam_name2id(bam_hdr_t *h, const char *_ref);
-    int target_id(string name)
+    int targetId(string name)
     {
-        return bam_name2id(this.header, toStringz(name));
+        return sam_hdr_name2tid(this.header, toStringz(name));
     }
+    alias target_id = targetId;
+
 
     /// fetch is provided as a PySAM compatible synonym for `query`
     alias fetch = query;
@@ -1076,6 +1085,7 @@ struct SAMReader
     }
 
     /// Iterate over records falling within a queried region (TODO: itr_multi_query)
+    /// TODO destroy the itr with dtor
     struct RecordRange
     {
         private htsFile* fp;
