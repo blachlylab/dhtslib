@@ -64,7 +64,10 @@ struct SAMHeader
     /// (passed line does not require \n)
     auto addLines(const(char)[] lines)
     {
-        return sam_hdr_add_lines(this.h, lines.ptr, lines.length);
+        import std.algorithm.searching : maxElement;
+        import std.algorithm.iteration : map;
+        auto maxlen = lines.map(x => x.length).maxElement;
+        return sam_hdr_add_lines(this.h, lines.ptr, maxlen);
     }
 
     /// Add a single line to an existing header
