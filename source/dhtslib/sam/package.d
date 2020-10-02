@@ -892,85 +892,134 @@ struct SAMReader
         return bam_name2id(this.header, toStringz(name));
     }
 
+    /// fetch is provided as a PySAM compatible synonym for `query`
     alias fetch = query;
 
-    /** Query a region and return matching alignments as an InputRange */
-    /// Query by chr, start, end
+    /** Query a region and return matching alignments as InputRange
+    *
+    *   Query on (chr, start, end) may take several forms:
+    *
+    *   1. `query(region)` with a string-based "region" form (e.g. chr1:1000-2000)
+            - Variant: pass an array of query region strings: `query([reg1, reg, ...])`
+    *   2. `query(chr, start, end)` with a combination of function parameters for
+    *       contig, start, and end (where contig may be either a string or the numeric
+    *       `tid` from BAM header; it would be uncommon to use this directly)
+    *   3. Array indexing on object of type SAMReader directly in one of two above styles:
+    *       1. `bamfile[region-string]`
+    *       2. `bamfile[contig, start .. end]` with contig like no. 2 above
+    *
+    *   NOTE THAT THERE IS AN OFF-BY-ONE DIFFERENCE IN THE TWO METHODS ABOVE!
+    *   Region string based coordinates assume the first base of the reference
+    *   is 1 (e.g., chrX:1-100 yields the first 100 bases), whereas with the
+    *   integer function parameter versions, the coordinates are zero-based, half-open
+    *   (e.g., <chrX, 0, 100> yields the first 100 bases).
+    *
+    *   In addition, the region string is parsed by underlying htslib's `hts_parse_region`
+    *   and has special semantics:
+    *
+    *   region          | Outputs
+    *   --------------- | -------------
+    *   REF             | All reads with RNAME REF
+    *   REF:            | All reads with RNAME REF
+    *   REF:START       | Reads with RNAME REF overlapping START to end of REF
+    *   REF:-END        | Reads with RNAME REF overlapping start of REF to END
+    *   REF:START-END   | Reads with RNAME REF overlapping START to END
+    *   .               | All reads from the start of the file
+    *   *               | Unmapped reads at the end of the file (RNAME '*' in SAM)
+    *
+    *
+    *   BUGS: Unfortunately, we cannot support (or, I cannot figure out how to support)
+    *   the dlang `$` convention noting end of an array, because the `opDollar` function
+    *   results depend on which contig passed to opSlice of which opDollar has no knowledge
+    *
+    *   Example:
+    *   ```
+    *   bamfile = SAMReader("whatever.bam");
+    *   auto reads1 = bamfile.query("chr1:1-500");
+    *   auto reads2 = bamfile.query("chr2", 0, 500);
+    *   auto reads3 = bamfile["chr3", 0 .. 500];
+    *   ```
+    */ 
     auto query(string chrom, long start, long end)
+    in (this.header !is null)
     {
-        string q = format("%s:%d-%d", chrom, start, end);
-        return query(q);
+        auto tid = sam_hdr_name2tid(this.header, toStringz(chrom));
+        return query(tid, start, end);
     }
 
-    /// Query by string chr:start-end
-    auto query(string q)
-    {
-        auto itr = sam_itr_querys(this.idx, this.header, toStringz(q));
-        return RecordRange(this.fp, this.header, itr);
-    }
-
-    /// Query by contig id, start, end
+    /// ditto
     auto query(int tid, long start, long end)
+    in (this.header !is null)
     {
         auto itr = sam_itr_queryi(this.idx, tid, start, end);
         return RecordRange(this.fp, this.header, itr);
     }
 
-    /// Query by ["chr1:1-2","chr1:1000-1001"]
+    /// ditto
+    auto query(string q)
+    in (this.header !is null)
+    {
+        auto itr = sam_itr_querys(this.idx, this.header, toStringz(q));
+        return RecordRange(this.fp, this.header, itr);
+    }
+
+    /// ditto
     auto query(string[] regions)
+    in (this.header !is null)
     {
         return RecordRangeMulti(this.fp, this.idx, this.header, &(this), regions);
     }
 
-    /// bam["chr1:1-2"]
+    /// ditto
     auto opIndex(string q)
     {
         return query(q);
     }
 
-    /// bam["chr1", 1..2]
-    auto opIndex(string tid, int[2] pos)
+    /// ditto
+    auto opIndex(string tid, long[2] pos)
     {
         return query(tid, pos[0], pos[1]);
     }
 
-    /// bam["chr1", 1]
-    auto opIndex(string tid, int pos)
-    {
-        return query(tid, pos, pos + 1);
-    }
-
-    /** Deprecated: use multidimensional slicing with second parameter as range (["chr1", 1 .. 2]) */
-    /// bam["chr1", 1, 2]
-    deprecated auto opIndex(string tid, int pos1, int pos2)
-    {
-        return query(tid, pos1, pos2);
-    }
-
-    /// Integer-based chr below
-    /// bam[0, 1..2]
-    auto opIndex(int tid, int[2] pos)
+    /// ditto
+    auto opIndex(int tid, long[2] pos)
     {
         return query(tid, pos[0], pos[1]);
     }
 
-    /// bam[0, 1]
-    auto opIndex(int tid, int pos)
+    /// ditto
+    auto opIndex(string tid, long pos)
     {
         return query(tid, pos, pos + 1);
     }
 
-    /// bam[0, 1, 2]
-    deprecated auto opIndex(int tid, int pos1, int pos2)
+    /// ditto
+    auto opIndex(int tid, long pos)
+    {
+        return query(tid, pos, pos + 1);
+    }
+
+    /// ditto
+    deprecated("use multidimensional slicing with second parameter as range (["chr1", 1 .. 2])")
+    auto opIndex(string tid, long pos1, long pos2)
     {
         return query(tid, pos1, pos2);
     }
 
-    /// support bam["chr1", 1..2 ]
-    int[2] opSlice(size_t dim)(int start, int end) if (dim  == 1)
+    /// ditto
+    deprecated("use multidimensional slicing with second parameter as range ([20, 1 .. 2])")
+    auto opIndex(int tid, long pos1, long pos2)
+    {
+        return query(tid, pos1, pos2);
+    }
+
+    /// ditto
+    int[2] opSlice(size_t dim)(long start, long end) if (dim  == 1)
     {
         return [start, end];
     }
+
 
     /// Return an InputRange representing all recods in the SAM/BAM/CRAM
     AllRecordsRange allRecords()
@@ -979,6 +1028,7 @@ struct SAMReader
         range.popFront();
         return range;
     }
+
     deprecated("Avoid snake_case names")
     alias all_records = allRecords;
 
