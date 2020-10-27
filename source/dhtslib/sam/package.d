@@ -343,57 +343,34 @@ class SAMRecord
     /// Return array of the quality scores
     /// see samtools/sam_view.c: get_quality
     /// TODO: Discussion -- should we return const(ubyte[]) or const(ubyte)[] instead?
-    ubyte[] qscores(bool phredScale=false)()
+    @property const(ubyte)[] qscores()
     {
-        static assert(phredScale==false, "qscores needs rewrite/discussion for phredScale=true");
 
         auto slice = bam_get_qual(this.b)[0 .. this.b.core.l_qseq];
         return slice;
-        /+
-        // calloc fills with \0; +1 len for Cstring
-        // char* q = cast(char*) calloc(1, this.b.core.l_qseq + 1);
-        ubyte[] q;
-        q.length = this.b.core.l_qseq;
-
-        auto qualdata = bam_get_qual(this.b);
-
-        for (int i; i < this.b.core.l_qseq; i++)
-            static if(phredScale) q[i] = cast(char)(qualdata[i] + 33);
-            else q[i] = cast(char)(qualdata[i]);
-        return q;
-        +/
     }
 
-    /// Add qscore sequence given that it is the same length as the bam sequence
+    /// Set quality scores from raw ubyte quality score array given that it is the same length as the bam sequence
     pragma(inline, true)
-    void q_scores(bool phredScale=true)(const(char)[] seq)
+    @property void qscores(const(ubyte)[] seq)
     {
-        if(seq.length!=b.core.l_qseq){
-            hts_log_error(__FUNCTION__,"qscore length does not match sequence length");
-            return;
-        }
-        auto s= seq.dup;
-        for(auto i=0;i<seq.length;i++){
-            static if(phredScale) s[i]=seq[i]-33;
-        }
-        
-        //get length of data before seq
-        uint l_prev=b.core.l_qname + cast(uint)(b.core.n_cigar*uint.sizeof)+((b.core.l_qseq+1)>>1);
-        b.data[l_prev..s.length+l_prev]=cast(ubyte[])s;
-    }
-
-    /// Add qscore sequence given that it is the same length as the bam sequence
-    pragma(inline, true)
-    void qscores(ubyte[] seq)
-    {
-        if(seq.length!=b.core.l_qseq){
+        if(seq.length != b.core.l_qseq){
             hts_log_error(__FUNCTION__,"qscore length does not match sequence length");
             return;
         }
         
         //get length of data before seq
-        uint l_prev=b.core.l_qname + cast(uint)(b.core.n_cigar*uint.sizeof)+((b.core.l_qseq+1)>>1);
-        b.data[l_prev..seq.length+l_prev]=seq;
+        uint l_prev = b.core.l_qname + cast(uint)(b.core.n_cigar * uint.sizeof) + ((b.core.l_qseq + 1) >> 1);
+        b.data[l_prev .. seq.length + l_prev] = seq;
+    }
+
+    /// get phred-scaled base qualities as char array
+    pragma(inline, true)
+    const(char)[] qscoresPhredScaled()
+    {
+        auto bqs = this.qscores.dup;
+        bqs[] += 33;
+        return cast(const(char)[]) bqs;
     }
 
     /// Create cigar from bam1_t record
@@ -632,13 +609,13 @@ unittest{
     assert(read.sequence=="AGCTAGGGCA");
 
     ubyte[] q=[255,255,255,255,255,255,255,255,255,255];
-    assert(read.qscores!false == cast(char[])(q));
+    assert(read.qscores == q);
     q = [1, 14, 20, 40, 30, 10, 14, 20, 40, 30];
     read.qscores(q);
-    assert(read.qscores!false == cast(char[])(q));
+    assert(read.qscores == q);
     q[] += 33;
-    // TODO: @charlesgregory, please fix this unittest; assume related to Phred scaling templ param?
-    // assert(read.qscores == cast(char[])(q));
+    
+    assert(read.qscoresPhredScaled == cast(char[])(q));
 
     assert(read.cigar.toString() == "78M1D22M");
     assert(read["RG"].check!string);
