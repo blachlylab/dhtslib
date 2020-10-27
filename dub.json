@@ -8,6 +8,11 @@
     },
     "configurations": [
         {
+            "name": "unittest",
+            "debugVersions": ["dhtslib_unittest"],
+            "libs": ["hts"]
+        },
+        {
             "name": "tabix_test",
             "targetType": "executable",
             "targetName": "tabix_gffreader",

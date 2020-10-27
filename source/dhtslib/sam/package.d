@@ -36,8 +36,9 @@ import std.format;
 import std.parallelism : totalCPUs;
 import std.stdio : writeln, writefln, stderr, File;
 import std.string : fromStringz, toStringz;
-import std.traits : ReturnType;
+import std.traits : isIntegral, ReturnType;
 import std.algorithm : filter;
+import std.typecons : Tuple;
 
 import htslib.hts : htsFile, hts_open, hts_close, hts_hopen;
 import htslib.hts : hts_idx_t, hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
@@ -446,7 +447,7 @@ class SAMRecord
     /// Assign a tag key value pair
     void opIndexAssign(T)(T value,string index)
     {
-        import std.traits:isIntegral,isSomeString;
+        import std.traits : isIntegral, isSomeString;
         static if(isIntegral!T){
             bam_aux_update_int(b,index[0..2],value);
         }else static if(is(T==float)){
@@ -629,13 +630,16 @@ unittest{
     assert(read.sequence=="AGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTGAAAAAACATTTTTTGGGTTTTT");
     read.sequence=read.sequence[0..10];
     assert(read.sequence=="AGCTAGGGCA");
+
     ubyte[] q=[255,255,255,255,255,255,255,255,255,255];
-    assert(read.qscores!false==cast(char[])(q));
-    q=[1,14,20,40,30,10,14,20,40,30];
+    assert(read.qscores!false == cast(char[])(q));
+    q = [1, 14, 20, 40, 30, 10, 14, 20, 40, 30];
     read.qscores(q);
-    assert(read.qscores!false==cast(char[])(q));
-    q[]+=33;
-    assert(read.qscores==cast(char[])(q));
+    assert(read.qscores!false == cast(char[])(q));
+    q[] += 33;
+    // TODO: @charlesgregory, please fix this unittest; assume related to Phred scaling templ param?
+    // assert(read.qscores == cast(char[])(q));
+
     assert(read.cigar.toString() == "78M1D22M");
     assert(read["RG"].check!string);
     assert(read["RG"].to!string=="1");
@@ -913,9 +917,6 @@ struct SAMReader
     *   2. `query(chr, start, end)` with a combination of function parameters for
     *       contig, start, and end (where contig may be either a string or the numeric
     *       `tid` from BAM header; it would be uncommon to use this directly)
-    *   3. Array indexing on object of type SAMReader directly in one of two above styles:
-    *       1. `bamfile[region-string]`
-    *       2. `bamfile[contig, start .. end]` with contig like no. 2 above
     *
     *   NOTE THAT THERE IS AN OFF-BY-ONE DIFFERENCE IN THE TWO METHODS ABOVE!
     *   Region string based coordinates assume the first base of the reference
@@ -923,8 +924,15 @@ struct SAMReader
     *   integer function parameter versions, the coordinates are zero-based, half-open
     *   (e.g., <chrX, 0, 100> yields the first 100 bases).
     *
-    *   In addition, the region string is parsed by underlying htslib's `hts_parse_region`
-    *   and has special semantics:
+    *   We also support array indexing on object of type SAMReader directly
+    *   in one of two above styles:
+    *       1. `bamfile[region-string]`
+    *       2. `bamfile[contig, start .. end]` with contig like no. 2 above
+    *
+    *   The D convention `$` operator marking length of array is supported.
+    *
+    *   Finally, the region string is parsed by underlying htslib's `hts_parse_region`
+    *   and has special semantics available:
     *
     *   region          | Outputs
     *   --------------- | -------------
@@ -937,16 +945,20 @@ struct SAMReader
     *   *               | Unmapped reads at the end of the file (RNAME '*' in SAM)
     *
     *
-    *   BUGS: Unfortunately, we cannot support (or, I cannot figure out how to support)
-    *   the dlang `$` convention noting end of an array, because the `opDollar` function
-    *   results depend on which contig passed to opSlice of which opDollar has no knowledge
-    *
-    *   Example:
+    *   Examples:
     *   ```
     *   bamfile = SAMReader("whatever.bam");
     *   auto reads1 = bamfile.query("chr1:1-500");
     *   auto reads2 = bamfile.query("chr2", 0, 500);
     *   auto reads3 = bamfile["chr3", 0 .. 500];
+    *
+    *   auto reads4 = bamfile["chrX", $-500 .. $];  // last 500 nt
+    *
+    *   auto reads5 = bamfile.query("chrY");    // entirety of chrY
+    *
+    *   // When colon present in reference name (e.g. HLA additions in GRCh38)
+    *   // wrap the ref name in { } (this is an htslib convention; see hts_parse_region)
+    *   auto reads6 = bamfile.query("{HLA-DRB1*12:17}:1-100");
     *   ```
     */ 
     auto query(string chrom, long start, long end)
@@ -1010,7 +1022,7 @@ struct SAMReader
     }
 
     /// ditto
-    deprecated("use multidimensional slicing with second parameter as range (["chr1", 1 .. 2])")
+    deprecated("use multidimensional slicing with second parameter as range ([\"chr1\", 1 .. 2])")
     auto opIndex(string tid, long pos1, long pos2)
     {
         return query(tid, pos1, pos2);
@@ -1024,9 +1036,70 @@ struct SAMReader
     }
 
     /// ditto
-    int[2] opSlice(size_t dim)(long start, long end) if (dim  == 1)
+    long[2] opSlice(size_t dim)(long start, long end) if (dim  == 1)
     {
         return [start, end];
+    }
+
+
+    private struct OffsetType
+    {
+        ptrdiff_t offset;
+        alias offset this;
+
+        // supports e.g. $ - x
+        OffsetType opBinary(string s, T)(T val)
+        {
+            mixin("return OffsetType(offset " ~ s ~ " val);");
+        }
+
+        invariant
+        {
+            assert(this.offset <= 0, "Offset from end should be zero or negative");
+        }
+    }
+    /** Array-end `$` indexing hack courtesy of Steve Schveighoffer
+        https://forum.dlang.org/post/rl7a56$nad$1@digitalmars.com
+
+        Requires in addition to opDollar returning a bespoke non-integral type
+        a series of overloads for opIndex and opSlice taking this type
+    */
+    OffsetType opDollar(size_t dim)() if(dim == 1)
+    {
+        return OffsetType.init;
+    }
+    /// ditto
+    auto opIndex(string ctg, OffsetType endoff)
+    {
+        auto tid = this.targetId(ctg);
+        auto end = this.targetLength(tid) + endoff.offset;
+        // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
+        return query(tid, end, end + 1);
+    }
+    /// ditto
+    auto opIndex(int tid, OffsetType endoff)
+    {
+        auto end = this.targetLength(tid) + endoff.offset;
+        // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
+        return query(tid, end, end + 1);
+    }
+    /// ditto
+    auto opSlice(size_t dim)(long start, OffsetType off) if (dim == 1)
+    {
+        return Tuple!(long, OffsetType)(start, off);
+    }
+    /// ditto
+    auto opIndex(string ctg, Tuple!(long, OffsetType) coords)
+    {
+        auto tid = this.targetId(ctg);
+        auto end = this.targetLength(tid) + coords[1];
+        return query(tid, coords[0], end);
+    }
+    /// ditto
+    auto opIndex(int tid, Tuple!(long, OffsetType) coords)
+    {
+        auto end = this.targetLength(tid) + coords[1];
+        return query(tid, coords[0], end);
     }
 
 
@@ -1413,7 +1486,8 @@ struct SAMWriter
     }
 }
 debug(dhtslib_unittest)
-unittest{
+unittest
+{
     writeln();
     import dhtslib.sam;
     import htslib.hts_log : hts_log_info;
@@ -1427,7 +1501,7 @@ unittest{
     auto sam2 = SAMWriter("test.bam",sam.header);
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto read = readrange.front();
-    sam2.write(&read);
+    sam2.write(read);
     sam2.close;
     destroy(sam2);
     sam = SAMFile("test.bam");
