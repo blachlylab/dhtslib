@@ -21,7 +21,7 @@ Implements InputRange interface using htslib calls to bgzf_getline().
 struct BGZFile {
 
     /// filename; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
-    private immutable(char)* fn;
+    private const(char)* fn;
 
     /// htslib data structure representing the BGZF compressed file/stream fp
     private BGZF* bgzf;
