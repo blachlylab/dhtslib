@@ -181,8 +181,8 @@ int sam_hdr_find_line_pos(sam_hdr_t *h, const char *type,
         return ret;
     }
 }
-
-unittest
+/// Example
+debug (dhtslib_unittest) unittest
 {
     import std;
 
