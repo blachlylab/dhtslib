@@ -578,12 +578,13 @@ class SAMRecord
 /+ END CHERRY-PICK +/
 }
 
-debug(dhtslib_unittest)
-unittest{
-    writeln();
+///
+debug(dhtslib_unittest) unittest
+{
     import dhtslib.sam;
     import htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
+
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMRecord mutation");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -641,12 +642,13 @@ unittest{
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
 }
 
-debug(dhtslib_unittest)
-unittest{
-    writeln();
+///
+debug(dhtslib_unittest) unittest
+{
     import dhtslib.sam;
     import htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
+
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMRecord mutation w/ realloc");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -702,7 +704,8 @@ unittest{
     hts_log_info(__FUNCTION__, "Cigar:" ~ read.cigar.toString());
 }
 
-unittest
+///
+debug(dhtslib_unittest) unittest
 {
     import std.stdio;
     import dhtslib.sam;
@@ -710,9 +713,11 @@ unittest
     import std.algorithm: map;
     import std.array: array;
     import std.path:buildPath,dirName;
+
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
     auto read=bam.all_records.front;
     auto pairs = read.getAlignedPairs!true(read.pos + 77, read.pos + 77 + 5);
+
     assert(pairs.map!(x => x.qpos).array == [77,77,78,79,80]);
     assert(pairs.map!(x => x.rpos).array == [77,78,79,80,81]);
     assert(pairs.map!(x => x.refBase).array == "GAAAA");
@@ -1329,8 +1334,10 @@ private char* reverse(char* str)
     return str;
 }
 
-/// SAM/BAM/CRAM disk format
-enum SAMWriterTypes{
+/// SAM/BAM/CRAM on-disk format.
+/// `DEDUCE` will attempt to auto-detect from filename or other means
+enum SAMWriterTypes
+{
     BAM,
     UBAM,
     SAM,
@@ -1462,14 +1469,14 @@ struct SAMWriter
         assert(ret>=0);
     }
 }
-debug(dhtslib_unittest)
-unittest
+///
+debug(dhtslib_unittest) unittest
 {
-    writeln();
     import dhtslib.sam;
     import htslib.hts_log : hts_log_info;
-    import std.path:buildPath,dirName;
-    import std.string:fromStringz;
+    import std.path : buildPath,dirName;
+    import std.string : fromStringz;
+
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMWriter");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -1526,13 +1533,14 @@ private int parseSam(string line, bam_hdr_t* header, bam1_t* b)
     return sam_parse1(&k, header, b);
 }
 
-debug(dhtslib_unittest)
-unittest{
-    writeln();
+///
+debug(dhtslib_unittest) unittest
+{
     import dhtslib.sam;
     import htslib.hts_log : hts_log_info;
     import std.path:buildPath,dirName;
     import std.string:fromStringz;
+
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -1544,8 +1552,8 @@ unittest{
     assert(read.sequence=="GCTAGCTCAG");
 }
 
-debug(dhtslib_unittest)
-unittest
+///
+debug(dhtslib_unittest) unittest
 {
     import std.stdio : writeln;
     import std.range : drop;
@@ -1553,6 +1561,7 @@ unittest
     import htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
     import std.path:buildPath,dirName;
     import std.conv:to;
+
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Loading sam file");
     auto range = File(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","realn01_exp-a.sam")).byLineCopy();
