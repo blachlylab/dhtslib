@@ -105,9 +105,12 @@ void hts_log_trace(const(char)[] ctx, string msg)
     string colormsg = "\x1b[1;36m" ~ msg ~ "\x1b[0m";
     hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), toStringz(colormsg));
 }
-debug(dhtslib_unittest)
-unittest{
+
+///
+debug(dhtslib_unittest) unittest
+{
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+
     hts_log_trace(__FUNCTION__, "Test: trace");
     hts_log_debug(__FUNCTION__, "Test: debug");
     hts_log_info(__FUNCTION__,  "Test: info");
