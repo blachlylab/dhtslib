@@ -737,7 +737,7 @@ struct SAMReader
     string filename;
 
     /// filename \0-terminated C string; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
-    private immutable(char)* fn;
+    private const(char)* fn;
 
     /// htsFile
     private htsFile* fp;
@@ -1352,7 +1352,7 @@ struct SAMWriter
     string filename;
 
     /// filename \0-terminated C string; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
-    private immutable(char)* fn;
+    private const(char)* fn;
 
     /// htsFile
     private htsFile* fp;
