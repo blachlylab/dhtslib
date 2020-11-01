@@ -326,7 +326,7 @@ struct AlignedCoordinatesItr
     }
 }
 
-unittest
+debug (dhtslib_unittest) unittest
 {
     writeln();
     import dhtslib.sam;
