@@ -22,6 +22,9 @@ enum RecordType : immutable(char)[2]
     CO = "CO",
 }
 
+/** SAMHeader encapsulates `sam_hdr_t*`
+    and provides convenience wrappers to manipulate the header metadata/records.
+*/
 struct SAMHeader
 {
     private sam_hdr_t* h;
