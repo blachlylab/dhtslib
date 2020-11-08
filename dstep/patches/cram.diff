@@ -1,0 +1,18 @@
+35c35,37
+< import core.stdc.stdio;
+---
+> module htslib.cram;
+> 
+> import core.stdc.stdarg;
+37a40,42
+> import htslib.hts;
+> import htslib.sam;
+> 
+432c437
+< alias SAM_hdr = sam_hdr_t_;
+---
+> alias SAM_hdr = sam_hdr_t;
+470c475
+< enum sam_hdr_add_PG = sam_hdr_add_pg;
+---
+> alias sam_hdr_add_PG = sam_hdr_add_pg;
