@@ -1,0 +1,14 @@
+Here we will use dstep (https://github.com/jacob-carlborg/dstep) to assist in
+conversion of htslib header files to D modules in the `htslib.*` namespace.
+
+Importantly, dstep does not get things 100% right (or when it does, we may
+prefer e.g. an inline function instead of a generic templated fn to replace
+a #define; or we may wish to add deprecated("...") etc.), and so we will store
+a patch for each (?) file to track any further transformation(s) before it can
+go in-tree. 
+
+This will also be critically important when upgrading the bindings to a new
+library version, so that we do not have to manually track fixes to the auto-
+mated conversion and can re-apply them (assuming `patch` can locate the hunk)
+
+Add new conversion to the Makefile
