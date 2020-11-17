@@ -87,8 +87,7 @@ struct IndexedFastaFile {
     /// Enable BGZF cacheing (size: bytes)
     void setCacheSize(int size)
     {
-        import htslib.bgzf : BGZF, bgzf_set_cache_size;
-        bgzf_set_cache_size(this.faidx.bgzf, size);
+        fai_set_cache_size(this.faidx, size);
     }
 
     /// Enable multithreaded decompression of this FA/FQ
