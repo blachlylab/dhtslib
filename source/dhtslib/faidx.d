@@ -94,11 +94,12 @@ struct IndexedFastaFile {
     /// Reading fn body of bgzf_mt, this actually ADDS threads (rather than setting)
     /// but we'll retain name for consistency with setCacheSize
     /// NB: IN A REAL-WORLD TEST (swiftover) CALLING setThreads(1) doubled runtime(???)
+    deprecated("disabled until faidx_t again made non-opaque")
     void setThreads(int nthreads)
     {
         import htslib.bgzf : BGZF, bgzf_mt;
         // third parameter, n_sub_blks is not used in htslib 1.9; .h suggests value 64-256
-        bgzf_mt(this.faidx.bgzf, nthreads, 64);
+        //bgzf_mt(this.faidx.bgzf, nthreads, 64);
     }
 
     /// Fetch sequence in region by assoc array-style lookup:
