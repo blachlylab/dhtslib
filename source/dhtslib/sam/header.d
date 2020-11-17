@@ -64,13 +64,19 @@ struct SAMHeader
     /* ==== Line level methods ==== */
 
     /// add multiple \n-terminated full SAM header records, eg "@SQ\tSN:foo\tLN:100"
-    /// (passed line does not require \n)
-    auto addLines(const(char)[] lines)
+    /// (single line or last of multiple does not require terminal \n)
+    auto addLines(const(char)[][] lines)
     {
-        import std.algorithm.searching : maxElement;
-        import std.algorithm.iteration : map;
-        auto maxlen = lines.map!(x => x.length).maxElement;
-        return sam_hdr_add_lines(this.h, lines.ptr, maxlen);
+        if (lines.length == 0)
+            return 0;   // (sam_hdr_add_lines also returns 0 for nothing added)
+        else if (lines.length == 1)
+            return sam_hdr_add_lines(this.h, lines[0].ptr, lines[0].length);
+        else {
+            char[] buf;
+            foreach(line; lines)
+                buf ~= line ~ '\n';
+            return sam_hdr_add_lines(this.h, buf.ptr, buf.length);
+        }
     }
 
     /// Add a single line to an existing header
