@@ -27,7 +27,7 @@
 /* The BGZF library was originally written by Bob Handsaker from the Broad
  * Institute. It was later improved by the SAMtools developers. */
 
-module htslib.bzf;
+module htslib.bgzf;
 
 import core.stdc.stdio;
 
