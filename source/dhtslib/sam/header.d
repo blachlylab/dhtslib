@@ -69,7 +69,7 @@ struct SAMHeader
     {
         import std.algorithm.searching : maxElement;
         import std.algorithm.iteration : map;
-        auto maxlen = lines.map(x => x.length).maxElement;
+        auto maxlen = lines.map!(x => x.length).maxElement;
         return sam_hdr_add_lines(this.h, lines.ptr, maxlen);
     }
 
