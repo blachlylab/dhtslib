@@ -1,3 +1,9 @@
+/**
+This module provides a wrapper, BGZFile, over an htslib BGZF compressed file/stream.
+The wrapper acts as a linewise ForwardRange over the file or stream.
+*/
+
+
 module dhtslib.bgzf;
 
 import core.stdc.stdlib: malloc, free;
@@ -5,8 +11,8 @@ import std.parallelism: totalCPUs;
 import std.stdio: writeln, writefln;
 import std.string: fromStringz, toStringz;
 
-import dhtslib.htslib.bgzf;
-import dhtslib.htslib.kstring;
+import htslib.bgzf;
+import htslib.kstring;
 
 /**
 Encapsulates a bgzipped (block gzipped) file.
@@ -15,7 +21,7 @@ Implements InputRange interface using htslib calls to bgzf_getline().
 struct BGZFile {
 
     /// filename; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
-    private immutable(char)* fn;
+    private const(char)* fn;
 
     /// htslib data structure representing the BGZF compressed file/stream fp
     private BGZF* bgzf;

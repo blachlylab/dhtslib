@@ -1,6 +1,8 @@
 /**
 
-VCFv4.2 (including BCF) reader and writer.
+VCF version 4.2 (including BCF) reader and writer, including
+a model with convenience functions for the header (metadata)
+and individual VCF/BCF records (rows).
 
 Specifications: https://samtools.github.io/hts-specs/VCFv4.2.pdf
 
@@ -18,9 +20,9 @@ import std.string: fromStringz, toStringz;
 import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 import std.traits: Unqual;
 
-import dhtslib.htslib.hts_log;
-import dhtslib.htslib.kstring;
-import dhtslib.htslib.vcf;
+import htslib.hts_log;
+import htslib.kstring;
+import htslib.vcf;
 
 alias BCFRecord = VCFRecord;
 alias BCFWriter = VCFWriter;
@@ -195,7 +197,7 @@ class VCFRecord
         if (this.line) bcf_destroy1(this.line);
     }
 
-    //////// FIXED FIELDS ////////
+    //----- FIXED FIELDS -----//
     
     /* CHROM */
     /// Get chromosome (CHROM)
@@ -221,19 +223,21 @@ class VCFRecord
 
 
     /* POS */
-    /// Get position (POS)
-    // NB: internally BCF is uzing 0 based coordinates; we only show +1 when printing a VCF line with toString (which calls vcf_format)
+    /** Get position (POS, column 2)
+     *
+     * NB: internally BCF is uzing 0 based coordinates; we only show +1 when printing a VCF line with toString (which calls vcf_format)
+    */
     @property
-    int pos()
+    long pos()
     out(coord) { assert(coord >= 0); }
     do
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
         return this.line.pos;
     }
-    /// Set position (POS)
+    /// Set position (POS, column 2)
     @property
-    void pos(int p)
+    void pos(long p)
     in { assert(p >= 0); }
     do
     {
@@ -257,7 +261,9 @@ class VCFRecord
         if (id == "") return bcf_update_id(this.vcfheader.hdr, this.line, null);
         else return bcf_update_id(this.vcfheader.hdr, this.line, toStringz(id));
     }
-    /// Append an ID (htslib performs duplicate checking)
+    /// Append an ID (column 3) to the record.
+    ///
+    /// NOTE: htslib performs duplicate checking
     int addID(const(char)[] id)
     {
         if(id == "") return 0;
@@ -279,7 +285,7 @@ class VCFRecord
         TODO: some of these may be inefficent; since they may be used in hot inner loops, pls optimize
     */
     /// REF allele length
-    @property int refLen()
+    @property long refLen()
     {
         version(DigitalMars) pragma(inline);
         version(LDC) pragma(inline, true);
@@ -430,7 +436,7 @@ class VCFRecord
 
 
     /* Quality (QUAL) */
-    /// Get variant quality (QUAL)
+    /// Get variant quality (QUAL, column 6)
     @property float qual()
     out(result) { assert(result >= 0); }
     do
@@ -438,7 +444,7 @@ class VCFRecord
         if (this.line.max_unpack < BCF_UN_FLT) bcf_unpack(this.line, BCF_UN_FLT);
         return this.line.qual;
     }
-    /// Set variant quality (QUAL)
+    /// Set variant quality (QUAL, column 6)
     @property void qual(float q)
     in { assert(q >= 0); }
     do { this.line.qual = q; }
@@ -524,12 +530,14 @@ class VCFRecord
     }
 
 
-    /* INFO */
-    /+
-        int tmpi = 1;
-        bcf_update_info_int32(this.vcfhdr.hdr, line, toStringz("NS"c), &tmpi, 1);
-    +/
-    /// Add a tag:value to the INFO column -- tag must already exist in the header
+    /** Update INFO (pan-sample info; column 8) 
+     *
+     *  Add a tag:value to the INFO column
+     *  NOTE: tag must already exist in the header
+     *
+     *  Templated on data type, calls one of bcf_update_info_{int32,float,string,flag}
+     *  Both singletons and arrays are supported.
+    */
     void addInfo(T)(string tag, T data)
     {
         int ret = -1;
@@ -556,7 +564,6 @@ class VCFRecord
             hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
     /// ditto
-    /// This handles a vector of values for the tag
     void addInfo(T)(string tag, T[] data)
     if(!is(T==immutable(char)))             // otherwise string::immutable(char)[] will match the other template
     {
@@ -576,8 +583,10 @@ class VCFRecord
             hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
 
-    /* FORMAT (sample info) */
-    /// bc_update_format_{int32,flat,string,flag}
+    /** Update FORMAT (sample info; column 9+)
+     *  
+     *  Templated on data type, calls one of bc_update_format_{int32,float,string,flag}
+    */
     void addFormat(T)(string tag, T data)
     if(!isArray!T)
     {
@@ -603,7 +612,7 @@ class VCFRecord
         
         if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add format (ignoring): %s", data));
     }
-    /// auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, int *values, int n) // @suppress(dscanner.style.undocumented_declaration)
+    /// ditto
     void addFormat(T)(string tag, T[] data)
     {
                 int ret = -1;
@@ -695,6 +704,9 @@ class VCFRecord
             hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
 
+    /// Return a string representation of the VCFRecord (i.e. as would appear in .vcf)
+    ///
+    /// As a bonus, there is a kstring_t memory leak
     override string toString() const
     {
         kstring_t s;
@@ -1053,7 +1065,7 @@ struct VCFReader
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
     bcf1_t* b;          /// record for use in iterator, will be recycled
 
-    int MAX_UNPACK;     /// see dhtslib.htslib.vcf
+    int MAX_UNPACK;     /// see htslib.vcf
 
     private static int refct;
 
@@ -1066,7 +1078,7 @@ struct VCFReader
     /// MAX_UNPACK: setting alternate value could speed reading
     this(string fn, int MAX_UNPACK = BCF_UN_ALL)
     {
-        import dhtslib.htslib.hts : hts_set_threads;
+        import htslib.hts : hts_set_threads;
 
         if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
         this.fp = vcf_open(toStringz(fn), "r"c.ptr);
@@ -1120,7 +1132,7 @@ struct VCFReader
     // TODO: Memory leak. We are never freeing the bcf_hrec_t, but, it escapes as pointer inside key/value string
     // TODO: handle structured and general lines
     string[string] getTagByKV(string tagType, T)(string key, string value, string str_class)
-    if((tagType == "FILTER" || tagType == "INFO" || tagType == "FORMAT" && tagType == "contig") &&
+    if((tagType == "FILTER" || tagType == "INFO" || tagType == "FORMAT" || tagType == "contig") &&
         (isIntegral!T || isSomeString!T))
     {
         // hlt : header line type

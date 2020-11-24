@@ -8,6 +8,11 @@
     },
     "configurations": [
         {
+            "name": "unittest",
+            "debugVersions": ["dhtslib_unittest"],
+            "libs": ["hts"]
+        },
+        {
             "name": "tabix_test",
             "targetType": "executable",
             "targetName": "tabix_gffreader",
@@ -39,15 +44,14 @@
         },
         {
             "name": "source",
-            "targetType": "sourceLibrary",
+            "targetType": "library",
             "libs": ["hts"]
         },
         {
             "name": "source-static",
-            "targetType": "sourceLibrary",
-            "preBuildCommands": ["cd $PACKAGE_DIR;make"],
-            "sourceFiles": ["htslib/libhts.a"],
-            "libs":["curl","crypto","lzma","bz2"]
+            "targetType": "library",
+            "sourceFiles": ["../htslib/libhts.a"],
+            "libs": [ ]
         }
     ]
 }

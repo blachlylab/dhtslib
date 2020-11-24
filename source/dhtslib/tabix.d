@@ -1,13 +1,21 @@
+/**
+Module providing a wrapper, `TabixIndexedFile` over a line-oriented NGS flat file,
+such as BED, GFF3, VCF that has been indexed with tabix.
+
+The wrapper provides a list of reference sequence names, as well as iterator over
+all rows falling within a sequence range, e.g. "chr1:1000-2000"
+*/
+
 module dhtslib.tabix;
 
 import std.stdio;
 import std.string;
 import core.stdc.stdlib : malloc, free;
 
-import dhtslib.htslib.hts;
-import dhtslib.htslib.kstring;
-import dhtslib.htslib.tbx;
-//import dhtslib.htslib.regidx;
+import htslib.hts;
+import htslib.kstring;
+import htslib.tbx;
+//import htslib.regidx;
 
 /** Encapsulates a position-sorted record-oriented NGS flat file,
  *  indexed with Tabix, including BED, GFF3, VCF.

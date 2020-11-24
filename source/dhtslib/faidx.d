@@ -1,9 +1,20 @@
+/**
+This module provides a wrapper, `IndexedFastaFile` over a FASTA.
+If an index exists, it will be used for rapid random access.
+If an index does not exist, one will be built.
+
+The wrapper provides the ability to list sequence names (i.e., chromosomes/contigs)
+in the FASTA, efficiently retrieve sequences (by contig, start, end)
+
+Sequence caching and multithreaded BGZF decompression are supported.
+*/
+
 module dhtslib.faidx;
 
 import std.string;
 import core.stdc.stdlib : malloc, free;
 
-import dhtslib.htslib.faidx;
+import htslib.faidx;
 
 /** Coodinate Systems, since htslib sequence fetching methods surprisingly use zero-based, closed */
 enum CoordSystem
@@ -76,19 +87,19 @@ struct IndexedFastaFile {
     /// Enable BGZF cacheing (size: bytes)
     void setCacheSize(int size)
     {
-        import dhtslib.htslib.bgzf : BGZF, bgzf_set_cache_size;
-        bgzf_set_cache_size(this.faidx.bgzf, size);
+        fai_set_cache_size(this.faidx, size);
     }
 
     /// Enable multithreaded decompression of this FA/FQ
     /// Reading fn body of bgzf_mt, this actually ADDS threads (rather than setting)
     /// but we'll retain name for consistency with setCacheSize
     /// NB: IN A REAL-WORLD TEST (swiftover) CALLING setThreads(1) doubled runtime(???)
+    deprecated("disabled until faidx_t again made non-opaque")
     void setThreads(int nthreads)
     {
-        import dhtslib.htslib.bgzf : BGZF, bgzf_mt;
+        import htslib.bgzf : BGZF, bgzf_mt;
         // third parameter, n_sub_blks is not used in htslib 1.9; .h suggests value 64-256
-        bgzf_mt(this.faidx.bgzf, nthreads, 64);
+        //bgzf_mt(this.faidx.bgzf, nthreads, 64);
     }
 
     /// Fetch sequence in region by assoc array-style lookup:
@@ -103,17 +114,18 @@ struct IndexedFastaFile {
     string fetchSequence(string region)
     {
         char *fetchedSeq;
-        int fetchedLen;
-        // char *fai_fetch(const faidx_t *fai, const char *reg, int *len);
+        long fetchedLen;
+        // char *fai_fetch(const faidx_t *fai, const char *reg, hts_pos_t *len);
         // @param  len  Length of the region; -2 if seq not present, -1 general error
-        fetchedSeq = fai_fetch(this.faidx, toStringz(region), &fetchedLen);
-
-        string seq = fromStringz(fetchedSeq).idup;
-        free(fetchedSeq);
+        fetchedSeq = fai_fetch64(this.faidx, toStringz(region), &fetchedLen);
 
         if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
         else if (fetchedLen == -2) throw new Exception("fai_fetch: sequence not found");
 
+        string seq = fromStringz(fetchedSeq).idup;
+        free(fetchedSeq);
+
+        assert(seq.length == fetchedLen);
         return seq;
     }
 
@@ -127,18 +139,18 @@ struct IndexedFastaFile {
     }
     /// ditto
     int[2] opSlice(size_t dim)(int start, int end) if (dim == 1)
-    in { assert(start >= 0); }
+    in { assert(start >= 0); assert(start <= end); }
     do
     {
         return [start, end];
     }
 
-    /// Fetch sequence in region by multidimensional slicing:
+    /// Fetch sequencing in a region by function call with contig, start, end
     /// `string sequence = fafile.fetchSequence("chr2", 20123, 30456)`
-    string fetchSequence(CoordSystem cs = CoordSystem.zbho)(string contig, int start, int end)
+    string fetchSequence(CoordSystem cs = CoordSystem.zbho)(string contig, long start, long end)
     {
         char *fetchedSeq;
-        int fetchedLen;
+        long fetchedLen;
 
         static if (cs == CoordSystem.zbho) {
             end--;
@@ -155,7 +167,7 @@ struct IndexedFastaFile {
         }
         /* htslib API for my reference:
          *
-         * char *faidx_fetch_seq(const faidx_t *fai, const char *c_name, int p_beg_i, int p_end_i, int *len);
+         * char *faidx_fetch_seq64(const faidx_t *fai, const char *c_name, hts_pos_t p_beg_i, hts_pos_t p_end_i, hts_pos_t *len);
          * @param  fai  Pointer to the faidx_t struct
          * @param  c_name Region name
          * @param  p_beg_i  Beginning position number (zero-based)
@@ -166,13 +178,13 @@ struct IndexedFastaFile {
          *  by end users by calling `free()` on it.
          *
         */
-        fetchedSeq = faidx_fetch_seq(this.faidx, toStringz(contig), start, end, &fetchedLen);
+        fetchedSeq = faidx_fetch_seq64(this.faidx, toStringz(contig), start, end, &fetchedLen);
         
-        string seq = fromStringz(fetchedSeq).idup;
-        free(fetchedSeq);
-
         if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
         else if (fetchedLen == -2) throw new Exception("fai_fetch: sequence not found");
+
+        string seq = fromStringz(fetchedSeq).idup;
+        free(fetchedSeq);
 
         assert(seq.length == fetchedLen);
         return seq;
@@ -202,6 +214,7 @@ struct IndexedFastaFile {
     }
 
     /// Return sequence length, -1 if not present
+    /// NOTE: there is no 64 bit equivalent of this function (yet) in htslib-1.10
     int seqLen(const(char)[] seqname)
     {
         // TODO should I check for -1 and throw exception or pass to caller?

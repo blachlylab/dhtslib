@@ -1,0 +1,7 @@
+28a29,32
+> module htslib.faidx;
+> 
+> import htslib.hts;
+> 
+199a204
+> deprecated("Please use faidx_nseq instead")
