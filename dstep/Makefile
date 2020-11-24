@@ -1,7 +1,7 @@
 
 DSTEP=dstep --space-after-function-name=false
 
-outputfiles=output/faidx.d
+outputfiles=output/faidx.d output/kstring.d
 
 all: $(outputfiles)
 .PHONY: all
