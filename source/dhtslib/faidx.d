@@ -152,6 +152,7 @@ struct IndexedFastaFile {
         char *fetchedSeq;
         long fetchedLen;
 
+        // Convert given coordinates in system cs to zero-based, closed (faidx_fetch_seq)
         static if (cs == CoordSystem.zbho) {
             end--;
         }
@@ -160,10 +161,11 @@ struct IndexedFastaFile {
         }
         else static if (cs == CoordSystem.obho) {
             start--;
-            end--;
+            end -= 2;
         }
         else static if (cs == CoordSystem.obc) {
             start--;
+            end--;
         }
         /* htslib API for my reference:
          *
