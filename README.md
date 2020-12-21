@@ -20,7 +20,7 @@ Add `dhtslib` as a dependency to `dub.json`:
 # Requirements
 
 ## Dynamically linking to htslib (default)
-A system installation of htslib v1.9 (1.10 compatibility in progress) is required.
+A system installation of htslib v1.10 or 1.11 is required.
 
 # Statically linking to htslib
 `libhts.a` needs to be added to your project's source files.
