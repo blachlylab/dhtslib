@@ -59,9 +59,7 @@ See the documentation for more details.
 Direct bindings to htslib C API are available as submodules under `dhtslib.htslib`. 
 Naming remains the same as the original `.h` include files.
 For example, `import dhtslib.htslib.faidx` for direct access to the C function calls.
-The current compatible versions are 1.7-1.9
-(compatibility with htslib 1.10, which is ABI breaking/has API changes, is in development now
-in the htslib-110 branch)
+The current compatible versions are 1.10+
 
 Currently implemented:
 
@@ -91,7 +89,7 @@ Missing or work-in-progress:
 **Q**: Does this work with the latest htslib?
 
 **A**:
-Almost: the current release works with htslib-1.9. htslib-1.10 included large number of breaking ABI changes and many new API functions. in the `htslib-110` branch we have a work in progress which works well with htslib-1.10, and we hope to merge this in to master soon.
+Yes
 
 **Q**: Why not use [bioD](https://github.com/biod/BioD)
 
