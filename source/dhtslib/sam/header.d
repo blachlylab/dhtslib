@@ -1,3 +1,11 @@
+/**
+
+This module provides a struct that encapsulates a SAMHeader
+
+`SAMHeader` encapsulates and owns a `sam_hdr_t*`,
+and provides convenience functions to read and write header records.
+
+*/
 module dhtslib.sam.header;
 
 import htslib.sam;
@@ -29,6 +37,7 @@ struct SAMHeader
 {
     private sam_hdr_t* h;
 
+    /// Construct from existing pointer
     this(sam_hdr_t* h)
     {
         this.h = h;

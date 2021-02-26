@@ -38,7 +38,7 @@ struct BGZFile {
         this.rc++;
     }
 
-    ///
+    /// Open filename `fn` for reading
     this(string fn)
     {
         debug(dhtslib_debug) { writeln("BGZFile ctor"); }

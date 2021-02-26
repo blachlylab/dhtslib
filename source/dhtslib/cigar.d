@@ -33,6 +33,7 @@ struct Cigar
         this.ops = ops;
     }
 
+    /// null CIGAR -- don't read!
     bool is_null()
     {
         return this.ops.length == 0;
@@ -45,7 +46,7 @@ struct Cigar
     }
 
     /// return the alignment length expressed by this Cigar
-    /// TODO: use CIGAR_TYPE to get rid of switch statement for less branching
+    // TODO: use CIGAR_TYPE to get rid of switch statement for less branching
     @property int refBasesCovered()
     {
         int len;
@@ -67,6 +68,7 @@ struct Cigar
         return len;
     }
 
+    deprecated("Use camelCase names instead");
     alias ref_bases_covered = refBasesCovered;
     /// previous alignedLength function had a bug and 
     /// it is just a duplicate of ref_bases_covered
@@ -287,12 +289,15 @@ debug (dhtslib_unittest) unittest
     assert(itr.map!(x => CIGAR_STR[x]).array.idup == "MMMMMMMDDMMMM");
 }
 
+/// Coordinate pair representing aligned query and reference positions,
+/// and the CIGAR op at or effecting their alignment.
 struct AlignedCoordinate
 {
     int qpos, rpos;
     Ops cigar_op;
 }
 
+/// Iterator yielding all AlignedCoordinate pairs for a given CIGAR string
 struct AlignedCoordinatesItr
 {
     CigarItr itr;
@@ -307,11 +312,13 @@ struct AlignedCoordinatesItr
         current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
     }
 
+    /// InputRange interface
     AlignedCoordinate front()
     {
         return current;
     }
 
+    /// InputRange interface
     void popFront()
     {
         itr.popFront;
@@ -320,6 +327,7 @@ struct AlignedCoordinatesItr
         current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
     }
 
+    /// InputRange interface
     bool empty()
     {
         return itr.empty;

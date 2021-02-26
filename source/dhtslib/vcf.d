@@ -1,4 +1,4 @@
-/**
+/** Module provides VCF Reader/Writer
 
 VCF version 4.2 (including BCF) reader and writer, including
 a model with convenience functions for the header (metadata)

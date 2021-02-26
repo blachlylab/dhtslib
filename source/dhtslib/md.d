@@ -4,7 +4,9 @@ Module to deal with SAM records' `MD` auxillary tag.
 This tag is a string encoding mismatched and deleted reference bases,
 used in conjunction with CIGAR and SEQ fields to reconstruct the bases
 of the reference sequence interval to which the alignment has been mapped.
-This can enable variant calling without require access to the entire original reference.
+This can enable variant calling without requiring access to the entire original reference.
+
+"For example,  a string `10A5^AC6` means from the leftmost reference base in the alignment, there are 10 matches followed by an A on the reference which is different from the aligned read base; the next 5 reference bases are matches followed by a 2bp deletion from the reference; the deleted sequence is AC; the last 6 bases are matches."
 
 Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
 */
@@ -58,6 +60,7 @@ struct MDPair
     }
 }
 
+/// (?) For SAM record `rec`, return ForwardRange over read's MD tag data
 auto getMDPairs(SAMRecord rec)
 {
     struct MDPairs
@@ -99,6 +102,7 @@ auto getMDPairs(SAMRecord rec)
     return MDPairs(tag.toString);
 }
 
+/// (?) Iterator yielding mismatched base in query; or '=' if equal to reference
 struct MDItr
 {
     ReturnType!getMDPairs mdPairs;

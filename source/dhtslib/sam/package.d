@@ -724,6 +724,7 @@ debug(dhtslib_unittest) unittest
     assert(pairs.map!(x => x.queryBase).array == "G-AAA");
 }
 
+deprecated("Use SAMReader instead of SAMFile")
 alias SAMFile = SAMReader;
 /**
 Encapsulates a SAM/BAM file.
