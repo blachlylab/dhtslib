@@ -35,3 +35,5 @@ jobs:
 
       - name: Run tests
         run: dub -q test -b=unittest-cov
+        env:
+          LIBRARY_PATH: /usr/local/lib 
