@@ -24,13 +24,13 @@ struct Cigar
     /// Construct Cigar from raw data
     this(uint* cigar, uint length)
     {
-        ops = (cast(CigarOp*) cigar)[0 .. length];
+        ops = (cast(CigarOp*) cigar)[0 .. length].dup;
     }
 
     /// Construct Cigar from an array of CIGAR ops
     this(CigarOp[] ops)
     {
-        this.ops = ops;
+        this.ops = ops.dup;
     }
 
     bool is_null()
@@ -85,6 +85,25 @@ struct Cigar
         }
 
         return result;
+    }
+
+    ref CigarOp opIndex(ulong i){
+        return ops[i];
+    }
+
+    CigarOp[] opIndex(size_t[2] range){
+        return ops[range[0] .. range[1]];
+    }
+
+    CigarOp opIndexAssign(CigarOp value, size_t index)
+    {
+        return ops[index] = value;
+    }
+
+    CigarOp[] opIndexAssign(CigarOp[] values, size_t[2] indexes)
+    {
+        assert(indexes[1] - indexes[0] == values.length);
+        return ops[indexes[0] .. indexes[1]] = values;
     }
 }
 
