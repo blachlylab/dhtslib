@@ -37,6 +37,7 @@ docs/
 
 # test output
 output.vcf
+test.bam
 
 # vi/vim
 *.swp
