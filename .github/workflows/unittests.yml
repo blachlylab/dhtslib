@@ -36,4 +36,11 @@ jobs:
       - name: Run tests
         run: dub -q test -b=unittest-cov
         env:
-          LIBRARY_PATH: /usr/local/lib 
+          LIBRARY_PATH: /usr/local/lib
+
+  codecov:
+    name: Upload coverage
+    needs: linux-unittests
+    env:
+      CODECOV_TOKEN: a3596086-1032-43ae-bf7a-903a67a0a272
+    run: bash <(curl -s https://codecov.io/bash)
