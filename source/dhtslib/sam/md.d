@@ -8,7 +8,7 @@ This can enable variant calling without require access to the entire original re
 
 Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
 */
-module dhtslib.md;
+module dhtslib.sam.md;
 
 import dhtslib.sam : SAMRecord;
 import dhtslib.cigar;

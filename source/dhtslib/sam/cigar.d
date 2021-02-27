@@ -1,7 +1,7 @@
 /**
 This module simplifies working with CIGAR strings/ops from SAM/BAM/CRAM alignment records.
 */
-module dhtslib.cigar;
+module dhtslib.sam.cigar;
 
 import std.stdio;
 import std.bitmanip : bitfields;
