@@ -1,6 +1,7 @@
 dhtslib
 =======
 
+[![unittests](https://github.com/blachlylab/dhtslib/actions/workflows/unittests.yml/badge.svg)](https://github.com/blachlylab/dhtslib/actions/workflows/unittests.yml)
 
 # Overview
 
