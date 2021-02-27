@@ -26,10 +26,7 @@ jobs:
 
       - name: Build htslib
         run: |
-            cd htslib
-            ./configure
-            make
-            sudo make install
+            cd htslib && ./configure && make && sudo make install
             sudo ldconfig
 
       - name: Run tests
