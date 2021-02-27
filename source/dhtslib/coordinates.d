@@ -128,7 +128,7 @@ unittest
     assert(c0.size == 100);
 
     auto c1 = c0.to!(CoordSystem.obc);
-    assert(c1 == Coordinates!(CoordSystem.obc)(1, 100);
+    assert(c1 == Coordinates!(CoordSystem.obc)(1, 100));
 
     // ...
 }
