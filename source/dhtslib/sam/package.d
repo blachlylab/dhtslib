@@ -49,7 +49,7 @@ import htslib.hfile : hdopen, hclose, hFILE;
 import htslib.hts_log;
 import htslib.kstring;
 import htslib.sam;
-import dhtslib.cigar;
+import dhtslib.sam.cigar;
 import dhtslib.tagvalue;
 
 /**
@@ -502,7 +502,7 @@ class SAMRecord
     /// range is 0-based half open using chromosomal coordinates
     auto getAlignedPairs(bool withRefSeq)(long start, long end)
     {
-        import dhtslib.md : MDItr;
+        import dhtslib.sam.md : MDItr;
         import std.range : dropExactly;
         struct AlignedPairs(bool refSeq)
         {
@@ -709,7 +709,7 @@ debug(dhtslib_unittest) unittest
 {
     import std.stdio;
     import dhtslib.sam;
-    import dhtslib.md : MDItr;
+    import dhtslib.sam.md : MDItr;
     import std.algorithm: map;
     import std.array: array;
     import std.path:buildPath,dirName;

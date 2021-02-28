@@ -11,7 +11,7 @@ Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
 module dhtslib.sam.md;
 
 import dhtslib.sam : SAMRecord;
-import dhtslib.cigar;
+import dhtslib.sam.cigar;
 import htslib.hts_log;
 import std.regex;
 import std.traits : ReturnType;
@@ -152,7 +152,7 @@ debug (dhtslib_unittest) unittest
     import std.array : array;
     import std.path : buildPath, dirName;
 
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
     auto read = bam.all_records.front;
     read["MD"] = "2G11^GATC7T6^A11";
