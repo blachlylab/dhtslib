@@ -33,12 +33,21 @@ jobs:
             sudo make install
             sudo ldconfig
 
+      - name: Get htslib commit
+        id: get-htslib-commit
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
+      - name: Cache htslib
+        uses: actions/cache@v2
+        with:
+          path: htslib
+          key: ${{ runner.os}}-htslib-${{ steps.get-htslib-commit.outputs.sha_short }}
+
       - name: Run tests
         run: dub -q test -b=unittest-cov
         env:
           LIBRARY_PATH: /usr/local/lib
 
-      # TODO: need to probably only update this for one value of os,dc matrix
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash)
         env:
