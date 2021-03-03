@@ -24,24 +24,30 @@ jobs:
         run: |
             sudo apt-get install -y build-essential autoconf zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev libssl-dev
 
+      - name: Get htslib commit
+        id: get-htslib-commit
+        run: echo "::set-output name=sha_short::$(git rev-parse --short :htslib)"
+
+      - name: Cache htslib
+        id: cache-htslib
+        uses: actions/cache@v2
+        with:
+          path: htslib
+          key: ${{ runner.os}}-htslib-${{ steps.get-htslib-commit.outputs.sha_short }}
+
       - name: Build htslib
+        if: steps.cache-htslib.outputs.cache-hit != 'true'
         run: |
             cd htslib
             autoreconf -i
             ./configure
             make
+
+      - name: Install htslib
+        run: |
+            cd htslib
             sudo make install
             sudo ldconfig
-
-      - name: Get htslib commit
-        id: get-htslib-commit
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
-
-      - name: Cache htslib
-        uses: actions/cache@v2
-        with:
-          path: htslib
-          key: ${{ runner.os}}-htslib-${{ steps.get-htslib-commit.outputs.sha_short }}
 
       - name: Run tests
         run: dub -q test -b=unittest-cov
