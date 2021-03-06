@@ -25,13 +25,13 @@ struct Cigar
     /// Construct Cigar from raw data
     this(uint* cigar, uint length)
     {
-        ops = (cast(CigarOp*) cigar)[0 .. length].dup;
+        ops = (cast(CigarOp*) cigar)[0 .. length];
     }
 
     /// Construct Cigar from an array of CIGAR ops
     this(CigarOp[] ops)
     {
-        this.ops = ops.dup;
+        this.ops = ops;
     }
 
     bool is_null()
