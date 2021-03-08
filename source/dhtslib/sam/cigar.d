@@ -1,7 +1,7 @@
 /**
 This module simplifies working with CIGAR strings/ops from SAM/BAM/CRAM alignment records.
 */
-module dhtslib.cigar;
+module dhtslib.sam.cigar;
 
 import std.stdio;
 import std.bitmanip : bitfields;
@@ -10,6 +10,7 @@ import std.algorithm : map;
 import std.algorithm.iteration : each;
 import std.conv : to;
 import std.range : array;
+import std.traits : isIntegral;
 
 import htslib.hts_log;
 import dhtslib.sam : SAMRecord;
@@ -85,6 +86,31 @@ struct Cigar
         }
 
         return result;
+    }
+    
+    /// Get a Slice of cigar ops from a range in the Cigar string
+    auto opSlice(T)(T start, T end) if (isIntegral!T)
+    {
+        return ops[start .. end];
+    }
+
+    /// Get a cigar op from a single position in the Cigar string
+    ref auto opIndex(ulong i)
+    {
+        return ops[i];
+    }
+
+    /// Assign a cigar op at a single position in the Cigar string
+    auto opIndexAssign(CigarOp value, size_t index)
+    {
+        return ops[index] = value;
+    }
+
+    /// Assign a range cigar ops over a range in the Cigar string
+    auto opSliceAssign(T)(CigarOp[] values, T start, T end)
+    {
+        assert(end - start == values.length);
+        return ops[start .. end] = values;
     }
 }
 
@@ -187,7 +213,7 @@ debug (dhtslib_unittest) unittest
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing cigar");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
@@ -197,6 +223,11 @@ debug (dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Cigar:" ~ cigar.toString());
     writeln(cigar.toString());
     assert(cigar.toString() == "78M1D22M");
+    assert(cigar[0] == CigarOp(78, Ops.MATCH));
+    assert(Cigar(cigar[0 .. 2]).toString == "78M1D");
+    cigar[0] = CigarOp(4,Ops.HARD_CLIP);
+    cigar[1..3] = [CigarOp(2, Ops.INS), CigarOp(21, Ops.MATCH)];
+    assert(cigar.toString() == "4H2I21M");
 }
 
 /// return Cigar struct for a given CIGAR string (e.g. from SAM line)
@@ -336,7 +367,7 @@ debug (dhtslib_unittest) unittest
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing cigar");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
