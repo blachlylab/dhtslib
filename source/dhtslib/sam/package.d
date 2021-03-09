@@ -1089,7 +1089,6 @@ struct SAMReader
     AllRecordsRange allRecords()
     {
         auto range = AllRecordsRange(this.fp, this.header, bam_init1());
-        range.popFront();
         return range;
     }
 
@@ -1102,16 +1101,22 @@ struct SAMReader
         private htsFile*    fp;     // belongs to parent; shared
         private sam_hdr_t*  header; // belongs to parent; shared
         private bam1_t*     b;
-        private int success;
+        private bool initialized;   // Needed to support both foreach and immediate .front()
+        private int success;        // sam_read1 return code
+
         ~this()
         {
             //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
+            //TODO ?: free(this.b);
         }
 
         /// InputRange interface
         @property bool empty() // @suppress(dscanner.suspicious.incorrect_infinite_range)
         {
-            //    int sam_read1(samFile *fp, bam_hdr_t *h, bam1_t *b);
+            if (!this.initialized) {
+                this.popFront();
+                this.initialized = true;
+            }
             if (success >= 0)
                 return false;
             else if (success == -1)
@@ -1126,14 +1131,12 @@ struct SAMReader
         void popFront()
         {
             success = sam_read1(this.fp, this.header, this.b);
-            // noop? 
-            // free this.b ?
-
             //bam_destroy1(this.b);
         }
         /// ditto
         SAMRecord front()
         {
+            assert(this.initialized, "front called before empty");
             return new SAMRecord(bam_dup1(this.b), this.header);
         }
 

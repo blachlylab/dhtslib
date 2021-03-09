@@ -79,13 +79,15 @@ int main()
 
     hts_log_info(__FUNCTION__, "Test AllRecordsRange iterator");
     int i;
+    // TODO: remove below once RecordRange is fixed
+    sf = SAMFile("./htslib/test/range.bam");
     auto x = sf.all_records;
     foreach(r; x) {
         i++;
         //writeln(r.queryName);
     }
     writefln("%d records", i);
-    assert(i == 112);
+    assert(i == 112);   // confirmed by samtools flagstat
 
     return 0;
 }
