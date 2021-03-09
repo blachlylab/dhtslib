@@ -1092,16 +1092,22 @@ struct SAMReader
 
 
     /// Return an InputRange representing all recods in the SAM/BAM/CRAM
-    AllRecordsRange allRecords()
+    RecordRange allRecords()
     {
-        auto range = AllRecordsRange(this.fp, this.header, bam_init1());
-        return range;
+        if (!this.fp.is_bgzf)
+            hts_log_error(__FUNCTION__, "Uncompressed SAM files don't support iterators; use sam_read1 directly");
+
+        //auto range = AllRecordsRange(this.fp, this.header);
+        import htslib.hts : HTS_IDX_START;
+        auto itr = sam_itr_queryi(this.idx, HTS_IDX_START, 0, 0);
+        return RecordRange(this.fp, this.header, itr);
     }
 
     deprecated("Avoid snake_case names")
     alias all_records = allRecords;
 
     /// Iterate through all records in the SAM/BAM/CRAM
+    deprecated("Use RecordRange with the HTS_IDX_START itr")
     struct AllRecordsRange
     {
         private htsFile*    fp;     // belongs to parent; shared
@@ -1109,6 +1115,20 @@ struct SAMReader
         private bam1_t*     b;
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
+
+        this(htsFile* fp, sam_hdr_t* header)
+        {
+            this.fp = fp;
+            this.header = header;
+            this.b = bam_init1();
+
+            // Sigh. Def necessary to seek(0), but will segfault for some reason
+            import core.stdc.stdio : SEEK_SET;
+            import htslib.hfile : hseek, htell, hFILE;
+            writeln(fp.fp.hfile);
+            writeln(htell(fp.fp.hfile));
+            hseek(fp.fp.hfile, 0, SEEK_SET);
+        }
 
         ~this()
         {
@@ -1157,29 +1177,33 @@ struct SAMReader
         private hts_itr_t* itr;
         private bam1_t* b;
 
-        private int r;
+        private int r;  // sam_itr_next: >= 0 on success; -1 when there is no more data; < -1 on error
 
-        ///
+        /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
         this(htsFile* fp, sam_hdr_t* header, hts_itr_t* itr)
         {
             this.fp = fp;
             this.h = header;
             this.itr = itr;
-            b = bam_init1();
-            //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
-            hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int) itr == 0));
-            popFront();
+            this.b = bam_init1();
+            
+            //assert(itr !is null, "itr was null");
+ 
+            if (this.itr !is null)
+                popFront();
         }
 
         /// InputRange interface
         @property bool empty()
         {
-            return (r <= 0 && itr.finished) ? true : false;
+            // TODO, itr.finished shouldn't be used
+            if (this.itr is null) return true;
+            return (r < 0 || itr.finished) ? true : false;
         }
         /// ditto
         void popFront()
         {
-            r = sam_itr_next(this.fp, this.itr, this.b);
+            this.r = sam_itr_next(this.fp, this.itr, this.b);
         }
         /// ditto
         SAMRecord front()
