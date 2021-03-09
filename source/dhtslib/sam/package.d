@@ -589,7 +589,9 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing SAMRecord mutation");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
-    auto read=bam.all_records.front;
+    auto ar = bam.allRecords;
+    assert(ar.empty == false);
+    auto read = ar.front;
 
     //change queryname
     hts_log_info(__FUNCTION__, "Testing queryname");
@@ -653,7 +655,9 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing SAMRecord mutation w/ realloc");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
-    auto read=bam.all_records.front;
+    auto ar = bam.allRecords;
+    assert(ar.empty == false);
+    auto read = ar.front;
 
     //change queryname
     hts_log_info(__FUNCTION__, "Testing queryname");
@@ -715,7 +719,9 @@ debug(dhtslib_unittest) unittest
     import std.path:buildPath,dirName;
 
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
-    auto read=bam.all_records.front;
+    auto ar = bam.allRecords;
+    assert(ar.empty == false);
+    auto read = ar.front;
     auto pairs = read.getAlignedPairs!true(read.pos + 77, read.pos + 77 + 5);
 
     assert(pairs.map!(x => x.qpos).array == [77,77,78,79,80]);
@@ -1484,15 +1490,19 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing SAMWriter");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
-    auto readrange = sam.allRecords;
     auto sam2 = SAMWriter("test.bam",sam.header);
+
     hts_log_info(__FUNCTION__, "Getting read 1");
+    auto readrange = sam.allRecords;
+    assert(readrange.empty == false);
     auto read = readrange.front();
+
     sam2.write(read);
     sam2.close;
     destroy(sam2);
     sam = SAMFile("test.bam");
     readrange = sam.allRecords;
+    assert(readrange.empty == false);
     read = readrange.front();
     writeln(read.sequence);
     assert(read.sequence=="GCTAGCTCAG");
@@ -1550,6 +1560,7 @@ debug(dhtslib_unittest) unittest
     auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
     auto readrange = sam.allRecords;
     hts_log_info(__FUNCTION__, "Getting read 1");
+    assert(readrange.empty == false);
     auto read = readrange.front();
     writeln(read.sequence);
     assert(read.sequence=="GCTAGCTCAG");
@@ -1571,6 +1582,7 @@ debug(dhtslib_unittest) unittest
     auto b = bam_init1();
     auto hdr = bam_hdr_init();
     string hdr_str;
+    assert(range.empty == false);
     for (auto i = 0; i < 4; i++)
     {
         hdr_str ~= range.front ~ "\n";

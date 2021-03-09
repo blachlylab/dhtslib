@@ -154,7 +154,9 @@ debug (dhtslib_unittest) unittest
 
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
-    auto read = bam.all_records.front;
+    auto ar = bam.allRecords;
+    assert(ar.empty == false);
+    auto read = ar.front;
     read["MD"] = "2G11^GATC7T6^A11";
     assert(MDItr(read).array == "==G===========GATC=======T======A===========");
 }

@@ -217,6 +217,7 @@ debug (dhtslib_unittest) unittest
             "test", "range.bam"), 0);
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
+    assert(readrange.empty == false);
     auto read = readrange.front();
     auto cigar = read.cigar;
     writeln(read.queryName);
@@ -371,6 +372,7 @@ debug (dhtslib_unittest) unittest
             "test", "range.bam"), 0);
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
+    assert(readrange.empty == false);
     auto read = readrange.front();
     writeln(read.getAlignedCoordinates(read.pos + 77, read.pos + 82));
 }

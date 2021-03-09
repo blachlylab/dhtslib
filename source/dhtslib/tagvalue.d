@@ -214,15 +214,20 @@ debug (dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
             "test", "auxf#values.sam"), 0);
+
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto readrange = bam.all_records(); // @suppress(dscanner.suspicious.unmodified)
+    assert(readrange.empty == false);
     auto read = readrange.front;
+
     hts_log_info(__FUNCTION__, "Testing string");
     assert(read["RG"].to!string == "ID");
+
     hts_log_info(__FUNCTION__, "Testing char");
     assert(read["A!"].to!char == '!');
     assert(read["Ac"].to!char == 'c');
     assert(read["AC"].to!char == 'C');
+
     hts_log_info(__FUNCTION__, "Testing int");
     assert(read["I0"].to!ubyte == 0);
     assert(read["I1"].to!ubyte == 1);
