@@ -158,6 +158,7 @@ debug(dhtslib_unittest) unittest
     import htslib.hts_log : hts_log_info;
     import std.path : buildPath,dirName;
     import std.string : fromStringz;
+    import std.array : array;
 
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing SAMWriter");
@@ -179,6 +180,7 @@ debug(dhtslib_unittest) unittest
     read = readrange.front();
     writeln(read.sequence);
     assert(read.sequence=="GCTAGCTCAG");
+    assert(sam.allRecords.array.length == 1);
     // destroy(sam2);
 }
 

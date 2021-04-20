@@ -1,13 +1,17 @@
 module dhtslib.sam.reader;
 
+import core.stdc.stdio : SEEK_SET;
 import std.format;
 import std.stdio : writeln, writefln, stderr, File;
 import std.string : fromStringz, toStringz;
 import std.typecons : Tuple;
+import std.range.interfaces : InputRange, inputRangeObject;
+import std.range.primitives : isInputRange, ElementType;
 
-import htslib.hts : htsFile, hts_open, hts_close, hts_hopen, hts_set_threads;
+import htslib.hts : htsFile, hts_open, hts_close, hts_hopen, hts_set_threads, htsExactFormat;
 import htslib.hts : hts_idx_t, hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
-import htslib.hfile : hdopen, hclose, hFILE;
+import htslib.hfile : hdopen, hclose, hFILE, off_t, htell, hseek;
+import htslib.bgzf : bgzf_tell, bgzf_seek;
 
 import htslib.hts_log;
 import htslib.kstring;
@@ -38,6 +42,8 @@ struct SAMReader
 
     /// header struct
     bam_hdr_t* header = null;
+
+    private off_t header_offset;
 
     /// SAM/BAM/CRAM index 
     private hts_idx_t* idx;
@@ -113,6 +119,11 @@ struct SAMReader
             // TODO: edit range to return empty immediately if no idx
         }
         hts_log_debug(__FUNCTION__, format("SAM index: %s", this.idx));
+
+        // collect header offset just in case it is a sam file
+        // we would like to iterate
+        if(this.fp.is_bgzf) this.header_offset = bgzf_tell(this.fp.fp.bgzf);
+        else this.header_offset = htell(this.fp.fp.hfile);
     }
 
     ~this()
@@ -376,43 +387,105 @@ struct SAMReader
     }
 
 
-    /// Return an InputRange representing all recods in the SAM/BAM/CRAM
-    RecordRange allRecords()
+    /// Return an InputRange representing all records in the SAM/BAM/CRAM
+    InputRange!SAMRecord allRecords()
     {
-        if (!this.fp.is_bgzf)
-            hts_log_error(__FUNCTION__, "Uncompressed SAM files don't support iterators; use sam_read1 directly");
-
-        //auto range = AllRecordsRange(this.fp, this.header);
-        import htslib.hts : HTS_IDX_START;
-        auto itr = sam_itr_queryi(this.idx, HTS_IDX_START, 0, 0);
-        return RecordRange(this.fp, this.header, itr);
+        if (this.fp.format.format == htsExactFormat.sam)
+            return SamRecordsRange(this.fp, this.header, this.header_offset).inputRangeObject;
+        else if(this.idx == null){
+            return BamRecordsRange(this.fp, this.header, this.header_offset).inputRangeObject;
+        }else{
+            assert(this.fp.format.format == htsExactFormat.bam);
+            //auto range = AllRecordsRange(this.fp, this.header);
+            import htslib.hts : HTS_IDX_START;
+            auto itr = sam_itr_queryi(this.idx, HTS_IDX_START, 0, 0);
+            return RecordRange(this.fp, this.header, itr).inputRangeObject;
+        }
     }
 
     deprecated("Avoid snake_case names")
     alias all_records = allRecords;
 
-    /// Iterate through all records in the SAM/BAM/CRAM
-    deprecated("Use RecordRange with the HTS_IDX_START itr")
-    struct AllRecordsRange
+    /// Iterate through all records in the BAM or BGZF compressed SAM with no index
+    struct BamRecordsRange
     {
         private htsFile*    fp;     // belongs to parent; shared
+        private off_t header_offset;
         private sam_hdr_t*  header; // belongs to parent; shared
         private bam1_t*     b;
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
-        this(htsFile* fp, sam_hdr_t* header)
+        this(htsFile* fp, sam_hdr_t* header, off_t header_offset)
         {
             this.fp = fp;
+            this.header_offset = header_offset;
+            this.header = header;
+            this.b = bam_init1();
+            
+            // Need to seek past header offset
+            bgzf_seek(fp.fp.bgzf, this.header_offset, SEEK_SET);
+        }
+
+        ~this()
+        {
+            //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
+            //TODO ?: free(this.b);
+        }
+
+        /// InputRange interface
+        @property bool empty() // @suppress(dscanner.suspicious.incorrect_infinite_range)
+        {
+            if (!this.initialized) {
+                this.popFront();
+                this.initialized = true;
+            }
+            if (success >= 0)
+                return false;
+            else if (success == -1)
+                return true;
+            else
+            {
+                hts_log_error(__FUNCTION__, "*** ERROR sam_read1 < -1");
+                return true;
+            }
+        }
+        /// ditto
+        void popFront()
+        {
+            success = sam_read1(this.fp, this.header, this.b);
+            writeln(success);
+            //bam_destroy1(this.b);
+        }
+        /// ditto
+        SAMRecord front()
+        {
+            assert(this.initialized, "front called before empty");
+            return new SAMRecord(bam_dup1(this.b), this.header);
+        }
+
+    }
+
+    /// Iterate through all records in the SAM
+    struct SamRecordsRange
+    {
+        private htsFile*    fp;     // belongs to parent; shared
+        private sam_hdr_t*  header; // belongs to parent; shared
+        private off_t header_offset;
+        private bam1_t*     b;
+        private bool initialized;   // Needed to support both foreach and immediate .front()
+        private int success;        // sam_read1 return code
+
+        this(htsFile* fp, sam_hdr_t* header, off_t header_offset)
+        {
+            this.fp = fp;
+            this.header_offset = header_offset;
+            assert(this.fp.format.format == htsExactFormat.sam);
             this.header = header;
             this.b = bam_init1();
 
-            // Sigh. Def necessary to seek(0), but will segfault for some reason
-            import core.stdc.stdio : SEEK_SET;
-            import htslib.hfile : hseek, htell, hFILE;
-            writeln(fp.fp.hfile);
-            writeln(htell(fp.fp.hfile));
-            hseek(fp.fp.hfile, 0, SEEK_SET);
+            // Need to seek past header offset
+            hseek(fp.fp.hfile, this.header_offset, SEEK_SET);
         }
 
         ~this()
@@ -496,6 +569,9 @@ struct SAMReader
             return new SAMRecord(bam_dup1(b), this.h);
         }
     }
+
+    static assert(isInputRange!RecordRange);
+    static assert(is(ElementType!RecordRange == SAMRecord));
 
     /// Iterate over records falling within queried regions using a RegionList
     struct RecordRangeMulti
