@@ -12,6 +12,7 @@ import htslib.hts_log;
 import htslib.sam;
 import dhtslib.sam.cigar;
 import dhtslib.sam.tagvalue;
+import dhtslib.sam.header;
 
 /**
 Encapsulates a SAM/BAM/CRAM record,
@@ -24,7 +25,7 @@ struct SAMRecord
     bam1_t* b;
 
     /// Corresponding SAM/BAM header data
-    sam_hdr_t* h;
+    SAMHeader h;
 
     private int refct;      // Postblit refcounting in case the object is passed around
 
@@ -36,7 +37,7 @@ struct SAMRecord
     }
    
     /// ditto
-    this(sam_hdr_t* h)
+    this(SAMHeader h)
     {
         this.b = bam_init1();
         this.h = h;
@@ -52,7 +53,7 @@ struct SAMRecord
     }
 
     /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
-    this(bam1_t* b, sam_hdr_t* h)
+    this(bam1_t* b, SAMHeader h)
     {
         this.b = b;
         this.h = h;
@@ -82,8 +83,8 @@ struct SAMRecord
     pragma(inline, true)
     @property const(char)[] referenceName()
     {
-        assert(this.h !is null);
-        return fromStringz( sam_hdr_tid2name(this.h, this.b.core.tid) );
+        assert(!this.h.isNull);
+        return this.h.targetName(this.b.core.tid);
     }
  
     /// 0-based leftmost coordinate

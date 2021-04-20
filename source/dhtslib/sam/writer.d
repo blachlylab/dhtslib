@@ -13,6 +13,7 @@ import htslib.kstring;
 import htslib.sam;
 import htslib.hts_log;
 import dhtslib.sam.record;
+import dhtslib.sam.header;
 import dhtslib.sam : parseSam;
 
 
@@ -43,7 +44,7 @@ struct SAMWriter
     private hFILE* f;
 
     /// header struct
-    bam_hdr_t* header = null;
+    SAMHeader header;
 
     private kstring_t line;
 
@@ -59,7 +60,7 @@ struct SAMWriter
                         0  use no extra threads
                         >1 add indicated number of threads (to a default of 1)
     */
-    this(T)(T f,bam_hdr_t * header, SAMWriterTypes t=SAMWriterTypes.DEDUCE,int extra_threads = -1)
+    this(T)(T f,SAMHeader header, SAMWriterTypes t=SAMWriterTypes.DEDUCE,int extra_threads = -1)
     if (is(T == string) || is(T == File))
     {
         import std.parallelism : totalCPUs;
@@ -123,8 +124,8 @@ struct SAMWriter
         }
 
         // read header
-        this.header = bam_hdr_dup(header);
-        sam_hdr_write(this.fp,this.header);
+        this.header = header.dup;
+        sam_hdr_write(this.fp,this.header.h);
     }
 
     ~this()
@@ -133,8 +134,6 @@ struct SAMWriter
         {
             writeln("SAMWriter dtor");
         }
-
-        bam_hdr_destroy(this.header);
 
     }
 
@@ -147,7 +146,7 @@ struct SAMWriter
 
     /// Write a SAMRecord to disk
     void write(SAMRecord rec){
-        const auto ret = sam_write1(this.fp, this.header, rec.b);
+        const auto ret = sam_write1(this.fp, this.header.h, rec.b);
         assert(ret>=0);
     }
 }

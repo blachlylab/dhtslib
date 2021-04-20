@@ -17,6 +17,7 @@ import htslib.hts_log;
 import htslib.kstring;
 import htslib.sam;
 import dhtslib.sam.record;
+import dhtslib.sam.header;
 import dhtslib.sam : cmpInterval, cmpRegList;
 
 alias SAMFile = SAMReader;
@@ -41,7 +42,7 @@ struct SAMReader
     private hFILE* f;
 
     /// header struct
-    bam_hdr_t* header = null;
+    SAMHeader header;
 
     private off_t header_offset;
 
@@ -110,7 +111,7 @@ struct SAMReader
         }
 
         // read header
-        this.header = sam_hdr_read(this.fp);
+        this.header = SAMHeader(sam_hdr_read(this.fp));
         this.idx = sam_index_load(this.fp, this.fn);
         if (this.idx == null)
         {
@@ -132,8 +133,9 @@ struct SAMReader
         {
             writeln("SAMFile dtor");
         }
-
-        bam_hdr_destroy(this.header);
+        
+        // SAMHeader now takes care of this
+        // bam_hdr_destroy(this.header);
 
         if((this.fp !is null) && (this.f is null))
         {
@@ -144,47 +146,46 @@ struct SAMReader
     }
 
     /// number of reference sequences; from bam_hdr_t
+    deprecated("use these properties from SAMHeader")
     @property int nTargets() const
     {
-        return this.header.n_targets;
+        return this.header.nTargets;
     }
     alias n_targets = nTargets;
 
     /// length of specific reference sequence by number (`tid`)
+    deprecated("use these properties from SAMHeader")
     uint targetLength(int target) const
     in (target >= 0)
     in (target < this.nTargets)
     {
-        return this.header.target_len[target];
+        return this.header.targetLength(target);
     }
     alias targetLen = targetLength;
     alias target_len = targetLength;
 
     /// lengths of the reference sequences
+    deprecated("use these properties from SAMHeader")
     @property uint[] targetLengths() const
     {
-        return this.header.target_len[0 .. this.n_targets].dup;
+        return this.header.targetLengths;
     }
     alias targetLens = targetLengths;
     alias target_lens = targetLengths;
 
     /// names of the reference sequences
+    deprecated("use these properties from SAMHeader")
     @property string[] targetNames() const
     {
-        string[] names;
-        names.length = this.n_targets;
-        foreach (i; 0 .. this.n_targets)
-        {
-            names[i] = fromStringz(this.header.target_name[i]).idup;
-        }
-        return names;
+        return this.header.targetNames;
     }
     alias target_names = targetNames;
 
     /// reference contig name to integer id
+    deprecated("use these properties from SAMHeader")
     int targetId(string name)
     {
-        return sam_hdr_name2tid(this.header, toStringz(name));
+        return this.header.targetId(name);
     }
     alias target_id = targetId;
 
@@ -246,15 +247,15 @@ struct SAMReader
     *   ```
     */ 
     auto query(string chrom, long start, long end)
-    in (this.header !is null)
+    in (!this.header.isNull)
     {
-        auto tid = sam_hdr_name2tid(this.header, toStringz(chrom));
+        auto tid = this.header.targetId(chrom);
         return query(tid, start, end);
     }
 
     /// ditto
     auto query(int tid, long start, long end)
-    in (this.header !is null)
+    in (!this.header.isNull)
     {
         auto itr = sam_itr_queryi(this.idx, tid, start, end);
         return RecordRange(this.fp, this.header, itr);
@@ -262,15 +263,15 @@ struct SAMReader
 
     /// ditto
     auto query(string q)
-    in (this.header !is null)
+    in (!this.header.isNull)
     {
-        auto itr = sam_itr_querys(this.idx, this.header, toStringz(q));
+        auto itr = sam_itr_querys(this.idx, this.header.h, toStringz(q));
         return RecordRange(this.fp, this.header, itr);
     }
 
     /// ditto
     auto query(string[] regions)
-    in (this.header !is null)
+    in (!this.header.isNull)
     {
         return RecordRangeMulti(this.fp, this.idx, this.header, &(this), regions);
     }
@@ -361,15 +362,15 @@ struct SAMReader
     /// ditto
     auto opIndex(string ctg, OffsetType endoff)
     {
-        auto tid = this.targetId(ctg);
-        auto end = this.targetLength(tid) + endoff.offset;
+        auto tid = this.header.targetId(ctg);
+        auto end = this.header.targetLength(tid) + endoff.offset;
         // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
         return query(tid, end, end + 1);
     }
     /// ditto
     auto opIndex(int tid, OffsetType endoff)
     {
-        auto end = this.targetLength(tid) + endoff.offset;
+        auto end = this.header.targetLength(tid) + endoff.offset;
         // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
         return query(tid, end, end + 1);
     }
@@ -381,14 +382,14 @@ struct SAMReader
     /// ditto
     auto opIndex(string ctg, Tuple!(long, OffsetType) coords)
     {
-        auto tid = this.targetId(ctg);
-        auto end = this.targetLength(tid) + coords[1];
+        auto tid = this.header.targetId(ctg);
+        auto end = this.header.targetLength(tid) + coords[1];
         return query(tid, coords[0], end);
     }
     /// ditto
     auto opIndex(int tid, Tuple!(long, OffsetType) coords)
     {
-        auto end = this.targetLength(tid) + coords[1];
+        auto end = this.header.targetLength(tid) + coords[1];
         return query(tid, coords[0], end);
     }
 
@@ -417,12 +418,12 @@ struct SAMReader
     {
         private htsFile*    fp;     // belongs to parent; shared
         private off_t header_offset;
-        private sam_hdr_t*  header; // belongs to parent; shared
+        private SAMHeader header; // belongs to parent; shared
         private bam1_t*     b;
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
-        this(htsFile* fp, sam_hdr_t* header, off_t header_offset)
+        this(htsFile* fp, SAMHeader header, off_t header_offset)
         {
             this.fp = fp;
             this.header_offset = header_offset;
@@ -459,7 +460,7 @@ struct SAMReader
         /// ditto
         void popFront()
         {
-            success = sam_read1(this.fp, this.header, this.b);
+            success = sam_read1(this.fp, this.header.h, this.b);
             //bam_destroy1(this.b);
         }
         /// ditto
@@ -482,13 +483,13 @@ struct SAMReader
     struct SamRecordsRange
     {
         private htsFile*    fp;     // belongs to parent; shared
-        private sam_hdr_t*  header; // belongs to parent; shared
+        private SAMHeader  header; // belongs to parent; shared
         private off_t header_offset;
         private bam1_t*     b;
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
-        this(htsFile* fp, sam_hdr_t* header, off_t header_offset)
+        this(htsFile* fp, SAMHeader header, off_t header_offset)
         {
             this.fp = fp;
             this.header_offset = header_offset;
@@ -526,7 +527,7 @@ struct SAMReader
         /// ditto
         void popFront()
         {
-            success = sam_read1(this.fp, this.header, this.b);
+            success = sam_read1(this.fp, this.header.h, this.b);
             //bam_destroy1(this.b);
         }
         /// ditto
@@ -550,14 +551,14 @@ struct SAMReader
     struct RecordRange
     {
         private htsFile* fp;
-        private sam_hdr_t* h;
+        private SAMHeader h;
         private hts_itr_t* itr;
         private bam1_t* b;
 
         private int r;  // sam_itr_next: >= 0 on success; -1 when there is no more data; < -1 on error
 
         /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
-        this(htsFile* fp, sam_hdr_t* header, hts_itr_t* itr)
+        this(htsFile* fp, SAMHeader header, hts_itr_t* itr)
         {
             this.fp = fp;
             this.h = header;
@@ -603,20 +604,20 @@ struct SAMReader
     struct RecordRangeMulti
     {
         private htsFile* fp;
-        private sam_hdr_t* h;
+        private SAMHeader h;
         private hts_itr_multi_t* itr;
         private bam1_t* b;
         private hts_reglist_t[] rlist;
         private int r;
 
         ///
-        this(htsFile* fp, hts_idx_t* idx, sam_hdr_t* header, SAMFile* sam, string[] regions)
+        this(htsFile* fp, hts_idx_t* idx, SAMHeader header, SAMFile* sam, string[] regions)
         {
             rlist = RegionList(sam, regions).getRegList();
             this.fp = fp;
             this.h = header;
             b = bam_init1();
-            itr = sam_itr_regions(idx, header, rlist.ptr, cast(uint) rlist.length);
+            itr = sam_itr_regions(idx, this.h.h, rlist.ptr, cast(uint) rlist.length);
             //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
             hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int) itr == 0));
             popFront();
@@ -669,32 +670,32 @@ struct SAMReader
             auto chr = split.front;
             //split 1-2 into 1 and 2
             split = split.drop(1).front.splitter("-");
-            if (sam.target_id(chr) < 0)
+            if (sam.header.targetId(chr) < 0)
             {
                 hts_log_error(__FUNCTION__, "tid not present in sam/bam");
             }
-            addRegion(sam.target_id(chr), split.front.to!int, split.drop(1).front.to!int);
+            addRegion(sam.header.targetId(chr), split.front.to!int, split.drop(1).front.to!int);
         }
 
         /// Add a region by {target/contig/chr id, start coord, end coord} to the RegionList
         void addRegion(int tid, int beg, int end)
         {
-            if (tid > this.sam.n_targets || tid < 0)
+            if (tid > this.sam.header.nTargets || tid < 0)
                 hts_log_error(__FUNCTION__, "tid not present in sam/bam");
 
-            auto val = (this.sam.target_names[tid] in this.rlist);
+            auto val = (this.sam.header.targetNames[tid] in this.rlist);
             hts_pair32_t p;
 
             if (beg < 0)
                 hts_log_error(__FUNCTION__, "first coordinate < 0");
 
-            if (beg >= this.sam.target_len(tid))
+            if (beg >= this.sam.header.targetLength(tid))
                 hts_log_error(__FUNCTION__, "first coordinate larger than tid length");
 
             if (end < 0)
                 hts_log_error(__FUNCTION__, "second coordinate < 0");
 
-            if (end >= this.sam.target_len(tid))
+            if (end >= this.sam.header.targetLength(tid))
                 hts_log_error(__FUNCTION__, "second coordinate larger than tid length");
 
             p.beg = beg;
@@ -713,7 +714,7 @@ struct SAMReader
                 r.count = cast(uint) plist.length;
                 r.min_beg = p.beg;
                 r.max_end = p.end;
-                this.rlist[this.sam.target_names[tid]] = r;
+                this.rlist[this.sam.header.targetNames[tid]] = r;
             }
             else
             {
@@ -775,11 +776,11 @@ debug(dhtslib_unittest) unittest
     assert(sam.allRecords.array.length == 1);
 
     // testing SAMReader targets/tid functions
-    assert(sam.nTargets == 1);
-    assert(sam.targetId("Sheila") == 0);
-    assert(sam.targetLength(0) == 20);
-    assert(sam.targetLengths == [20]);
-    assert(sam.targetNames == ["Sheila"]);
+    assert(sam.header.nTargets == 1);
+    assert(sam.header.targetId("Sheila") == 0);
+    assert(sam.header.targetLength(0) == 20);
+    assert(sam.header.targetLengths == [20]);
+    assert(sam.header.targetNames == ["Sheila"]);
 
 }
 
