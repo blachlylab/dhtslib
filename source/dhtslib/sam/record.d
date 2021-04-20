@@ -4,6 +4,7 @@ import core.stdc.stdlib : calloc, free, realloc;
 import core.stdc.string : memset;
 import std.string : fromStringz, toStringz;
 import std.algorithm : filter;
+import std.range.interfaces : InputRange, inputRangeObject;
 
 import htslib.hts : seq_nt16_str, seq_nt16_table;
 
@@ -39,6 +40,7 @@ struct SAMRecord
     {
         this.b = bam_init1();
         this.h = h;
+        refct = 1;
     }
  
     /// Construct SAMRecord from supplied bam1_t
@@ -46,6 +48,7 @@ struct SAMRecord
     this(bam1_t* b)
     {
         this.b = b;
+        refct = 1;
     }
 
     /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
@@ -53,6 +56,7 @@ struct SAMRecord
     {
         this.b = b;
         this.h = h;
+        refct = 1;
     }
 
     ~this()
@@ -338,7 +342,7 @@ struct SAMRecord
     @property Cigar cigar()
     {
         // see if cigar is already initialized
-        if(p_cigar == Cigar.init) 
+        if(p_cigar.references == 0) 
             p_cigar = Cigar(bam_get_cigar(b), (*b).core.n_cigar);
         return p_cigar;
     }
@@ -435,17 +439,16 @@ struct SAMRecord
     @property void insertSize(long isize) { this.b.core.isize = isize; }
 /+ BEGIN CHERRY-PICK: TODO: confirm below chunk with htslib-1.10 (mainly long coordinates +/
     /// get aligned coordinates per each cigar op
-    auto getAlignedCoordinates(){
-        return AlignedCoordinatesItr(this.cigar);
+    InputRange!AlignedCoordinate getAlignedCoordinates(){
+        return AlignedCoordinatesItr(this.cigar).inputRangeObject;
     }
 
     /// get aligned coordinates per each cigar op within range
     /// range is 0-based half open using chromosomal coordinates
-    auto getAlignedCoordinates(long start, long end){
-        assert(start >= this.pos);
-        assert(end <= this.pos + this.cigar.ref_bases_covered);
-        auto mappedPos = this.pos;
-        return this.getAlignedCoordinates.filter!(x=> mappedPos + x.rpos >= start).filter!(x=> mappedPos + x.rpos < end);
+    InputRange!AlignedCoordinate getAlignedCoordinates(long start, long end){
+        assert(start >= 0);
+        assert(end <= this.cigar.ref_bases_covered);
+        return this.getAlignedCoordinates.filter!(x=> x.rpos >= start).filter!(x=> x.rpos < end).inputRangeObject;
     }
 
     struct AlignedPair(bool refSeq)
@@ -466,33 +469,27 @@ struct SAMRecord
     /// this is meant to recreate functionality from pysam:
     /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
     /// range is 0-based half open using chromosomal coordinates
-    auto getAlignedPairs(bool withRefSeq)(long start, long end)
+    auto  getAlignedPairs(bool withRefSeq)(long start, long end)
     {
         import dhtslib.sam.md : MDItr;
         import std.range : dropExactly;
-        import std.traits : ReturnType;
         struct AlignedPairs(bool refSeq)
         {
-            ReturnType!getAlignedCoordinates coords;
+            InputRange!AlignedCoordinate coords;
             static if(refSeq) MDItr mdItr;
             AlignedPair!refSeq current;
             const(char)[] qseq;
-
-            auto getAlignedCoordinates(SAMRecord rec, long start, long end){
-                return rec.getAlignedCoordinates(start,end);
-            }
             
-            this(SAMRecord rec, long start, long end){
+            this(InputRange!AlignedCoordinate coords, SAMRecord rec, long start, long end){
                 assert(start < end);
-                assert(start >= rec.pos);
-                assert(end <= rec.pos + rec.cigar.ref_bases_covered);
-                
-                coords = getAlignedCoordinates(rec, start, end);
+                assert(start >= 0);
+                assert(end <= rec.cigar.ref_bases_covered);
+                this.coords = coords;
                 qseq = rec.sequence;
                 static if(refSeq){
                     assert(rec["MD"].exists,"MD tag must exist for record");
                     mdItr = MDItr(rec);
-                    mdItr = mdItr.dropExactly(start - rec.pos);
+                    mdItr = mdItr.dropExactly(start);
                 } 
                 current.qpos = coords.front.qpos;
                 current.rpos = coords.front.rpos;
@@ -534,13 +531,14 @@ struct SAMRecord
             }
 
         }
-        return AlignedPairs!withRefSeq(this,start,end);
+        auto coords = this.getAlignedCoordinates(start, end);
+        return AlignedPairs!withRefSeq(coords,this,start,end).inputRangeObject;
     }
     /// get a range of aligned read and reference positions
     /// this is meant to recreate functionality from pysam:
     /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
     auto getAlignedPairs(bool withRefSeq)(){
-        return getAlignedPairs!withRefSeq(this.pos, this.pos + this.cigar.ref_bases_covered);
+        return getAlignedPairs!withRefSeq(0, this.cigar.ref_bases_covered);
     }
 /+ END CHERRY-PICK +/
 }
@@ -684,21 +682,21 @@ debug(dhtslib_unittest) unittest
     import std.algorithm: map;
     import std.array: array;
     import std.path:buildPath,dirName;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
 
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
     auto ar = bam.allRecords;
     assert(ar.empty == false);
     SAMRecord read = ar.front;
-    writeln(read.pos);
-    writeln(read.cigar.alignedLength);
-    writeln(read.pos + read.cigar.alignedLength);
-    writeln(read.pos + 77 + 5);
-    writeln(read.getAlignedPairs!true(read.pos + 77, read.pos + 77 + 5));
-    auto pairs = read.getAlignedPairs!true(read.pos + 77, read.pos + 77 + 5);
+    
+    auto pairs = read.getAlignedPairs!true(77, 77 + 5);
 
     assert(pairs.map!(x => x.qpos).array == [77,77,78,79,80]);
+    pairs = read.getAlignedPairs!true(77, 77 + 5);
     assert(pairs.map!(x => x.rpos).array == [77,78,79,80,81]);
+    pairs = read.getAlignedPairs!true(77, 77 + 5);
     assert(pairs.map!(x => x.refBase).array == "GAAAA");
+    pairs = read.getAlignedPairs!true(77, 77 + 5);
     assert(pairs.map!(x => x.queryBase).array == "G-AAA");
 }
 

@@ -741,7 +741,7 @@ debug(dhtslib_unittest) unittest
     import std.string : fromStringz;
     import std.array : array; 
 
-    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
     hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
@@ -787,7 +787,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map;
     import std.array : array;
     import std.path : buildPath,dirName;
-    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
     hts_log_info(__FUNCTION__, "Testing SAMFile query");
     hts_log_info(__FUNCTION__, "Loading test file");
 

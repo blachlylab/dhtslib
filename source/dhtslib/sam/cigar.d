@@ -42,12 +42,14 @@ struct Cigar
     this(uint* cigar, uint length)
     {
         ops = (cast(CigarOp*) cigar)[0 .. length];
+        refct = 1;
     }
 
     /// Construct Cigar from an array of CIGAR ops
     this(CigarOp[] ops)
     {
         this.ops = ops;
+        refct = 1;
     }
 
     bool is_null()
@@ -231,6 +233,10 @@ union CigarOp
     alias is_reference_consuming = isReferenceConsuming;
     alias is_match_or_mismatch = isMatchOrMismatch;
     alias is_clipping = isClipping;
+
+    string toString(){
+        return this.length.to!string ~ CIGAR_STR[this.op];
+    }
 }
 
 /**
@@ -288,6 +294,7 @@ debug (dhtslib_unittest) unittest
     assert(Cigar(cigar[0 .. 2]).toString == "78M1D");
     cigar[0] = CigarOp(4,Ops.HARD_CLIP);
     cigar[1..3] = [CigarOp(2, Ops.INS), CigarOp(21, Ops.MATCH)];
+    assert(cigar[1 .. $] == [CigarOp(2, Ops.INS), CigarOp(21, Ops.MATCH)]);
     assert(cigar.toString() == "4H2I21M");
 }
 
@@ -350,13 +357,18 @@ struct CigarItr
 
     void popFront()
     {
-        if (current.length == 0)
+        // import std.stdio;
+        // writeln(current);
+        // writeln(cigar);
+        if(cigar.length == 1 && current.length == 0)
+            cigar.length = 0;
+        else if (current.length == 0)
         {
             cigar = cigar[1 .. $];
-            if (!empty)
-                current = cigar[0];
+            current = cigar[0];
+            current.length = current.length - 1;
         }
-        if (current.length != 0)
+        else if (current.length != 0)
             current.length = current.length - 1;
     }
 
@@ -424,6 +436,8 @@ debug (dhtslib_unittest) unittest
     import dhtslib.sam;
     import htslib.hts_log;
     import std.path : buildPath, dirName;
+    import std.algorithm : map;
+    import std.array : array;
 
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing cigar");
@@ -434,5 +448,6 @@ debug (dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Getting read 1");
     assert(readrange.empty == false);
     auto read = readrange.front();
-    writeln(read.getAlignedCoordinates(read.pos + 77, read.pos + 82));
+    auto coords = read.getAlignedCoordinates(77, 82);
+    assert(coords.map!(x => x.rpos).array == [77,78,79,80,81]);
 }

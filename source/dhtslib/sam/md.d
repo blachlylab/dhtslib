@@ -94,6 +94,7 @@ auto getMDPairs(SAMRecord rec)
     }
 
     auto tag = rec["MD"];
+    import std.stdio;
     debug if (!tag.exists)
         hts_log_error(__FUNCTION__, "MD tag not present");
     return MDPairs(tag.toString);
