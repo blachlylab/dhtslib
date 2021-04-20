@@ -745,16 +745,21 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
+    auto sam2 = SAMWriter("/tmp/test.bam", sam.header);
     auto readrange = sam.allRecords;
     hts_log_info(__FUNCTION__, "Getting read 1");
     assert(readrange.empty == false);
     auto read = readrange.front();
+    
     writeln(read.sequence);
     assert(read.sequence=="GCTAGCTCAG");
     assert(sam.allRecords.array.length == 2);
+    sam2.write(read);
+    sam2.close;
+
 
     // testing with multiple specified threads
-    sam = SAMFile("test.bam", 2);
+    sam = SAMFile("/tmp/test.bam", 2);
     readrange = sam.allRecords;
     assert(readrange.empty == false);
     read = readrange.front();
@@ -762,7 +767,7 @@ debug(dhtslib_unittest) unittest
     assert(sam.allRecords.array.length == 1);
 
     // testing with no additional threads
-    sam = SAMFile("test.bam", 0);
+    sam = SAMFile("/tmp/test.bam", 0);
     readrange = sam.allRecords;
     assert(readrange.empty == false);
     read = readrange.front();
