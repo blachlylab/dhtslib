@@ -3,7 +3,7 @@ Module provides a parser for SAM/BAM record auxillary tags.
 
 Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
 */
-module dhtslib.tagvalue;
+module dhtslib.sam.tagvalue;
 
 import std.stdio;
 import std.meta : AliasSeq, staticIndexOf;
@@ -212,11 +212,11 @@ debug (dhtslib_unittest) unittest
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing tagvalue");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "auxf#values.sam"), 0);
 
     hts_log_info(__FUNCTION__, "Getting read 1");
-    auto readrange = bam.all_records(); // @suppress(dscanner.suspicious.unmodified)
+    auto readrange = bam.allRecords(); // @suppress(dscanner.suspicious.unmodified)
     assert(readrange.empty == false);
     auto read = readrange.front;
 

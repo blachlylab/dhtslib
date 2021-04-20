@@ -13,7 +13,7 @@ import std.range : array;
 import std.traits : isIntegral;
 
 import htslib.hts_log;
-import dhtslib.sam : SAMRecord;
+import dhtslib.sam.record : SAMRecord;
 
 /// Represents a CIGAR string
 /// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
