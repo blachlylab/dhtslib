@@ -454,7 +454,6 @@ struct SAMReader
         void popFront()
         {
             success = sam_read1(this.fp, this.header, this.b);
-            writeln(success);
             //bam_destroy1(this.b);
         }
         /// ditto
