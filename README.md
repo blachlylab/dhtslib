@@ -2,6 +2,7 @@ dhtslib
 =======
 
 [![unittests](https://github.com/blachlylab/dhtslib/actions/workflows/unittests.yml/badge.svg)](https://github.com/blachlylab/dhtslib/actions/workflows/unittests.yml)
+[![codecov.io](https://codecov.io/github/blachlylab/dhtslib/coverage.svg?branch=develop)](https://codecov.io/github/blachlylab/dhtslib?branch=develop)
 
 # Overview
 
