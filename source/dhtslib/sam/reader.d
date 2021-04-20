@@ -460,7 +460,14 @@ struct SAMReader
         SAMRecord front()
         {
             assert(this.initialized, "front called before empty");
-            return new SAMRecord(bam_dup1(this.b), this.header);
+            return SAMRecord(bam_dup1(this.b), this.header);
+        }
+
+        SAMRecord moveFront()
+        {
+            auto ret = SAMRecord(bam_dup1(this.b), this.header);
+            popFront;
+            return ret;
         }
 
     }
@@ -520,7 +527,14 @@ struct SAMReader
         SAMRecord front()
         {
             assert(this.initialized, "front called before empty");
-            return new SAMRecord(bam_dup1(this.b), this.header);
+            return SAMRecord(bam_dup1(this.b), this.header);
+        }
+
+        SAMRecord moveFront()
+        {
+            auto ret = SAMRecord(bam_dup1(this.b), this.header);
+            popFront;
+            return ret;
         }
 
     }
@@ -565,7 +579,14 @@ struct SAMReader
         /// ditto
         SAMRecord front()
         {
-            return new SAMRecord(bam_dup1(b), this.h);
+            return SAMRecord(bam_dup1(b), this.h);
+        }
+
+        SAMRecord moveFront()
+        {
+            auto ret = SAMRecord(bam_dup1(this.b), this.h);
+            popFront;
+            return ret;
         }
     }
 
@@ -608,7 +629,7 @@ struct SAMReader
         /// ditto
         SAMRecord front()
         {
-            return new SAMRecord(bam_dup1(b), this.h);
+            return SAMRecord(bam_dup1(b), this.h);
         }
     }
 

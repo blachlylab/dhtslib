@@ -20,7 +20,23 @@ import dhtslib.sam.record : SAMRecord;
 struct Cigar
 {
     /// array of distinct CIGAR ops 
-    CigarOp[] ops;
+    /// private now to force fixing some reference issues
+    private CigarOp[] ops;
+
+    /// Since we are reference counting and Cigar doesn't usually own its data
+    /// we have to do some special things.
+
+    private int refct;      // Postblit refcounting in case the object is passed around
+
+    this(this)
+    {
+        refct++;
+    }
+
+    ~this(){
+        if(--refct == 0)
+            destroy(ops);
+    }
 
     /// Construct Cigar from raw data
     this(uint* cigar, uint length)
@@ -45,25 +61,40 @@ struct Cigar
         return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
     }
 
+    /// get number of references to Cigar
+    int references()
+    {
+        return this.refct;
+    }
+
+    /// get length of cigar
+    auto length(){
+        return this.ops.length;
+    }
+    
+    /// set length of cigar
+    void length(T)(T len)
+    if(isIntegral!T)
+    {
+        this.ops.length = len;
+    }
+
+    /// copy cigar
+    auto const dup(){
+        return Cigar(this.ops.dup);
+    }
+
     /// return the alignment length expressed by this Cigar
-    /// TODO: use CIGAR_TYPE to get rid of switch statement for less branching
     @property int refBasesCovered()
     {
         int len;
         foreach (op; this.ops)
         {
-            switch (op.op)
-            {
-            case Ops.MATCH:
-            case Ops.EQUAL:
-            case Ops.DIFF:
-            case Ops.DEL:
-            case Ops.REF_SKIP:
-                len += op.length;
-                break;
-            default:
-                break;
-            }
+            // look ma no branching (ignore the above foreach)
+            // add op.length if reference consuming
+            // mask is 0 if not reference consuming
+            // mask is -1 if reference consuming
+            len += op.length & (uint.init - (((CIGAR_TYPE >> ((op.op & 0xF) << 1)) & 2) >> 1));
         }
         return len;
     }
@@ -89,6 +120,12 @@ struct Cigar
     }
     
     /// Get a Slice of cigar ops from a range in the Cigar string
+    auto opSlice()
+    {
+        return ops;
+    }
+
+    /// Get a Slice of cigar ops from a range in the Cigar string
     auto opSlice(T)(T start, T end) if (isIntegral!T)
     {
         return ops[start .. end];
@@ -111,6 +148,29 @@ struct Cigar
     {
         assert(end - start == values.length);
         return ops[start .. end] = values;
+    }
+
+    auto opAssign(T: CigarOp[])(T value)
+    {
+        this.ops = value;
+        return this;
+    }
+
+    auto opAssign(T: Cigar)(T value)
+    {
+        this.ops = value.ops;
+        return this;
+    }
+
+    size_t opDollar()
+    {
+        return length;
+    }
+
+    auto opBinary(string op)(const Cigar rhs) const
+    if(op == "~")
+    {
+        return Cigar(this.dup[] ~ rhs.dup[]);
     }
 }
 
@@ -278,8 +338,8 @@ struct CigarItr
     this(Cigar c)
     {
         // Copy the cigar
-        cigar.ops = c.ops.dup;
-        current = cigar.ops[0];
+        cigar = c.dup;
+        current = cigar[0];
         current.length = current.length - 1;
     }
 
@@ -292,9 +352,9 @@ struct CigarItr
     {
         if (current.length == 0)
         {
-            cigar.ops = cigar.ops[1 .. $];
+            cigar = cigar[1 .. $];
             if (!empty)
-                current = cigar.ops[0];
+                current = cigar[0];
         }
         if (current.length != 0)
             current.length = current.length - 1;
@@ -302,7 +362,7 @@ struct CigarItr
 
     bool empty()
     {
-        return cigar.ops.length == 0;
+        return cigar.length == 0;
     }
 }
 

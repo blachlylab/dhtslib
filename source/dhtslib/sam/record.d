@@ -17,7 +17,7 @@ Encapsulates a SAM/BAM/CRAM record,
 using the bam1_t type for memory efficiency,
 and the htslib helper functions for speed.
 **/
-class SAMRecord
+struct SAMRecord
 {
     /// Backing SAM/BAM row record
     bam1_t* b;
@@ -25,12 +25,13 @@ class SAMRecord
     /// Corresponding SAM/BAM header data
     sam_hdr_t* h;
 
-    /// Construct blank SAMRecord with empty backing bam1_t
-    deprecated("Construct with sam_hdr_t* for mapped contig (tid) name support")
-    this()
+    private int refct;      // Postblit refcounting in case the object is passed around
+
+    private Cigar p_cigar;
+
+    this(this)
     {
-        this.b = bam_init1();
-        this.h = null;
+        refct++;
     }
    
     /// ditto
@@ -56,9 +57,9 @@ class SAMRecord
 
     ~this()
     {
-        // TODO: should we only free this if we created b via bam_init1? i.e., if received through ctor, don't free?
-        //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
-        bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
+        // remove only if no references to this or underlying bam1_t data
+        if (--refct == 0 && p_cigar.references == 0)
+            bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
     }
 
 
@@ -336,7 +337,10 @@ class SAMRecord
     /// Create cigar from bam1_t record
     @property Cigar cigar()
     {
-        return Cigar(bam_get_cigar(b), (*b).core.n_cigar);
+        // see if cigar is already initialized
+        if(p_cigar == Cigar.init) 
+            p_cigar = Cigar(bam_get_cigar(b), (*b).core.n_cigar);
+        return p_cigar;
     }
 
     /// Assign a cigar string
@@ -355,24 +359,25 @@ class SAMRecord
 
         //copy rest of data
         ubyte[] rest=b.data[start_rest..b.l_data].dup;
-        
+
         //if not enough space
-        if(uint.sizeof*cigar.ops.length+l_prev+(b.l_data-start_rest)>b.m_data){
-            auto ptr=cast(ubyte*)realloc(b.data,uint.sizeof*cigar.ops.length+l_prev+(b.l_data-start_rest));
-            assert(ptr!=null);
-            b.data=ptr;
-            b.m_data=cast(uint)(uint.sizeof*cigar.ops.length)+l_prev+(b.l_data-start_rest);
+        if(uint.sizeof * cigar.length + l_prev + (b.l_data - start_rest) > b.m_data){
+            auto ptr = cast(ubyte*) realloc(b.data, uint.sizeof * cigar.length + l_prev + (b.l_data - start_rest));
+            assert(ptr != null);
+            b.data = ptr;
+            b.m_data=cast(uint)(uint.sizeof * cigar.length) + l_prev + (b.l_data - start_rest);
         }
 
         //reassign q_name and rest of data
-        b.data[0..l_prev]=prev;
+        b.data[0 .. l_prev]=prev;
         //without cigar.ops.dup we get the overlapping array copy error
-        b.data[l_prev..uint.sizeof*cigar.ops.length+l_prev]=cast(ubyte[])(cast(uint[])cigar.ops.dup);
-        b.data[l_prev+uint.sizeof*cigar.ops.length..l_prev+uint.sizeof*cigar.ops.length+(b.l_data-start_rest)]=rest;
+        b.data[l_prev .. uint.sizeof * cigar.length + l_prev] = cast(ubyte[])( cast(uint[]) cigar.dup[]);
+        b.data[l_prev + uint.sizeof * cigar.length .. l_prev + uint.sizeof * cigar.length + (b.l_data - start_rest)] = rest;
 
         //reset data length, seq length
-        b.l_data=cast(uint)(uint.sizeof*cigar.ops.length)+l_prev+(b.l_data-start_rest);
-        b.core.n_cigar=cast(int)(cigar.ops.length);
+        b.l_data = cast(uint)(uint.sizeof * cigar.length) + l_prev + (b.l_data - start_rest);
+        b.core.n_cigar=cast(uint)(cigar.length);
+        p_cigar = Cigar(bam_get_cigar(b), (*b).core.n_cigar);
     }
 
     /// Get aux tag from bam1_t record and return a TagValue
@@ -439,7 +444,8 @@ class SAMRecord
     auto getAlignedCoordinates(long start, long end){
         assert(start >= this.pos);
         assert(end <= this.pos + this.cigar.ref_bases_covered);
-        return this.getAlignedCoordinates.filter!(x=> this.pos + x.rpos >= start).filter!(x=> this.pos + x.rpos < end);
+        auto mappedPos = this.pos;
+        return this.getAlignedCoordinates.filter!(x=> mappedPos + x.rpos >= start).filter!(x=> mappedPos + x.rpos < end);
     }
 
     struct AlignedPair(bool refSeq)
@@ -588,7 +594,7 @@ debug(dhtslib_unittest) unittest
     //change cigar
     hts_log_info(__FUNCTION__, "Testing cigar");
     auto c=read.cigar;
-    c.ops[$-1].length=21;
+    c[$-1].length=21;
     read.cigar=c;
     assert(read.cigar.toString() == "78M1D21M");
     assert(read["RG"].check!string);
@@ -650,7 +656,7 @@ debug(dhtslib_unittest) unittest
     //change cigar
     hts_log_info(__FUNCTION__, "Testing cigar");
     auto c=read.cigar;
-    c.ops=c.ops~c.ops;
+    c=c~c;
     prev_m=read.b.m_data;
     read.cigar=c;
     assert(read.b.m_data >prev_m);
@@ -682,7 +688,12 @@ debug(dhtslib_unittest) unittest
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
     auto ar = bam.allRecords;
     assert(ar.empty == false);
-    auto read = ar.front;
+    SAMRecord read = ar.front;
+    writeln(read.pos);
+    writeln(read.cigar.alignedLength);
+    writeln(read.pos + read.cigar.alignedLength);
+    writeln(read.pos + 77 + 5);
+    writeln(read.getAlignedPairs!true(read.pos + 77, read.pos + 77 + 5));
     auto pairs = read.getAlignedPairs!true(read.pos + 77, read.pos + 77 + 5);
 
     assert(pairs.map!(x => x.qpos).array == [77,77,78,79,80]);
