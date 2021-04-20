@@ -35,6 +35,14 @@
             "debugVersions": ["dhtslib_debug"]
         },
         {
+            "name": "cigar_test",
+            "targetType": "executable",
+            "targetName": "samreader",
+            "mainSourceFile": "test/cigar_segfault.d",
+            "libs": ["hts"],
+            "debugVersions": ["dhtslib_debug"]
+        },
+        {
             "name": "vcf_writer_test",
             "targetType": "executable",
             "targetName": "vcfwriter",
