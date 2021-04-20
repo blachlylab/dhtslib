@@ -282,6 +282,12 @@ struct SAMReader
     }
 
     /// ditto
+    auto opIndex(string[] regions)
+    {
+        return query(regions);
+    }
+
+    /// ditto
     auto opIndex(string tid, long[2] pos)
     {
         return query(tid, pos[0], pos[1]);
@@ -724,4 +730,87 @@ struct SAMReader
             return rlist.byValue.array.sort!(cmpRegList).array;
         }
     }
+}
+
+///
+debug(dhtslib_unittest) unittest
+{
+    import dhtslib.sam;
+    import htslib.hts_log : hts_log_info;
+    import std.path : buildPath, dirName;
+    import std.string : fromStringz;
+    import std.array : array; 
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
+    auto readrange = sam.allRecords;
+    hts_log_info(__FUNCTION__, "Getting read 1");
+    assert(readrange.empty == false);
+    auto read = readrange.front();
+    writeln(read.sequence);
+    assert(read.sequence=="GCTAGCTCAG");
+    assert(sam.allRecords.array.length == 2);
+
+    // testing with multiple specified threads
+    sam = SAMFile("test.bam", 2);
+    readrange = sam.allRecords;
+    assert(readrange.empty == false);
+    read = readrange.front();
+    assert(read.sequence=="GCTAGCTCAG");
+    assert(sam.allRecords.array.length == 1);
+
+    // testing with no additional threads
+    sam = SAMFile("test.bam", 0);
+    readrange = sam.allRecords;
+    assert(readrange.empty == false);
+    read = readrange.front();
+    assert(read.sequence=="GCTAGCTCAG");
+    assert(sam.allRecords.array.length == 1);
+
+    // testing SAMReader targets/tid functions
+    assert(sam.nTargets == 1);
+    assert(sam.targetId("Sheila") == 0);
+    assert(sam.targetLength(0) == 20);
+    assert(sam.targetLengths == [20]);
+    assert(sam.targetNames == ["Sheila"]);
+
+}
+
+///
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import dhtslib.sam;
+    import dhtslib.sam.md : MDItr;
+    import std.algorithm : map;
+    import std.array : array;
+    import std.path : buildPath,dirName;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Testing SAMFile query");
+    hts_log_info(__FUNCTION__, "Loading test file");
+
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
+    assert(bam.allRecords.array.length == 112);
+    assert(bam["CHROMOSOME_I"].array.length == 18);
+    assert(bam["CHROMOSOME_II"].array.length == 34);
+    assert(bam["CHROMOSOME_III"].array.length == 41);
+    assert(bam["CHROMOSOME_IV"].array.length == 19);
+    assert(bam["CHROMOSOME_V"].array.length == 0);
+    assert(bam.query("CHROMOSOME_I:900-2000") .array.length == 14);
+    assert(bam.query("CHROMOSOME_I",900, 2000) .array.length == 14);
+    assert(bam["CHROMOSOME_I",900 .. 2000].array.length == 14);
+    assert(bam["CHROMOSOME_I",[900, 2000]].array.length == 14);
+    assert(bam[0, [900, 2000]].array.length == 14);
+
+    assert(bam["CHROMOSOME_I",940].array.length == 2);
+    assert(bam[0, 940].array.length == 2);
+
+
+    assert(bam["CHROMOSOME_I",900 .. $].array.length == 18);
+    assert(bam[0, 900 .. $].array.length == 18);
+    assert(bam["CHROMOSOME_I",$].array.length == 0);
+    assert(bam[0, $].array.length == 0);
+    assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
 }

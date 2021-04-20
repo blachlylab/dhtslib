@@ -701,3 +701,35 @@ debug(dhtslib_unittest) unittest
     assert(pairs.map!(x => x.refBase).array == "GAAAA");
     assert(pairs.map!(x => x.queryBase).array == "G-AAA");
 }
+
+///
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio : writeln, File;
+    import std.range : drop;
+    import std.utf : toUTFz;
+    import htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
+    import std.path:buildPath,dirName;
+    import std.conv:to;
+    import dhtslib.sam : parseSam;
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    hts_log_info(__FUNCTION__, "Loading sam file");
+    auto range = File(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","realn01_exp-a.sam")).byLineCopy();
+    auto b = bam_init1();
+    auto hdr = bam_hdr_init();
+    string hdr_str;
+    assert(range.empty == false);
+    for (auto i = 0; i < 4; i++)
+    {
+        hdr_str ~= range.front ~ "\n";
+        range.popFront;
+    }
+    hts_log_info(__FUNCTION__, "Header");
+    writeln(hdr_str);
+    hdr = sam_hdr_parse(cast(int) hdr_str.length, toUTFz!(char*)(hdr_str));
+    hts_log_info(__FUNCTION__, "Read status:" ~ parseSam(range.front, hdr, b).to!string);
+    auto r = new SAMRecord(b);
+    hts_log_info(__FUNCTION__, "Cigar" ~ r.cigar.toString);
+    assert(r.cigar.toString == "6M1D117M5D28M");
+}

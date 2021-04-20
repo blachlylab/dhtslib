@@ -63,7 +63,7 @@ bool cmpRegList(hts_reglist_t a, hts_reglist_t b)
 }
 
 /// Parse text line of SAM; Used in unittest
-private int parseSam(string line, bam_hdr_t* header, bam1_t* b)
+int parseSam(string line, bam_hdr_t* header, bam1_t* b)
 {
     import htslib.kstring : kstring_t;
     import std.utf : toUTFz;

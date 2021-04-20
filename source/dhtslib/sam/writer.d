@@ -164,7 +164,9 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing SAMWriter");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
-    auto sam2 = SAMWriter("test.bam",sam.header);
+    auto sam2 = SAMWriter("/tmp/test.bam",sam.header);
+    auto sam3 = SAMWriter("/tmp/test2.bam",sam.header, SAMWriterTypes.DEDUCE, 4);
+    auto sam4 = SAMWriter("/tmp/test3.bam",sam.header, SAMWriterTypes.DEDUCE, 0);
 
     hts_log_info(__FUNCTION__, "Getting read 1");
     auto readrange = sam.allRecords;
@@ -172,65 +174,24 @@ debug(dhtslib_unittest) unittest
     auto read = readrange.front();
 
     sam2.write(read);
+    sam3.write(read);
+    sam4.write(read);
     sam2.close;
     destroy(sam2);
-    sam = SAMFile("test.bam");
-    readrange = sam.allRecords;
-    assert(readrange.empty == false);
-    read = readrange.front();
-    writeln(read.sequence);
-    assert(read.sequence=="GCTAGCTCAG");
-    assert(sam.allRecords.array.length == 1);
-    // destroy(sam2);
+    sam3.close;
+    destroy(sam3);
+    sam4.close;
+    destroy(sam4);
+    auto sam5 = SAMFile("/tmp/test.bam");
+    auto sam6 = SAMFile("/tmp/test2.bam");
+    auto sam7 = SAMFile("/tmp/test3.bam");
+
+    assert(sam5.allRecords.array.length == 1);
+    assert(sam5.allRecords.array.length == sam6.allRecords.array.length);
+    assert(sam5.allRecords.array.length == sam7.allRecords.array.length);
+    assert(sam7.allRecords.array.length == sam6.allRecords.array.length);
+
 }
 
-///
-debug(dhtslib_unittest) unittest
-{
-    import dhtslib.sam;
-    import htslib.hts_log : hts_log_info;
-    import std.path:buildPath,dirName;
-    import std.string:fromStringz;
 
-    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
-    hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
-    hts_log_info(__FUNCTION__, "Loading test file");
-    auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
-    auto readrange = sam.allRecords;
-    hts_log_info(__FUNCTION__, "Getting read 1");
-    assert(readrange.empty == false);
-    auto read = readrange.front();
-    writeln(read.sequence);
-    assert(read.sequence=="GCTAGCTCAG");
-}
 
-///
-debug(dhtslib_unittest) unittest
-{
-    import std.stdio : writeln;
-    import std.range : drop;
-    import std.utf : toUTFz;
-    import htslib.hts_log; // @suppress(dscanner.suspicious.local_imports)
-    import std.path:buildPath,dirName;
-    import std.conv:to;
-
-    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
-    hts_log_info(__FUNCTION__, "Loading sam file");
-    auto range = File(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","realn01_exp-a.sam")).byLineCopy();
-    auto b = bam_init1();
-    auto hdr = bam_hdr_init();
-    string hdr_str;
-    assert(range.empty == false);
-    for (auto i = 0; i < 4; i++)
-    {
-        hdr_str ~= range.front ~ "\n";
-        range.popFront;
-    }
-    hts_log_info(__FUNCTION__, "Header");
-    writeln(hdr_str);
-    hdr = sam_hdr_parse(cast(int) hdr_str.length, toUTFz!(char*)(hdr_str));
-    hts_log_info(__FUNCTION__, "Read status:" ~ parseSam(range.front, hdr, b).to!string);
-    auto r = new SAMRecord(b);
-    hts_log_info(__FUNCTION__, "Cigar" ~ r.cigar.toString);
-    assert(r.cigar.toString == "6M1D117M5D28M");
-}
