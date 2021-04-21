@@ -39,6 +39,10 @@ struct BGZFile {
         debug(dhtslib_debug) { writeln("BGZFile postblit"); }
         this.rc++;
     }
+    
+    invariant(){
+        assert(rc >= 0);
+    }
 
     ///
     this(string fn)

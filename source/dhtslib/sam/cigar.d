@@ -33,6 +33,10 @@ struct Cigar
         refct++;
     }
 
+    invariant(){
+        assert(refct >= 0);
+    }
+
     ~this(){
         if(--refct == 0)
             destroy(ops);

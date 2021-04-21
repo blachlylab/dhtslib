@@ -64,6 +64,11 @@ struct IndexedFastaFile {
     {
         refct++;
     }
+
+    invariant(){
+        assert(refct >= 0);
+    }
+    
     /// construct from filename, optionally creating index if it does not exist
     /// throws Exception (TODO: remove) if file DNE, or if index DNE unless create->true
     this(string fn, bool create=false)
