@@ -69,7 +69,7 @@ struct TagValue
     this(bam1_t* b, char[2] tag)
     {
         data = bam_aux_get(b, tag);
-        debug
+        debug(dhtslib_debug)
         {
             if (data is null)
                 hts_log_warning(__FUNCTION__, (tag ~ " doesn't exist for this record").idup);
