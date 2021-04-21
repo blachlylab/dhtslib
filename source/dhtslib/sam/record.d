@@ -2,9 +2,11 @@ module dhtslib.sam.record;
 
 import core.stdc.stdlib : calloc, free, realloc;
 import core.stdc.string : memset;
+import core.stdc.errno : EINVAL, EOVERFLOW, ENOMEM, ERANGE;
 import std.string : fromStringz, toStringz;
 import std.algorithm : filter;
 import std.range.interfaces : InputRange, inputRangeObject;
+import std.traits : isArray, isIntegral, isSomeString;
 
 import htslib.hts : seq_nt16_str, seq_nt16_table;
 
@@ -34,6 +36,10 @@ struct SAMRecord
     this(this)
     {
         refct++;
+    }
+
+    invariant(){
+        assert(refct >= 0);
     }
    
     /// ditto
@@ -392,22 +398,61 @@ struct SAMRecord
     }
 
     /// Assign a tag key value pair
-    void opIndexAssign(T)(T value,string index)
+    void opIndexAssign(T)(T value, string index)
+    if(!isArray!T || isSomeString!T)
     {
-        import std.traits : isIntegral, isSomeString;
         static if(isIntegral!T){
-            bam_aux_update_int(b,index[0..2],value);
+            auto err = bam_aux_update_int(b,index[0..2],value);
         }else static if(is(T==float)){
-            bam_aux_update_float(b,index[0..2],value);
+            auto err = bam_aux_update_float(b,index[0..2],value);
         }else static if(isSomeString!T){
-            bam_aux_update_str(b,index[0..2],cast(int)value.length+1,toStringz(value));
+            auto err = bam_aux_update_str(b,index[0..2],cast(int)value.length+1,toStringz(value));
+        }
+        switch(err){
+            case EINVAL:
+                throw new Exception("The bam record's aux data is corrupt or an existing tag" ~ 
+                " with the given ID is not of an integer type (c, C, s, S, i or I).");
+            case ENOMEM:
+                throw new Exception("The bam data needs to be expanded and either the attempt" ~
+                " to reallocate the data buffer failed or the resulting buffer would be longer" ~
+                " than the maximum size allowed in a bam record (2Gbytes).");
+            case ERANGE:
+            case EOVERFLOW:
+                throw new Exception("val is outside the range that can be stored in an integer" ~ 
+                " bam tag (-2147483647 to 4294967295).");
+            case -1:
+                throw new Exception("Something went wrong adding the bam tag.");
+            case 0:
+                return;
+            default:
+                throw new Exception("Something went wrong adding the bam tag.");
         }
     }
 
     /// Assign a tag key array pair
-    void opIndexAssign(T:T[])(T[] value,string index)
+    void opIndexAssign(T)(T[] value, string index)
+    if(!isSomeString!(T[]))
     {
-        bam_aux_update_array(b,index[0..2],TypeChars[TypeIndex!T],value.length,value.ptr);
+        auto err = bam_aux_update_array(b,index[0..2],TypeChars[TypeIndex!T],cast(int) value.length,value.ptr);
+        switch(err){
+            case EINVAL:
+                throw new Exception("The bam record's aux data is corrupt or an existing tag" ~ 
+                " with the given ID is not of an integer type (c, C, s, S, i or I).");
+            case ENOMEM:
+                throw new Exception("The bam data needs to be expanded and either the attempt" ~
+                " to reallocate the data buffer failed or the resulting buffer would be longer" ~
+                " than the maximum size allowed in a bam record (2Gbytes).");
+            case ERANGE:
+            case EOVERFLOW:
+                throw new Exception("val is outside the range that can be stored in an integer" ~ 
+                " bam tag (-2147483647 to 4294967295).");
+            case -1:
+                throw new Exception("Something went wrong adding the bam tag.");
+            case 0:
+                return;
+            default:
+                throw new Exception("Something went wrong adding the bam tag.");
+        }
     }
 
     /// chromosome ID of next read in template, defined by bam_hdr_t
