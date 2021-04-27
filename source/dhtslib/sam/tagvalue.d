@@ -3,7 +3,7 @@ Module provides a parser for SAM/BAM record auxillary tags.
 
 Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
 */
-module dhtslib.tagvalue;
+module dhtslib.sam.tagvalue;
 
 import std.stdio;
 import std.meta : AliasSeq, staticIndexOf;
@@ -11,6 +11,8 @@ import std.string : fromStringz;
 import htslib.sam : bam_aux_get, bam1_t, bam_aux2i;
 import htslib.hts_log;
 import std.conv : to;
+import std.exception : enforce, assertThrown;
+import std.math : approxEqual;
 
 alias Types = AliasSeq!(byte, ubyte, short, ushort, int, uint, float, string, char);
 enum TypeIndex(T) = staticIndexOf!(T, Types);
@@ -29,7 +31,7 @@ A   Printable character
 i   Signed integer (see specs §1.5 footnote on size)
 f   Single-precision float
 Z   Printable string, including space
-H   Byte array in the Hex format (network byte order / big-endian)
+H   Byte array in the Hex format (network byte order / big-endian) //unknown if still supported
 B   Integer or numeric array
 
 Byte-array (B) types:
@@ -60,6 +62,8 @@ Usage: auto t = TagValue(b, 'XX') where b is bam1_t* BAM record and XX is tag
 */
 struct TagValue
 {
+    private int refct;      // Postblit refcounting in case the object is passed around
+
     private ubyte* data;
 
     /** Constructor
@@ -69,71 +73,143 @@ struct TagValue
     this(bam1_t* b, char[2] tag)
     {
         data = bam_aux_get(b, tag);
-        debug
-        {
-            if (data is null)
-                hts_log_warning(__FUNCTION__, (tag ~ " doesn't exist for this record").idup);
-        }
+        refct = 1;
+    }
+
+    this(this)
+    {
+        refct++;
+    }
+
+    ~this()
+    {
+        --refct;
+    }
+
+    invariant(){
+        assert(refct >= 0);
+    }
+
+    auto references(){
+        return refct;
     }
 
     /// check if empty/exists/null
     @property
     bool exists()
     {
-        if (this.data is null) return false;
-        return true;
+        return this.data is null ? false : true;
     }
 
-    /// Convert tag value
-    string to(T : string)()
-    {
-        assert(this.data !is null);
-        return fromStringz(cast(char*)&data[1]).idup;
-    }
-    /// Convert tag value
-    T to(T)()
-    {
-        assert(this.data !is null);
-        return *cast(T*) data[1 .. T.sizeof + 1].ptr;
-    }
-    /// Convert tag value
-    T[] to(T : T[])()
-    {
-        assert(this.data !is null);
-        int n = *cast(int*) data[2 .. 6].ptr;
-        return (cast(T*)(data[6 .. T.sizeof + 6].ptr))[0 .. n];
-    }
+    /* Tag type checking */
+
     /// Check if tag type is type T
     bool check(T)()
     {
-        assert(this.data !is null);
+        enforce(this.exists,"Tag doesn't exist");
         return TypeChars[TypeIndex!T] == cast(char) data[0];
     }
     /// Check if tag type is type T
     bool check(T : string)()
     {
-        assert(this.data !is null);
+        enforce(this.exists,"Tag doesn't exist");
         return TypeChars[TypeIndex!T] == cast(char) data[0];
     }
     /// Check if tag type is type T
     bool check(T : T[])()
     {
-        assert(this.data !is null);
+        enforce(this.exists,"Tag doesn't exist");
         return (cast(char) data[0] == 'B') && (TypeChars[TypeIndex!T] == cast(char) data[1]);
     }
-    /// Convert tag value to string
-    string toString() const
+
+    /// Check if tag type is type T
+    bool checkArray()
     {
-        if (data !is null && cast(char) data[0] == 'Z')
+        enforce(this.exists,"Tag doesn't exist");
+        return cast(char) data[0] == 'B';
+    }
+
+    /// Check if tag type is type T
+    bool checkHexByteArray()
+    {
+        enforce(this.exists,"Tag doesn't exist");
+        return cast(char) data[0] == 'H';
+    }
+
+    /* Tag conversion */
+
+    /// Convert tag value to D string
+    string to(T : string)()
+    {
+        enforce(this.check!string || this.checkHexByteArray,"Tag is not type Z or H");
+        return fromStringz(cast(char*)&data[1]).idup;
+    }
+    /// Convert tag value to D type
+    T to(T)()
+    {
+        enforce(this.check!T,"Tag is not type " ~ T.stringof);
+        return *cast(T*) data[1 .. T.sizeof + 1].ptr;
+    }
+    /// Convert array tag value D array
+    T[] to(T : T[])()
+    {
+        enforce(this.check!(T[]),"Tag is not type " ~ T.stringof);
+        int n = *cast(int*) data[2 .. 6].ptr;
+        return (cast(T*)(data[6 .. T.sizeof + 6].ptr))[0 .. n];
+    }
+    
+
+    /// Convert any tag value to string
+    string toString()
+    {
+        enforce(this.exists,"Tag doesn't exist");
+        switch (cast(char) data[0])
         {
-            return fromStringz(cast(char*)&data[1]).idup;
+        case 'c':
+            return to!byte.to!string;
+        case 'C':
+            return to!ubyte.to!string;
+        case 's':
+            return to!short.to!string;
+        case 'S':
+            return to!ushort.to!string;
+        case 'i':
+            return to!int.to!string;
+        case 'I':
+            return to!uint.to!string;
+        case 'f':
+            return to!float.to!string;
+        case 'Z':
+        case 'H':
+            return to!string;
+        case 'B':
+            switch (cast(char) data[1])
+            {
+            case 'c':
+                return to!(byte[]).to!string;
+            case 'C':
+                return to!(ubyte[]).to!string;
+            case 's':
+                return to!(short[]).to!string;
+            case 'S':
+                return to!(ushort[]).to!string;
+            case 'i':
+                return to!(int[]).to!string;
+            case 'I':
+                return to!(uint[]).to!string;
+            case 'f':
+                return to!(float[]).to!string;
+            default:
+                throw new Exception("Array Tag malformed");    
+            }
+        default:
+            throw new Exception("Tag malformed");
         }
-        return "";
     }
     /// Convert tag value to integer
     long toInt()
     {
-        assert(this.data !is null);
+        enforce(this.exists,"Tag doesn't exist");
         switch (cast(char) data[0])
         {
         case 'c':
@@ -149,13 +225,14 @@ struct TagValue
         case 'I':
             return cast(long)(to!uint);
         default:
-            return long.min;
+            throw new Exception("Tag is not numeric or is malformed");
         }
     }
     /// Convert tag value to integer array
     long[] toIntArray()
     {
-        assert(this.data !is null);
+        enforce(this.exists,"Tag doesn't exist");
+        enforce(this.checkArray,"Tag is not a numeric array");
         switch (cast(char) data[1])
         {
         case 'c':
@@ -171,13 +248,15 @@ struct TagValue
         case 'I':
             return (to!(uint[]).to!(long[]));
         default:
-            return [];
+            throw new Exception("Tag is malformed");
         }
     }
     /// Convert tag value to float array
     float[] toFloatArray()
     {
-        assert(this.data !is null);
+        enforce(this.exists,"Tag doesn't exist");
+        enforce(this.checkArray,"Tag is not an array");
+        enforce(this.check!(float[]),"Tag is not a float array");
         return to!(float[]);
     }
 }
@@ -185,9 +264,13 @@ struct TagValue
 debug (dhtslib_unittest) unittest
 {
     TagValue v;
+    assert(!v.exists);
     ubyte[12] testdata;
+    assertThrown(v.toIntArray);
+    assertThrown(v.toInt);
+    assertThrown(v.toString);
     testdata[0] = cast(ubyte) 'B';
-    testdata[1] = cast(ubyte) 'C';
+    testdata[1] = cast(ubyte) 'S';
     *cast(int*) testdata[2 .. 6].ptr = 3;
     testdata[6] = 1;
     testdata[8] = 2;
@@ -212,18 +295,48 @@ debug (dhtslib_unittest) unittest
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing tagvalue");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "auxf#values.sam"), 0);
+
     hts_log_info(__FUNCTION__, "Getting read 1");
-    auto readrange = bam.all_records(); // @suppress(dscanner.suspicious.unmodified)
+    auto readrange = bam.allRecords(); // @suppress(dscanner.suspicious.unmodified)
+    assert(readrange.empty == false);
     auto read = readrange.front;
+    assert(read["RG"].references == 2);
+
     hts_log_info(__FUNCTION__, "Testing string");
     assert(read["RG"].to!string == "ID");
+
     hts_log_info(__FUNCTION__, "Testing char");
     assert(read["A!"].to!char == '!');
     assert(read["Ac"].to!char == 'c');
     assert(read["AC"].to!char == 'C');
-    hts_log_info(__FUNCTION__, "Testing int");
+
+    hts_log_info(__FUNCTION__, "Testing integral checks");
+    assert(read["I0"].check!ubyte);
+    assert(read["I1"].check!ubyte);
+    assert(read["I2"].check!ubyte);
+    assert(read["I3"].check!ubyte);
+    assert(read["I4"].check!ubyte);
+    assert(read["I5"].check!ushort);
+    assert(read["I6"].check!ushort);
+    assert(read["I7"].check!ushort);
+    assert(read["I8"].check!ushort);
+    assert(read["I9"].check!uint);
+    assert(read["IA"].check!uint);
+    assert(read["i1"].check!byte);
+    assert(read["i2"].check!byte);
+    assert(read["i3"].check!byte);
+    assert(read["i4"].check!short);
+    assert(read["i5"].check!short);
+    assert(read["i6"].check!short);
+    assert(read["i7"].check!short);
+    assert(read["i8"].check!int);
+    assert(read["i9"].check!int);
+    assert(read["iA"].check!int);
+    assert(read["iB"].check!int);
+
+    hts_log_info(__FUNCTION__, "Testing integral conversion");
     assert(read["I0"].to!ubyte == 0);
     assert(read["I1"].to!ubyte == 1);
     assert(read["I2"].to!ubyte == 127);
@@ -246,6 +359,32 @@ debug (dhtslib_unittest) unittest
     assert(read["i9"].to!int == -65_536);
     assert(read["iA"].to!int == -2_147_483_647);
     assert(read["iB"].to!int == -2_147_483_648);
+
+    hts_log_info(__FUNCTION__, "Testing integral toString");
+    assert(read["I0"].toString == "0");
+    assert(read["I1"].toString == "1");
+    assert(read["I2"].toString == "127");
+    assert(read["I3"].toString == "128");
+    assert(read["I4"].toString == "255");
+    assert(read["I5"].toString == "256");
+    assert(read["I6"].toString == "32767");
+    assert(read["I7"].toString == "32768");
+    assert(read["I8"].toString == "65535");
+    assert(read["I9"].toString == "65536");
+    assert(read["IA"].toString == "2147483647");
+    assert(read["i1"].toString == "-1");
+    assert(read["i2"].toString == "-127");
+    assert(read["i3"].toString == "-128");
+    assert(read["i4"].toString == "-255");
+    assert(read["i5"].toString == "-256");
+    assert(read["i6"].toString == "-32767");
+    assert(read["i7"].toString == "-32768");
+    assert(read["i8"].toString == "-65535");
+    assert(read["i9"].toString == "-65536");
+    assert(read["iA"].toString == "-2147483647");
+    assert(read["iB"].toString == "-2147483648");
+
+    hts_log_info(__FUNCTION__, "Testing integral toInt");
     assert(read["I0"].toInt == 0);
     assert(read["I1"].toInt == 1);
     assert(read["I2"].toInt == 127);
@@ -268,10 +407,24 @@ debug (dhtslib_unittest) unittest
     assert(read["i9"].toInt == -65_536);
     assert(read["iA"].toInt == -2_147_483_647);
     assert(read["iB"].toInt == -2_147_483_648);
-    hts_log_info(__FUNCTION__, "Testing float");
+
+    hts_log_info(__FUNCTION__, "Testing float checks");
+
+    assert(read["F0"].check!float);
+    assert(read["F1"].check!float);
+    assert(read["F2"].check!float);
+
+    hts_log_info(__FUNCTION__, "Testing float conversion");
     assert(read["F0"].to!float == -1.0);
     assert(read["F1"].to!float == 0.0);
     assert(read["F2"].to!float == 1.0);
+
+    hts_log_info(__FUNCTION__, "Testing float toString");
+
+    assert(approxEqual(read["F0"].toString.to!float, -1.0));
+    assert(approxEqual(read["F1"].toString.to!float, 0.0));
+    assert(approxEqual(read["F2"].toString.to!float, 1.0));
+
     hts_log_info(__FUNCTION__, "Running tag checking");
     assert(read["I0"].check!ubyte == true);
     assert(read["I5"].check!ushort == true);
@@ -291,6 +444,13 @@ debug (dhtslib_unittest) unittest
     assert(read["BI"].to!(uint[]) == [
             0, 2_147_483_647, 2_147_483_648, 4_294_967_295
             ]);
+    
+    hts_log_info(__FUNCTION__, "Testing array toString");
+    assert(read["Bs"].toString == "[-32768, -32767, 0, 32767]");
+    assert(read["Bi"].toString == "[-2147483648, -2147483647, 0, 2147483647]");
+    assert(read["BS"].toString == "[0, 32767, 32768, 65535]");
+    assert(read["BI"].toString == "[0, 2147483647, 2147483648, 4294967295]");
+
     writeln(read["Bs"].toIntArray);
     assert(read["Bs"].toIntArray == [-32_768, -32_767, 0, 32_767]);
     assert(read["Bi"].toIntArray == [
@@ -305,4 +465,26 @@ debug (dhtslib_unittest) unittest
     assert(read["Bi"].check!(int[]) == true);
     assert(read["BS"].check!(ushort[]) == true);
     assert(read["BI"].check!(uint[]) == true);
+
+    hts_log_info(__FUNCTION__, "Testing float Array");
+    float[] arr = [10.0,11.0,12.1];
+    read["fA"] = arr;
+    assert(read["fA"].to!(float[]) == arr);
+    assert(read["fA"].toFloatArray == arr);
+    assert(read["fA"].toString == "[10, 11, 12.1]");
+
+    hts_log_info(__FUNCTION__, "Testing byte Array");
+    byte[] arr2 = [10, -10]; 
+    read["cA"] = arr2;
+    assert(read["cA"].to!(byte[]) == arr2);
+    assert(read["cA"].toIntArray == arr2.to!(long[]));
+    assert(read["cA"].toString == "[10, -10]");
+
+    hts_log_info(__FUNCTION__, "Testing ubyte Array");
+    ubyte[] arr3 = [10, 11]; 
+    read["CA"] = arr3;
+    assert(read["CA"].to!(ubyte[]) == arr3);
+    assert(read["CA"].toIntArray == arr3.to!(long[]));
+    assert(read["CA"].toString == "[10, 11]");
+
 }

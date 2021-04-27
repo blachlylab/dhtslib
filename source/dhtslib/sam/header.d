@@ -15,7 +15,7 @@ import core.stdc.stdlib : free;
 import core.stdc.string : memcpy;
 
 import std.conv : to;
-import std.string : toStringz;
+import std.string : toStringz, fromStringz;
 import std.traits : isSomeString;
 
 /// SAM specifications Section 1.3
@@ -35,14 +35,82 @@ enum RecordType : immutable(char)[2]
 */
 struct SAMHeader
 {
-    private sam_hdr_t* h;
+    sam_hdr_t* h;
+
+    private int refct;      // Postblit refcounting in case the object is passed around
 
     /// Construct from existing pointer
     this(sam_hdr_t* h)
     {
         this.h = h;
+        refct = 1;
     }
-    // no destructor
+
+    /// ref counting
+    this(this)
+    {
+        refct++;
+    }
+    
+    /// ref counting
+    ~this(){
+        if(--refct == 0)
+            sam_hdr_destroy(this.h);
+    }
+
+    bool isNull(){
+        return this.h is null;
+    }
+
+    /// Copy a SAMHeader
+    auto dup(){
+        return SAMHeader(sam_hdr_dup(this.h));
+    }
+
+    /* contig info */
+    /// number of reference sequences; from bam_hdr_t
+    @property int nTargets() const
+    {
+        return this.h.n_targets;
+    }
+
+    /// length of specific reference sequence by number (`tid`)
+    uint targetLength(int target) const
+    in (target >= 0)
+    in (target < this.nTargets)
+    {
+        return this.h.target_len[target];
+    }
+
+    /// lengths of the reference sequences
+    @property uint[] targetLengths() const
+    {
+        return this.h.target_len[0 .. this.nTargets].dup;
+    }
+
+    /// names of the reference sequences
+    @property string[] targetNames() const
+    {
+        string[] names;
+        names.length = this.nTargets;
+        foreach (i; 0 .. this.nTargets)
+        {
+            names[i] = fromStringz(this.h.target_name[i]).idup;
+        }
+        return names;
+    }
+
+    /// reference contig name to integer id
+    int targetId(string name)
+    {
+        return sam_hdr_name2tid(this.h, toStringz(name));
+    }
+
+    /// reference contig name to integer id
+    const(char)[] targetName(int tid)
+    {
+        return fromStringz(sam_hdr_tid2name(this.h, tid));
+    }
 
     /* Array-like indexing */
 

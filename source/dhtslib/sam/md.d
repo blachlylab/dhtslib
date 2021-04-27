@@ -10,10 +10,10 @@ This can enable variant calling without requiring access to the entire original 
 
 Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
 */
-module dhtslib.md;
+module dhtslib.sam.md;
 
 import dhtslib.sam : SAMRecord;
-import dhtslib.cigar;
+import dhtslib.sam.cigar;
 import htslib.hts_log;
 import std.regex;
 import std.traits : ReturnType;
@@ -97,6 +97,7 @@ auto getMDPairs(SAMRecord rec)
     }
 
     auto tag = rec["MD"];
+    import std.stdio;
     debug if (!tag.exists)
         hts_log_error(__FUNCTION__, "MD tag not present");
     return MDPairs(tag.toString);
@@ -156,9 +157,11 @@ debug (dhtslib_unittest) unittest
     import std.array : array;
     import std.path : buildPath, dirName;
 
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
-    auto read = bam.all_records.front;
+    auto ar = bam.allRecords;
+    assert(ar.empty == false);
+    auto read = ar.front;
     read["MD"] = "2G11^GATC7T6^A11";
     assert(MDItr(read).array == "==G===========GATC=======T======A===========");
 }

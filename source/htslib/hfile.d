@@ -56,7 +56,6 @@ struct hFILE { // @suppress(dscanner.style.phobos_naming_convention)
     const(hFILE_backend) *backend;      /// internal
     off_t offset;   /// file offset
     //unsigned at_eof:1, mobile:1, readonly:1;
-    pragma(msg, "hFile: bitfield order assumed starting with LSB");
     mixin(bitfields!(
     ubyte, "at_eof", 1,
     ubyte, "mobile", 1,

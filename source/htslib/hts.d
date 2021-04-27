@@ -246,7 +246,6 @@ alias hts_idx_t = __hts_idx_t;
 //  - line is used directly in bcftools (up to and including current develop)
 /// Data and metadata for an hts file; part of public and private ABI
 struct htsFile { // @suppress(dscanner.style.phobos_naming_convention)
-    pragma(msg, "htsFile: bitfield order assumed starting with LSB");
     //uint32_t is_bin:1, is_write:1, is_be:1, is_cram:1, is_bgzf:1, dummy:27;
     mixin(bitfields!(
         bool, "is_bin", 1,
@@ -712,8 +711,7 @@ alias hts_tell_func = long function(void *fp);
 
 /// iterator
 struct hts_itr_t { // @suppress(dscanner.style.phobos_naming_convention)
-    pragma(msg, "hts_itr_t: bitfield order assumed starting with LSB");
-    // uint32_t read_rest:1, finished:1, is_cram:1, dummy:29;
+    // uint32_t read_rest:1, finished:1, is_cram:1, nocoor:1, multi:1, dummy:27;
     mixin(bitfields!(
         bool, "read_rest", 1,
         bool, "finished",  1,

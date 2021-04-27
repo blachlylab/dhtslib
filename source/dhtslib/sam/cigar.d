@@ -1,7 +1,7 @@
 /**
 This module simplifies working with CIGAR strings/ops from SAM/BAM/CRAM alignment records.
 */
-module dhtslib.cigar;
+module dhtslib.sam.cigar;
 
 import std.stdio;
 import std.bitmanip : bitfields;
@@ -10,27 +10,50 @@ import std.algorithm : map;
 import std.algorithm.iteration : each;
 import std.conv : to;
 import std.range : array;
+import std.traits : isIntegral;
 
 import htslib.hts_log;
-import dhtslib.sam : SAMRecord;
+import dhtslib.sam.record : SAMRecord;
 
 /// Represents a CIGAR string
 /// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
 struct Cigar
 {
     /// array of distinct CIGAR ops 
-    CigarOp[] ops;
+    /// private now to force fixing some reference issues
+    private CigarOp[] ops;
+
+    /// Since we are reference counting and Cigar doesn't usually own its data
+    /// we have to do some special things.
+
+    private int refct;      // Postblit refcounting in case the object is passed around
+
+    this(this)
+    {
+        refct++;
+    }
+
+    invariant(){
+        assert(refct >= 0);
+    }
+
+    ~this(){
+        if(--refct == 0)
+            destroy(ops);
+    }
 
     /// Construct Cigar from raw data
     this(uint* cigar, uint length)
     {
         ops = (cast(CigarOp*) cigar)[0 .. length];
+        refct = 1;
     }
 
     /// Construct Cigar from an array of CIGAR ops
     this(CigarOp[] ops)
     {
         this.ops = ops;
+        refct = 1;
     }
 
     /// null CIGAR -- don't read!
@@ -45,25 +68,40 @@ struct Cigar
         return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
     }
 
+    /// get number of references to Cigar
+    int references()
+    {
+        return this.refct;
+    }
+
+    /// get length of cigar
+    auto length(){
+        return this.ops.length;
+    }
+    
+    /// set length of cigar
+    void length(T)(T len)
+    if(isIntegral!T)
+    {
+        this.ops.length = len;
+    }
+
+    /// copy cigar
+    auto const dup(){
+        return Cigar(this.ops.dup);
+    }
+
     /// return the alignment length expressed by this Cigar
-    // TODO: use CIGAR_TYPE to get rid of switch statement for less branching
     @property int refBasesCovered()
     {
         int len;
         foreach (op; this.ops)
         {
-            switch (op.op)
-            {
-            case Ops.MATCH:
-            case Ops.EQUAL:
-            case Ops.DIFF:
-            case Ops.DEL:
-            case Ops.REF_SKIP:
-                len += op.length;
-                break;
-            default:
-                break;
-            }
+            // look ma no branching (ignore the above foreach)
+            // add op.length if reference consuming
+            // mask is 0 if not reference consuming
+            // mask is -1 if reference consuming
+            len += op.length & (uint.init - (((CIGAR_TYPE >> ((op.op & 0xF) << 1)) & 2) >> 1));
         }
         return len;
     }
@@ -87,6 +125,60 @@ struct Cigar
         }
 
         return result;
+    }
+    
+    /// Get a Slice of cigar ops from a range in the Cigar string
+    auto opSlice()
+    {
+        return ops;
+    }
+
+    /// Get a Slice of cigar ops from a range in the Cigar string
+    auto opSlice(T)(T start, T end) if (isIntegral!T)
+    {
+        return ops[start .. end];
+    }
+
+    /// Get a cigar op from a single position in the Cigar string
+    ref auto opIndex(ulong i)
+    {
+        return ops[i];
+    }
+
+    /// Assign a cigar op at a single position in the Cigar string
+    auto opIndexAssign(CigarOp value, size_t index)
+    {
+        return ops[index] = value;
+    }
+
+    /// Assign a range cigar ops over a range in the Cigar string
+    auto opSliceAssign(T)(CigarOp[] values, T start, T end)
+    {
+        assert(end - start == values.length);
+        return ops[start .. end] = values;
+    }
+
+    auto opAssign(T: CigarOp[])(T value)
+    {
+        this.ops = value;
+        return this;
+    }
+
+    auto opAssign(T: Cigar)(T value)
+    {
+        this.ops = value.ops;
+        return this;
+    }
+
+    size_t opDollar()
+    {
+        return length;
+    }
+
+    auto opBinary(string op)(const Cigar rhs) const
+    if(op == "~")
+    {
+        return Cigar(this.dup[] ~ rhs.dup[]);
     }
 }
 
@@ -147,6 +239,10 @@ union CigarOp
     alias is_reference_consuming = isReferenceConsuming;
     alias is_match_or_mismatch = isMatchOrMismatch;
     alias is_clipping = isClipping;
+
+    string toString(){
+        return this.length.to!string ~ CIGAR_STR[this.op];
+    }
 }
 
 /**
@@ -189,16 +285,23 @@ debug (dhtslib_unittest) unittest
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing cigar");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
+    assert(readrange.empty == false);
     auto read = readrange.front();
     auto cigar = read.cigar;
     writeln(read.queryName);
     hts_log_info(__FUNCTION__, "Cigar:" ~ cigar.toString());
     writeln(cigar.toString());
     assert(cigar.toString() == "78M1D22M");
+    assert(cigar[0] == CigarOp(78, Ops.MATCH));
+    assert(Cigar(cigar[0 .. 2]).toString == "78M1D");
+    cigar[0] = CigarOp(4,Ops.HARD_CLIP);
+    cigar[1..3] = [CigarOp(2, Ops.INS), CigarOp(21, Ops.MATCH)];
+    assert(cigar[1 .. $] == [CigarOp(2, Ops.INS), CigarOp(21, Ops.MATCH)]);
+    assert(cigar.toString() == "4H2I21M");
 }
 
 /// return Cigar struct for a given CIGAR string (e.g. from SAM line)
@@ -248,8 +351,8 @@ struct CigarItr
     this(Cigar c)
     {
         // Copy the cigar
-        cigar.ops = c.ops.dup;
-        current = cigar.ops[0];
+        cigar = c.dup;
+        current = cigar[0];
         current.length = current.length - 1;
     }
 
@@ -260,19 +363,24 @@ struct CigarItr
 
     void popFront()
     {
-        if (current.length == 0)
+        // import std.stdio;
+        // writeln(current);
+        // writeln(cigar);
+        if(cigar.length == 1 && current.length == 0)
+            cigar.length = 0;
+        else if (current.length == 0)
         {
-            cigar.ops = cigar.ops[1 .. $];
-            if (!empty)
-                current = cigar.ops[0];
+            cigar = cigar[1 .. $];
+            current = cigar[0];
+            current.length = current.length - 1;
         }
-        if (current.length != 0)
+        else if (current.length != 0)
             current.length = current.length - 1;
     }
 
     bool empty()
     {
-        return cigar.ops.length == 0;
+        return cigar.length == 0;
     }
 }
 
@@ -340,14 +448,18 @@ debug (dhtslib_unittest) unittest
     import dhtslib.sam;
     import htslib.hts_log;
     import std.path : buildPath, dirName;
+    import std.algorithm : map;
+    import std.array : array;
 
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
     hts_log_info(__FUNCTION__, "Testing cigar");
     hts_log_info(__FUNCTION__, "Loading test file");
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(__FILE__))), "htslib",
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
     auto readrange = bam["CHROMOSOME_I", 914];
     hts_log_info(__FUNCTION__, "Getting read 1");
+    assert(readrange.empty == false);
     auto read = readrange.front();
-    writeln(read.getAlignedCoordinates(read.pos + 77, read.pos + 82));
+    auto coords = read.getAlignedCoordinates(77, 82);
+    assert(coords.map!(x => x.rpos).array == [77,78,79,80,81]);
 }

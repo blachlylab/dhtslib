@@ -21,13 +21,13 @@ bug_minimal
 sam_iter
 csam_iter
 vcf
+dhtslib-test-unittest
 
 # DUB
 .dub
 docs.json
 __dummy.html
 docs/
-dub.selections.json
 
 # Code coverage
 *.lst
@@ -37,6 +37,7 @@ dub.selections.json
 
 # test output
 output.vcf
+test.bam
 
 # vi/vim
 *.swp

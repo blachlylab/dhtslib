@@ -30,6 +30,7 @@
 module htslib.bgzf;
 
 import core.stdc.stdio;
+import htslib.hfile: hFILE;
 
 import core.sys.posix.sys.types;
 // ssize_t doesn't exist in core.sys.posix.sys.types for windows builds
@@ -56,7 +57,6 @@ enum BGZF_ERR_MISUSE = 8;
 enum BGZF_ERR_MT = 16; // stream cannot be multi-threaded
 enum BGZF_ERR_CRC = 32;
 
-struct hFILE;
 struct hts_tpool;
 struct bgzf_mtaux_t;
 struct __bgzidx_t;
