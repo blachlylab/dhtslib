@@ -106,7 +106,7 @@ struct Cigar
         return len;
     }
 
-    deprecated("Use camelCase names instead");
+    deprecated("Use camelCase names instead")
     alias ref_bases_covered = refBasesCovered;
     /// previous alignedLength function had a bug and 
     /// it is just a duplicate of ref_bases_covered
