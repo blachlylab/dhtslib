@@ -32,6 +32,8 @@ struct SAMRecord
     private int refct = 1;      // Postblit refcounting in case the object is passed around
 
     private Cigar p_cigar;
+
+    private bool cigarInitialized;
     
     private TagValue p_tagval;
 
@@ -348,8 +350,9 @@ struct SAMRecord
     @property Cigar cigar()
     {
         // see if cigar is already initialized
-        if(p_cigar.references == 0) 
+        if(!cigarInitialized) 
             p_cigar = Cigar(bam_get_cigar(b), (*b).core.n_cigar);
+            this.cigarInitialized = true;
         return p_cigar;
     }
 
