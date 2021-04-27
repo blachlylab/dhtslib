@@ -29,7 +29,7 @@ struct SAMRecord
     /// Corresponding SAM/BAM header data
     SAMHeader h;
 
-    private int refct;      // Postblit refcounting in case the object is passed around
+    private int refct = 1;      // Postblit refcounting in case the object is passed around
 
     private Cigar p_cigar;
     
@@ -49,7 +49,6 @@ struct SAMRecord
     {
         this.b = bam_init1();
         this.h = h;
-        refct = 1;
     }
  
     /// Construct SAMRecord from supplied bam1_t
@@ -57,7 +56,6 @@ struct SAMRecord
     this(bam1_t* b)
     {
         this.b = b;
-        refct = 1;
     }
 
     /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
@@ -65,7 +63,6 @@ struct SAMRecord
     {
         this.b = b;
         this.h = h;
-        refct = 1;
     }
 
     ~this()

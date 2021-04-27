@@ -26,7 +26,7 @@ struct Cigar
     /// Since we are reference counting and Cigar doesn't usually own its data
     /// we have to do some special things.
 
-    private int refct;      // Postblit refcounting in case the object is passed around
+    private int refct = 1;      // Postblit refcounting in case the object is passed around
 
     this(this)
     {
@@ -46,14 +46,12 @@ struct Cigar
     this(uint* cigar, uint length)
     {
         ops = (cast(CigarOp*) cigar)[0 .. length];
-        refct = 1;
     }
 
     /// Construct Cigar from an array of CIGAR ops
     this(CigarOp[] ops)
     {
         this.ops = ops;
-        refct = 1;
     }
 
     /// null CIGAR -- don't read!

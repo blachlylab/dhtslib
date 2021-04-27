@@ -62,7 +62,7 @@ Usage: auto t = TagValue(b, 'XX') where b is bam1_t* BAM record and XX is tag
 */
 struct TagValue
 {
-    private int refct;      // Postblit refcounting in case the object is passed around
+    private int refct = 1;      // Postblit refcounting in case the object is passed around
 
     private ubyte* data;
 
@@ -73,7 +73,6 @@ struct TagValue
     this(bam1_t* b, char[2] tag)
     {
         data = bam_aux_get(b, tag);
-        refct = 1;
     }
 
     this(this)

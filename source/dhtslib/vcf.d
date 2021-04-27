@@ -125,7 +125,7 @@ struct VCFRecord
     VCFHeader *vcfheader;   /// corresponding header (required);
                             /// is ptr to avoid copying struct containing ptr to bcf_hdr_t (leads to double free())
     
-    private int refct;      // Postblit refcounting in case the object is passed around
+    private int refct = 1;      // Postblit refcounting in case the object is passed around
 
     /** VCFRecord
 
@@ -151,7 +151,6 @@ struct VCFRecord
         // Now it must be unpacked
         // Protip: specifying alternate MAX_UNPACK can speed it tremendously
         immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
-        this.refct = 1;
     }
     /// ditto
     this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
@@ -168,7 +167,6 @@ struct VCFRecord
 
         this.qual = qual;
         this.filter = filter;
-        this.refct = 1;
     }
     /// ditto
     this(VCFHeader *vcfhdr, string line, int MAX_UNPACK = BCF_UN_ALL)
@@ -191,7 +189,6 @@ struct VCFRecord
         } else {
             ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
         }
-        this.refct = 1;
     }
 
     // post-blit reference counting
