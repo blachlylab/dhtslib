@@ -37,7 +37,7 @@
         {
             "name": "cigar_test",
             "targetType": "executable",
-            "targetName": "samreader",
+            "targetName": "cigartest",
             "mainSourceFile": "test/cigar_segfault.d",
             "libs": ["hts"],
             "debugVersions": ["dhtslib_debug"]
