@@ -118,12 +118,14 @@ BCF_UN_SHR: all shared information (BCF_UN_STR|BCF_UN_FLT|BCF_UN_INFO)
 #CHROM  POS ID  REF ALT QUAL    FILTER  INFO    FORMAT  NA00001 NA00002 NA00003 ...
 
 */
-class VCFRecord
+struct VCFRecord
 {
     bcf1_t* line;   /// htslib structured record TODO: change to 'b' for better internal consistency? (vcf.h/c actually use line quite a bit in fn params)
 
     VCFHeader *vcfheader;   /// corresponding header (required);
                             /// is ptr to avoid copying struct containing ptr to bcf_hdr_t (leads to double free())
+    
+    private int refct;      // Postblit refcounting in case the object is passed around
 
     /** VCFRecord
 
@@ -149,6 +151,7 @@ class VCFRecord
         // Now it must be unpacked
         // Protip: specifying alternate MAX_UNPACK can speed it tremendously
         immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
+        this.refct = 1;
     }
     /// ditto
     this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
@@ -165,6 +168,7 @@ class VCFRecord
 
         this.qual = qual;
         this.filter = filter;
+        this.refct = 1;
     }
     /// ditto
     this(VCFHeader *vcfhdr, string line, int MAX_UNPACK = BCF_UN_ALL)
@@ -187,14 +191,23 @@ class VCFRecord
         } else {
             ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
         }
+        this.refct = 1;
     }
 
-    /// disable copying to prevent double-free (which should not come up except when writeln'ing)
-    //@disable this(this);  // commented out as class has no postblit ctor (relevant when VCFRecord was struct)
-    /// dtor
-    ~this()
+    // post-blit reference counting
+    this(this)
     {
-        if (this.line) bcf_destroy1(this.line);
+        refct++;
+    }
+
+    invariant(){
+        assert(refct >= 0);
+    }
+
+    /// dtor
+    ~this(){
+        if(--refct == 0 && this.line)
+            bcf_destroy1(this.line);
     }
 
     //----- FIXED FIELDS -----//
@@ -707,7 +720,7 @@ class VCFRecord
     /// Return a string representation of the VCFRecord (i.e. as would appear in .vcf)
     ///
     /// As a bonus, there is a kstring_t memory leak
-    override string toString() const
+    string toString() const
     {
         kstring_t s;
 
@@ -1194,7 +1207,7 @@ struct VCFReader
         // * unpacking and
         // * destroying
         // its copy
-        return new VCFRecord(this.vcfhdr, bcf_dup(this.b), this.MAX_UNPACK);
+        return VCFRecord(this.vcfhdr, bcf_dup(this.b), this.MAX_UNPACK);
     }
 }
 
