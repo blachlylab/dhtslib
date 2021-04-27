@@ -302,7 +302,7 @@ debug (dhtslib_unittest) unittest
     auto readrange = bam.allRecords(); // @suppress(dscanner.suspicious.unmodified)
     assert(readrange.empty == false);
     auto read = readrange.front;
-    assert(read["RG"].references == 1);
+    assert(read["RG"].references == 2);
 
     hts_log_info(__FUNCTION__, "Testing string");
     assert(read["RG"].to!string == "ID");

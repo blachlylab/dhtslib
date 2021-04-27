@@ -32,6 +32,8 @@ struct SAMRecord
     private int refct;      // Postblit refcounting in case the object is passed around
 
     private Cigar p_cigar;
+    
+    private TagValue p_tagval;
 
     this(this)
     {
@@ -69,7 +71,7 @@ struct SAMRecord
     ~this()
     {
         // remove only if no references to this or underlying bam1_t data
-        if (--refct == 0 && p_cigar.references == 0)
+        if (--refct == 0 && p_cigar.references == 0 && p_tagval.references == 0)
             bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
     }
 
@@ -394,7 +396,8 @@ struct SAMRecord
     /// Get aux tag from bam1_t record and return a TagValue
     TagValue opIndex(string val)
     {
-        return TagValue(b, val[0..2]);
+        p_tagval = TagValue(b, val[0..2]);
+        return p_tagval;
     }
 
     /// Assign a tag key value pair
