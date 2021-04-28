@@ -40,6 +40,118 @@ obc  -1,0   -1,-1    0,+1    -
 
 module dhtslib.coordinates;
 
+enum Based
+{
+    zero = 0,
+    one
+}
+
+enum End
+{
+    open = 0,
+    closed
+}
+
+/// Coordinate type for a single position with in a Coordinate set,
+/// where the type itself encodes the coordinate system details
+/// (zero or one-based)
+struct Coordinate(Based bs)
+{
+    long pos;
+    alias pos this;
+
+    invariant
+    {
+        // in one based systems, pos cannot be zero
+        static if(bs == Based.one)
+        {
+            assert(pos != 0);
+        }
+    }
+    
+    /// Convert coordinate to another based system 
+    auto to(Based tobs)()
+    {
+        // return same Base type
+        static if (bs == tobs) return Coordinate!bs(pos);
+        // one to zero base, decrement
+        else static if (tobs == Based.zero) return Coordinate!bs(pos - 1);
+        // zero to one base, increment
+        else static if (tobs == Based.one) return Coordinate!bs(pos + 1);
+        else static assert(0, "Coordinate Type error");
+    }
+}
+
+/// template to convert Based, End enum combination to 
+/// respective CoordinateSystem enum
+template getCoordinateSystem(Based bs, End es){
+    static if(bs == Based.zero){
+        static if(es == End.open)
+            enum CoordSystem getCoordinateSystem = CoordSystem.zbho;
+        else static if(es == End.closed)
+            enum CoordSystem getCoordinateSystem = CoordSystem.zbc;
+    }
+    else static if(bs == Based.one){
+        static if(es == End.open)
+            enum CoordSystem getCoordinateSystem = CoordSystem.obho;
+        else static if(es == End.closed)
+            enum CoordSystem getCoordinateSystem = CoordSystem.obc;
+    }
+}
+
+// just sanity checking
+static assert(getCoordinateSystem!(Based.zero, End.open) == CoordSystem.zbho);
+static assert(getCoordinateSystem!(Based.zero, End.closed) == CoordSystem.zbc);
+static assert(getCoordinateSystem!(Based.one, End.open) == CoordSystem.obho);
+static assert(getCoordinateSystem!(Based.one, End.closed) == CoordSystem.obc);
+
+/// template to convert CoordinateSystem enum to 
+/// respective Based enum
+template coordinateSystemToBased(CoordSystem cs){
+    static if(cs == CoordSystem.zbho){
+        enum Based coordinateSystemToBased = Based.zero;
+    }
+    else static if(cs == CoordSystem.zbc){
+        enum Based coordinateSystemToBased = Based.zero;
+    }
+    else static if(cs == CoordSystem.obho){
+        enum Based coordinateSystemToBased = Based.one;
+    }
+    else static if(cs == CoordSystem.obc){
+        enum Based coordinateSystemToBased = Based.one;
+    }
+}
+
+// just sanity checking
+static assert(coordinateSystemToBased!(CoordSystem.zbho) == Based.zero);
+static assert(coordinateSystemToBased!(CoordSystem.zbc) == Based.zero);
+static assert(coordinateSystemToBased!(CoordSystem.obho) == Based.one);
+static assert(coordinateSystemToBased!(CoordSystem.obc) == Based.one);
+
+/// template to convert CoordinateSystem enum to 
+/// respective End enum
+template coordinateSystemToEnd(CoordSystem cs){
+    static if(cs == CoordSystem.zbho){
+        enum End coordinateSystemToEnd = End.open;
+    }
+    else static if(cs == CoordSystem.zbc){
+        enum End coordinateSystemToEnd = End.closed;
+    }
+    else static if(cs == CoordSystem.obho){
+        enum End coordinateSystemToEnd = End.open;
+    }
+    else static if(cs == CoordSystem.obc){
+        enum End coordinateSystemToEnd = End.closed;
+    }
+}
+
+// just sanity checking
+static assert(coordinateSystemToEnd!(CoordSystem.zbho) == End.open);
+static assert(coordinateSystemToEnd!(CoordSystem.zbc) == End.closed);
+static assert(coordinateSystemToEnd!(CoordSystem.obho) == End.open);
+static assert(coordinateSystemToEnd!(CoordSystem.obc) == End.closed);
+
+
 enum CoordSystem
 {
     zbho = 0,   /// zero-based, half-open (BED, BAM)
@@ -53,8 +165,18 @@ enum CoordSystem
 /// (zero or one-based; half-open vs. closed)
 struct Coordinates(CoordSystem cs)
 {
-    long start;
-    long end;
+    /// alias Based and End enums for this Coordsystem type
+    alias basetype = coordinateSystemToBased!cs;
+    alias endtype = coordinateSystemToEnd!cs;
+
+    Coordinate!basetype start;
+    Coordinate!basetype end;
+
+    this(long start, long end)
+    {
+        this.start.pos = start;
+        this.end.pos = end;
+    }
 
     invariant
     {
@@ -80,55 +202,49 @@ struct Coordinates(CoordSystem cs)
     /// Convert coordinates to another coordinate system 
     auto to(CoordSystem tocs)()
     {
+
+        /// alias Based and End enums for the tocs Coordsystem type
+        alias tobasetype = coordinateSystemToBased!tocs;
+        alias toendtype = coordinateSystemToEnd!tocs;
+
+        // new coordinates
+        auto newStart = this.start;
+        auto newEnd = this.end;
+
+        // return same CoordinateSystem type
         static if (cs == tocs)
-            return Coordinates!(tocs)(this.start, this.end);
+            return Coordinates!(tocs)(newStart, newEnd);
+        
+        // convert coordinates to new base type
+        newStart = newStart.to!tobasetype;
+        newEnd = newEnd.to!tobasetype;
 
-        // from zero-based, half-open
-        else static if (cs == CoordSystem.zbho && tocs == CoordSystem.zbc) {
-            assert(start <= end);
-            return Coordinates!tocs(this.start, this.end - 1);
+        // if going between end types
+        static if (endtype != toendtype){
+            // open to closed end, decrement end
+            // closed to open end, increment end
+            static if(toendtype == End.closed){
+                newEnd--;
+            }else{
+                newEnd++;
+            }
         }
-        else static if (cs == CoordSystem.zbho && tocs == CoordSystem.obho)
-            return Coordinates!tocs(this.start + 1, this.end + 1);
-        else static if (cs == CoordSystem.zbho && tocs == CoordSystem.obc) {
-            assert(start < end);
-            return Coordinates!tocs(this.start + 1, this.end);
-        }
-
-        // from zero-based, closed
-        else static if (cs == CoordSystem.zbc && tocs == CoordSystem.zbho)
-            return Coordinates!tocs(this.start, this.end + 1);
-        else static if (cs == CoordSystem.zbc && tocs == CoordSystem.obho)
-            return Coordinates!tocs(this.start + 1, this.end + 2);
-        else static if (cs == CoordSystem.zbc && tocs == CoordSystem.obc)
-            return Coordiantes!tocs(this.start + 1, this.end + 1);
-
-        // from one-based, half-open
-        else static if (cs == CoordSystem.obho && tocs == CoordSystem.zbho)
-            return Coordinates!tocs(this.start - 1, this.end - 1);
-        else static if (cs == CoordSystem.obho && tocs == CoordSystem.zbc)
-            return Coordinates!tocs(this.start - 1, this.end - 2);
-        else static if (cs == CoordSystem.obho && tocs == CoordSystem.obc)
-            return Coordiantes!tocs(this.start, this.end - 1);
-
-        // from one-based, closed
-        else static if (cs == CoordSystem.obc && tocs == CoordSystem.zbho)
-            return Coordinates!tocs(this.start - 1, this.end);
-        else static if (cs == CoordSystem.obc && tocs == CoordSystem.zbc)
-            return Coordinates!tocs(this.start - 1, this.end - 1);
-        else static if (cs == CoordSystem.obc && tocs == CoordSystem.obho)
-            return Coordinates!tocs(this.start, this.end + 1);
-
-        else static assert(0, "Coordinate Type error");
+        return Coordinates!(tocs)(newStart, newEnd);
     }
 }
 unittest
 {
+    import std.stdio;
     auto c0 = Coordinates!(CoordSystem.zbho)(0, 100);
     assert(c0.size == 100);
 
-    auto c1 = c0.to!(CoordSystem.obc);
-    assert(c1 == Coordinates!(CoordSystem.obc)(1, 100));
-
+    auto c1 = c0.to!(CoordSystem.zbc);
+    auto c2 = c0.to!(CoordSystem.obc);
+    auto c3 = c0.to!(CoordSystem.obho);
+    
+    assert(c1 == Coordinates!(CoordSystem.zbc)(0, 99));
+    assert(c2 == Coordinates!(CoordSystem.obc)(1, 100));
+    assert(c3 == Coordinates!(CoordSystem.obho)(1, 101));
+    
     // ...
 }
