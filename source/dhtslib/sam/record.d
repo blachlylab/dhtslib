@@ -69,8 +69,9 @@ struct SAMRecord
 
     ~this()
     {
+        if(refct > 0) refct--;
         // remove only if no references to this or underlying bam1_t data
-        if (--refct == 0 && p_cigar.references == 0 && p_tagval.references == 0)
+        if (refct == 0 && p_cigar.references == 0 && p_tagval.references == 0)
             bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
     }
 
@@ -779,4 +780,23 @@ debug(dhtslib_unittest) unittest
     auto r = new SAMRecord(b);
     hts_log_info(__FUNCTION__, "Cigar" ~ r.cigar.toString);
     assert(r.cigar.toString == "6M1D117M5D28M");
+}
+
+///
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import dhtslib.sam;
+    import dhtslib.sam.md : MDItr;
+    import std.algorithm: map;
+    import std.array: array;
+    import std.parallelism : parallel; 
+    import std.path:buildPath,dirName;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
+    foreach(rec;parallel(bam.allRecords)){
+        rec.queryName = "multithreading test";
+    }
+
 }
