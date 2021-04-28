@@ -40,12 +40,15 @@ obc  -1,0   -1,-1    0,+1    -
 
 module dhtslib.coordinates;
 
+/// Represents 0-based vs 1-based coordinate types
 enum Based
 {
     zero = 0,
     one
 }
 
+/// Represents whether a coordinate set's end 
+/// coordinate is open or closed
 enum End
 {
     open = 0,
