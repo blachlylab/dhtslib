@@ -41,7 +41,7 @@ obc  -1,0   -1,-1    0,+1    -
 module dhtslib.coordinates;
 
 /// Represents 0-based vs 1-based coordinate types
-enum Based
+enum Basis
 {
     zero = 0,
     one
@@ -58,7 +58,7 @@ enum End
 /// Coordinate type for a single position with in a Coordinate set,
 /// where the type itself encodes the coordinate system details
 /// (zero or one-based)
-struct Coordinate(Based bs)
+struct Coordinate(Basis bs)
 {
     long pos;
     alias pos this;
@@ -66,35 +66,35 @@ struct Coordinate(Based bs)
     invariant
     {
         // in one based systems, pos cannot be zero
-        static if(bs == Based.one)
+        static if(bs == Basis.one)
         {
             assert(pos != 0);
         }
     }
     
     /// Convert coordinate to another based system 
-    auto to(Based tobs)()
+    auto to(Basis tobs)()
     {
         // return same Base type
         static if (bs == tobs) return Coordinate!bs(pos);
         // one to zero base, decrement
-        else static if (tobs == Based.zero) return Coordinate!bs(pos - 1);
+        else static if (tobs == Basis.zero) return Coordinate!bs(pos - 1);
         // zero to one base, increment
-        else static if (tobs == Based.one) return Coordinate!bs(pos + 1);
+        else static if (tobs == Basis.one) return Coordinate!bs(pos + 1);
         else static assert(0, "Coordinate Type error");
     }
 }
 
-/// template to convert Based, End enum combination to 
+/// template to convert Basis, End enum combination to 
 /// respective CoordinateSystem enum
-template getCoordinateSystem(Based bs, End es){
-    static if(bs == Based.zero){
+template getCoordinateSystem(Basis bs, End es){
+    static if(bs == Basis.zero){
         static if(es == End.open)
             enum CoordSystem getCoordinateSystem = CoordSystem.zbho;
         else static if(es == End.closed)
             enum CoordSystem getCoordinateSystem = CoordSystem.zbc;
     }
-    else static if(bs == Based.one){
+    else static if(bs == Basis.one){
         static if(es == End.open)
             enum CoordSystem getCoordinateSystem = CoordSystem.obho;
         else static if(es == End.closed)
@@ -103,33 +103,33 @@ template getCoordinateSystem(Based bs, End es){
 }
 
 // just sanity checking
-static assert(getCoordinateSystem!(Based.zero, End.open) == CoordSystem.zbho);
-static assert(getCoordinateSystem!(Based.zero, End.closed) == CoordSystem.zbc);
-static assert(getCoordinateSystem!(Based.one, End.open) == CoordSystem.obho);
-static assert(getCoordinateSystem!(Based.one, End.closed) == CoordSystem.obc);
+static assert(getCoordinateSystem!(Basis.zero, End.open) == CoordSystem.zbho);
+static assert(getCoordinateSystem!(Basis.zero, End.closed) == CoordSystem.zbc);
+static assert(getCoordinateSystem!(Basis.one, End.open) == CoordSystem.obho);
+static assert(getCoordinateSystem!(Basis.one, End.closed) == CoordSystem.obc);
 
 /// template to convert CoordinateSystem enum to 
-/// respective Based enum
-template coordinateSystemToBased(CoordSystem cs){
+/// respective Basis enum
+template coordinateSystemToBasis(CoordSystem cs){
     static if(cs == CoordSystem.zbho){
-        enum Based coordinateSystemToBased = Based.zero;
+        enum Basis coordinateSystemToBasis = Basis.zero;
     }
     else static if(cs == CoordSystem.zbc){
-        enum Based coordinateSystemToBased = Based.zero;
+        enum Basis coordinateSystemToBasis = Basis.zero;
     }
     else static if(cs == CoordSystem.obho){
-        enum Based coordinateSystemToBased = Based.one;
+        enum Basis coordinateSystemToBasis = Basis.one;
     }
     else static if(cs == CoordSystem.obc){
-        enum Based coordinateSystemToBased = Based.one;
+        enum Basis coordinateSystemToBasis = Basis.one;
     }
 }
 
 // just sanity checking
-static assert(coordinateSystemToBased!(CoordSystem.zbho) == Based.zero);
-static assert(coordinateSystemToBased!(CoordSystem.zbc) == Based.zero);
-static assert(coordinateSystemToBased!(CoordSystem.obho) == Based.one);
-static assert(coordinateSystemToBased!(CoordSystem.obc) == Based.one);
+static assert(coordinateSystemToBasis!(CoordSystem.zbho) == Basis.zero);
+static assert(coordinateSystemToBasis!(CoordSystem.zbc) == Basis.zero);
+static assert(coordinateSystemToBasis!(CoordSystem.obho) == Basis.one);
+static assert(coordinateSystemToBasis!(CoordSystem.obc) == Basis.one);
 
 /// template to convert CoordinateSystem enum to 
 /// respective End enum
@@ -168,8 +168,8 @@ enum CoordSystem
 /// (zero or one-based; half-open vs. closed)
 struct Coordinates(CoordSystem cs)
 {
-    /// alias Based and End enums for this Coordsystem type
-    alias basetype = coordinateSystemToBased!cs;
+    /// alias Basis and End enums for this Coordsystem type
+    alias basetype = coordinateSystemToBasis!cs;
     alias endtype = coordinateSystemToEnd!cs;
 
     Coordinate!basetype start;
@@ -206,8 +206,8 @@ struct Coordinates(CoordSystem cs)
     auto to(CoordSystem tocs)()
     {
 
-        /// alias Based and End enums for the tocs Coordsystem type
-        alias tobasetype = coordinateSystemToBased!tocs;
+        /// alias Basis and End enums for the tocs Coordsystem type
+        alias tobasetype = coordinateSystemToBasis!tocs;
         alias toendtype = coordinateSystemToEnd!tocs;
 
         // new coordinates
