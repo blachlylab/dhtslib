@@ -181,6 +181,11 @@ struct Coordinates(CoordSystem cs)
         this.end.pos = end;
     }
 
+    this(Coordinate!basetype start, Coordinate!basetype end){
+        this.start = start;
+        this.end = end;
+    }
+
     invariant
     {
         // In half-open systems, ensure start strictly less than end,

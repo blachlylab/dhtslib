@@ -14,6 +14,7 @@ import std.traits : isIntegral;
 
 import htslib.hts_log;
 import dhtslib.sam.record : SAMRecord;
+import dhtslib.coordinates;
 
 /// Represents a CIGAR string
 /// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
@@ -399,7 +400,7 @@ debug (dhtslib_unittest) unittest
 /// and the CIGAR op at or effecting their alignment.
 struct AlignedCoordinate
 {
-    int qpos, rpos;
+    Coordinate!(Basis.zero) qpos, rpos;
     Ops cigar_op;
 }
 
@@ -412,7 +413,7 @@ struct AlignedCoordinatesItr
     this(Cigar cigar)
     {
         itr = CigarItr(cigar);
-        current.qpos = current.rpos = -1;
+        current.qpos = current.rpos = Coordinate!(Basis.zero)(-1);
         current.cigar_op = itr.front;
         current.qpos += ((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 1);
         current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
