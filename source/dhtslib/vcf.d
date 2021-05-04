@@ -20,6 +20,7 @@ import std.string: fromStringz, toStringz;
 import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 import std.traits: Unqual;
 
+import dhtslib.coordinates;
 import htslib.hts_log;
 import htslib.kstring;
 import htslib.vcf;
@@ -238,22 +239,22 @@ struct VCFRecord
      * NB: internally BCF is uzing 0 based coordinates; we only show +1 when printing a VCF line with toString (which calls vcf_format)
     */
     @property
-    long pos()
+    Coordinate!(Basis.zero) pos()
     out(coord) { assert(coord >= 0); }
     do
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
-        return this.line.pos;
+        return Coordinate!(Basis.zero)(this.line.pos);
     }
     /// Set position (POS, column 2)
     @property
-    void pos(long p)
+    void pos(Coordinate!(Basis.zero) p)
     in { assert(p >= 0); }
     do
     {
         // TODO: should we check for pos >= 0 && pos < contig length? Could really hamper performance.
         // TODO: if writing out the file with invalid POS values crashes htslib, will consider it
-        this.line.pos = p;
+        this.line.pos = p.pos;
     }
 
 
@@ -302,6 +303,13 @@ struct VCFRecord
         version(GNU) pragma(inline, true);
         return this.line.rlen;
     }
+
+    /// Coordinate range of the reference allele
+    @property Coordinates!(CoordSystem.zbho) coordinates()
+    {
+        return Coordinates!(CoordSystem.zbho)(this.pos, this.pos + this.refLen);
+    }
+    
     /// All alleles getter (array)
     @property string[] allelesAsArray()
     {
@@ -1238,9 +1246,9 @@ unittest
     assert(r.chrom == "20");
     assertThrown(r.chrom = "chr20");   // headerline chromosome is "20" not "chr20"
 
-    r.pos = 999_999;
-    assert(r.pos == 999_999);
-    r.pos = 62_435_964 + 1;     // Exceeds contig length
+    r.pos = Coordinate!(Basis.zero)(999_999);
+    assert(r.pos == Coordinate!(Basis.zero)(999_999));
+    r.pos = Coordinate!(Basis.zero)(62_435_964 + 1);     // Exceeds contig length
 
     // Test ID field
     // note that in an empty freshly initialized bcf1_t, the ID field is "" rather than "."
