@@ -247,7 +247,7 @@ struct SAMReader
     *   auto reads6 = bamfile.query("{HLA-DRB1*12:17}:1-100");
     *   ```
     */ 
-    auto query(string chrom, Coordinates!(CoordSystem.zbho) coords)
+    auto query(CoordSystem cs = CoordSystem.zbho)(string chrom, Coordinates!cs coords)
     in (!this.header.isNull)
     {
         auto tid = this.header.targetId(chrom);
@@ -255,10 +255,12 @@ struct SAMReader
     }
 
     /// ditto
-    auto query(int tid, Coordinates!(CoordSystem.zbho) coords)
+    auto query(CoordSystem cs = CoordSystem.zbho)(int tid, Coordinates!cs coords)
     in (!this.header.isNull)
     {
-        auto itr = sam_itr_queryi(this.idx, tid, coords.start, coords.end);
+        /// convert to zero-based half-open
+        auto newcoords = coords.to!(CoordSystem.zbho);
+        auto itr = sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end);
         return RecordRange(this.fp, this.header, itr);
     }
 
