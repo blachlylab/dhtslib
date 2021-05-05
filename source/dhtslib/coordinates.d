@@ -222,22 +222,23 @@ struct Coordinates(CoordSystem cs)
         // return same CoordinateSystem type
         static if (cs == tocs)
             return Coordinates!(tocs)(newStart, newEnd);
-        
-        // convert coordinates to new base type
-        newStart = newStart.to!tobasetype;
-        newEnd = newEnd.to!tobasetype;
+        else{
+            // convert coordinates to new base type
+            newStart = newStart.to!tobasetype;
+            newEnd = newEnd.to!tobasetype;
 
-        // if going between end types
-        static if (endtype != toendtype){
-            // open to closed end, decrement end
-            // closed to open end, increment end
-            static if(toendtype == End.closed){
-                newEnd--;
-            }else{
-                newEnd++;
+            // if going between end types
+            static if (endtype != toendtype){
+                // open to closed end, decrement end
+                // closed to open end, increment end
+                static if(toendtype == End.closed){
+                    newEnd--;
+                }else{
+                    newEnd++;
+                }
             }
+            return Coordinates!(tocs)(newStart, newEnd);
         }
-        return Coordinates!(tocs)(newStart, newEnd);
     }
 }
 unittest
@@ -249,10 +250,12 @@ unittest
     auto c1 = c0.to!(CoordSystem.zbc);
     auto c2 = c0.to!(CoordSystem.obc);
     auto c3 = c0.to!(CoordSystem.obho);
+    auto c4 = c0.to!(CoordSystem.zbho);
     
     assert(c1 == Coordinates!(CoordSystem.zbc)(0, 99));
     assert(c2 == Coordinates!(CoordSystem.obc)(1, 100));
     assert(c3 == Coordinates!(CoordSystem.obho)(1, 101));
+    assert(c4 == Coordinates!(CoordSystem.zbho)(0, 100));
     
     // ...
 }
