@@ -39,6 +39,7 @@ obc  -1,0   -1,-1    0,+1    -
 */
 
 module dhtslib.coordinates;
+import std.conv : to;
 
 /// Represents 0-based vs 1-based coordinate types
 enum Basis
@@ -163,6 +164,8 @@ enum CoordSystem
     obc         /// one-based, closed (GFF3, VCF [not BCF], SAM [not BAM])
 }
 
+string[4] CoordSystemLabels = ["zbho", "zbc", "obho", "obc"];
+
 /// The (start, end) coordinates within a coordinate system,
 /// where the type itself encodes the coordinate system details
 /// (zero or one-based; half-open vs. closed)
@@ -240,7 +243,90 @@ struct Coordinates(CoordSystem cs)
             return Coordinates!(tocs)(newStart, newEnd);
         }
     }
+
+    string toString(){
+        return "[" ~ CoordSystemLabels[cs] ~ "] " ~ this.start.pos.to!string ~ "-" ~ this.end.pos.to!string;
+    }
 }
+
+/// Represents a string version of coordinates
+/// takes a string of form: chrom:start-end
+struct ChromCoordinates(CoordSystem cs)
+{
+    string chrom;
+    Coordinates!cs coords;
+
+    this(string region){
+        import std.array : split;
+
+        auto first = region.split(":");
+        assert(first.length == 2);
+
+        this.chrom = first[0];
+
+        auto strcoords = first[1].split("-");
+        assert(strcoords.length == 2);
+
+        auto start = strcoords[0].to!long;
+        auto end = strcoords[1].to!long;
+
+        this.coords = Coordinates!cs(start,end);
+    }
+
+    /// Convert coordinates to another coordinate system 
+    auto to(CoordSystem tocs)()
+    {
+        ChromCoordinates!tocs c;
+        c.chrom = this.chrom;
+        c.coords = this.coords.to!tocs;
+        return c;
+    }
+
+    string toString(){
+        return "[" ~ CoordSystemLabels[cs] ~ "] " ~ chrom ~ ":" ~ this.coords.start.pos.to!string ~ "-" ~ this.coords.end.pos.to!string;
+    } 
+}
+
+// Shortcuts
+
+auto Zbho(T: string)(T region)
+{
+    return ChromCoordinates!(CoordSystem.zbho)(region);
+}
+
+auto Zbho(T: long)(T start, T end)
+{
+    return Coordinates!(CoordSystem.zbho)(start, end);
+}
+
+auto Zbc(T: string)(T region)
+{
+    return ChromCoordinates!(CoordSystem.zbc)(region);
+}
+
+auto Zbc(T: long)(T start, T end)
+{
+    return Coordinates!(CoordSystem.zbc)(start, end);
+}
+auto Obho(T: string)(T region)
+{
+    return ChromCoordinates!(CoordSystem.obho)(region);
+}
+
+auto Obho(T: long)(T start, T end)
+{
+    return Coordinates!(CoordSystem.obho)(start, end);
+}
+auto Obc(T: string)(T region)
+{
+    return ChromCoordinates!(CoordSystem.obc)(region);
+}
+
+auto Obc(T: long)(T start, T end)
+{
+    return Coordinates!(CoordSystem.obc)(start, end);
+}
+
 unittest
 {
     import std.stdio;
@@ -252,10 +338,37 @@ unittest
     auto c3 = c0.to!(CoordSystem.obho);
     auto c4 = c0.to!(CoordSystem.zbho);
     
-    assert(c1 == Coordinates!(CoordSystem.zbc)(0, 99));
-    assert(c2 == Coordinates!(CoordSystem.obc)(1, 100));
-    assert(c3 == Coordinates!(CoordSystem.obho)(1, 101));
-    assert(c4 == Coordinates!(CoordSystem.zbho)(0, 100));
+    assert(c1 == Zbc(0, 99));
+    assert(c2 == Obc(1, 100));
+    assert(c3 == Obho(1, 101));
+    assert(c4 == Zbho(0, 100));
     
+    writeln(c0);
+    writeln(c1);
+    writeln(c2);
+    writeln(c3);
+    // ...
+}
+
+unittest
+{
+    import std.stdio;
+    auto c0 = ChromCoordinates!(CoordSystem.zbho)("chrom1:0-100");
+    assert(c0.coords.size == 100);
+
+    auto c1 = c0.to!(CoordSystem.zbc);
+    auto c2 = c0.to!(CoordSystem.obc);
+    auto c3 = c0.to!(CoordSystem.obho);
+    auto c4 = c0.to!(CoordSystem.zbho);
+    
+    assert(c1 == Zbc("chrom1:0-99"));
+    assert(c2 == Obc("chrom1:1-100"));
+    assert(c3 == Obho("chrom1:1-101"));
+    assert(c4 == Zbho("chrom1:0-100"));
+    
+    writeln(c0);
+    writeln(c1);
+    writeln(c2);
+    writeln(c3);
     // ...
 }
