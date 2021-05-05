@@ -14,16 +14,8 @@ module dhtslib.faidx;
 import std.string;
 import core.stdc.stdlib : malloc, free;
 
+import dhtslib.coordinates;
 import htslib.faidx;
-
-/** Coodinate Systems, since htslib sequence fetching methods surprisingly use zero-based, closed */
-enum CoordSystem
-{
-    zbho = 0,   /// zero-based, half-open
-    zbc,        /// zero-based, closed (behavior of faidx_fetch_seq)
-    obho,       /// one-based, half-open
-    obc         /// one-based, closed
-}
 
 /** Build index for a FASTA or bgzip-compressed FASTA file.
 
@@ -140,7 +132,8 @@ struct IndexedFastaFile {
     /// Sadly, $ to represent max length is not supported
     auto opIndex(string contig, int[2] pos)
     {
-        return fetchSequence(contig, pos[0], pos[1]);
+        auto coords = Coordinates!(CoordSystem.zbho)(pos[0], pos[0]);
+        return fetchSequence(contig, coords);
     }
     /// ditto
     int[2] opSlice(size_t dim)(int start, int end) if (dim == 1)
@@ -152,26 +145,13 @@ struct IndexedFastaFile {
 
     /// Fetch sequencing in a region by function call with contig, start, end
     /// `string sequence = fafile.fetchSequence("chr2", 20123, 30456)`
-    string fetchSequence(CoordSystem cs = CoordSystem.zbho)(string contig, long start, long end)
+    string fetchSequence(CoordSystem cs = CoordSystem.zbho)(string contig, Coordinates!cs coords)
     {
         char *fetchedSeq;
         long fetchedLen;
 
         // Convert given coordinates in system cs to zero-based, closed (faidx_fetch_seq)
-        static if (cs == CoordSystem.zbho) {
-            end--;
-        }
-        else static if (cs == CoordSystem.zbc) {
-            // ok
-        }
-        else static if (cs == CoordSystem.obho) {
-            start--;
-            end -= 2;
-        }
-        else static if (cs == CoordSystem.obc) {
-            start--;
-            end--;
-        }
+        auto newcoords = coords.to!(CoordSystem.zbc);
         /* htslib API for my reference:
          *
          * char *faidx_fetch_seq64(const faidx_t *fai, const char *c_name, hts_pos_t p_beg_i, hts_pos_t p_end_i, hts_pos_t *len);
@@ -185,7 +165,7 @@ struct IndexedFastaFile {
          *  by end users by calling `free()` on it.
          *
         */
-        fetchedSeq = faidx_fetch_seq64(this.faidx, toStringz(contig), start, end, &fetchedLen);
+        fetchedSeq = faidx_fetch_seq64(this.faidx, toStringz(contig), newcoords.start, newcoords.end, &fetchedLen);
         
         if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
         else if (fetchedLen == -2) throw new Exception("fai_fetch: sequence not found");
