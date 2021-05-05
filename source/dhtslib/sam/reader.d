@@ -17,6 +17,7 @@ import htslib.hts_log;
 import htslib.kstring;
 import htslib.sam;
 import dhtslib.sam.record;
+import dhtslib.coordinates;
 import dhtslib.sam.header;
 import dhtslib.sam : cmpInterval, cmpRegList;
 
@@ -246,18 +247,18 @@ struct SAMReader
     *   auto reads6 = bamfile.query("{HLA-DRB1*12:17}:1-100");
     *   ```
     */ 
-    auto query(string chrom, long start, long end)
+    auto query(string chrom, Coordinates!(CoordSystem.zbho) coords)
     in (!this.header.isNull)
     {
         auto tid = this.header.targetId(chrom);
-        return query(tid, start, end);
+        return query(tid, coords);
     }
 
     /// ditto
-    auto query(int tid, long start, long end)
+    auto query(int tid, Coordinates!(CoordSystem.zbho) coords)
     in (!this.header.isNull)
     {
-        auto itr = sam_itr_queryi(this.idx, tid, start, end);
+        auto itr = sam_itr_queryi(this.idx, tid, coords.start, coords.end);
         return RecordRange(this.fp, this.header, itr);
     }
 
@@ -291,44 +292,51 @@ struct SAMReader
     /// ditto
     auto opIndex(string tid, long[2] pos)
     {
-        return query(tid, pos[0], pos[1]);
+        auto coords = Coordinates!(CoordSystem.zbho)(pos[0], pos[1]);
+        return query(tid, coords);
     }
 
     /// ditto
     auto opIndex(int tid, long[2] pos)
     {
-        return query(tid, pos[0], pos[1]);
+        auto coords = Coordinates!(CoordSystem.zbho)(pos[0], pos[1]);
+        return query(tid, coords);
     }
 
     /// ditto
     auto opIndex(string tid, long pos)
     {
-        return query(tid, pos, pos + 1);
+        auto coords = Coordinates!(CoordSystem.zbho)(pos, pos + 1);
+        return query(tid, coords);
     }
 
     /// ditto
     auto opIndex(int tid, long pos)
     {
-        return query(tid, pos, pos + 1);
+        auto coords = Coordinates!(CoordSystem.zbho)(pos, pos + 1);
+        return query(tid, coords);
     }
 
     /// ditto
     deprecated("use multidimensional slicing with second parameter as range ([\"chr1\", 1 .. 2])")
     auto opIndex(string tid, long pos1, long pos2)
     {
-        return query(tid, pos1, pos2);
+        auto coords = Coordinates!(CoordSystem.zbho)(pos1, pos2);
+        return query(tid, coords);
     }
 
     /// ditto
     deprecated("use multidimensional slicing with second parameter as range ([20, 1 .. 2])")
     auto opIndex(int tid, long pos1, long pos2)
     {
-        return query(tid, pos1, pos2);
+        auto coords = Coordinates!(CoordSystem.zbho)(pos1, pos2);
+        return query(tid, coords);
     }
 
     /// ditto
     long[2] opSlice(size_t dim)(long start, long end) if (dim  == 1)
     {
+        assert(end > start);
         return [start, end];
     }
 
@@ -365,14 +373,16 @@ struct SAMReader
         auto tid = this.header.targetId(ctg);
         auto end = this.header.targetLength(tid) + endoff.offset;
         // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
-        return query(tid, end, end + 1);
+        auto coords = Coordinates!(CoordSystem.zbho)(end, end + 1);
+        return query(tid, coords);
     }
     /// ditto
     auto opIndex(int tid, OffsetType endoff)
     {
         auto end = this.header.targetLength(tid) + endoff.offset;
         // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
-        return query(tid, end, end + 1);
+        auto coords = Coordinates!(CoordSystem.zbho)(end, end + 1);
+        return query(tid, coords);
     }
     /// ditto
     auto opSlice(size_t dim)(long start, OffsetType off) if (dim == 1)
@@ -384,13 +394,15 @@ struct SAMReader
     {
         auto tid = this.header.targetId(ctg);
         auto end = this.header.targetLength(tid) + coords[1];
-        return query(tid, coords[0], end);
+        auto c = Coordinates!(CoordSystem.zbho)(coords[0], end);
+        return query(tid, c);
     }
     /// ditto
     auto opIndex(int tid, Tuple!(long, OffsetType) coords)
     {
         auto end = this.header.targetLength(tid) + coords[1];
-        return query(tid, coords[0], end);
+        auto c = Coordinates!(CoordSystem.zbho)(coords[0], end);
+        return query(tid, c);
     }
 
 
@@ -805,7 +817,7 @@ debug(dhtslib_unittest) unittest
     assert(bam["CHROMOSOME_IV"].array.length == 19);
     assert(bam["CHROMOSOME_V"].array.length == 0);
     assert(bam.query("CHROMOSOME_I:900-2000") .array.length == 14);
-    assert(bam.query("CHROMOSOME_I",900, 2000) .array.length == 14);
+    assert(bam.query("CHROMOSOME_I",Coordinates!(CoordSystem.zbho)(900, 2000)) .array.length == 14);
     assert(bam["CHROMOSOME_I",900 .. 2000].array.length == 14);
     assert(bam["CHROMOSOME_I",[900, 2000]].array.length == 14);
     assert(bam[0, [900, 2000]].array.length == 14);
