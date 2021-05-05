@@ -286,7 +286,7 @@ debug (dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
-    auto readrange = bam["CHROMOSOME_I", 914];
+    auto readrange = bam["CHROMOSOME_I", ZeroBased(914)];
     hts_log_info(__FUNCTION__, "Getting read 1");
     assert(readrange.empty == false);
     auto read = readrange.front();
@@ -455,7 +455,7 @@ debug (dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
-    auto readrange = bam["CHROMOSOME_I", 914];
+    auto readrange = bam["CHROMOSOME_I", ZeroBased(914)];
     hts_log_info(__FUNCTION__, "Getting read 1");
     assert(readrange.empty == false);
     auto read = readrange.front();
