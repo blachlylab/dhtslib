@@ -211,6 +211,9 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing IndexedFastaFile");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto fai = IndexedFastaFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","ce.fa"));
+
+    fai.setCacheSize(4000000);
+
     assert(fai.fetchSequence("CHROMOSOME_I",Zbho(0, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
     assert(fai.fetchSequence("CHROMOSOME_I",Obho(1, 30)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
     assert(fai.fetchSequence("CHROMOSOME_I",Zbc(0, 28)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
@@ -230,4 +233,12 @@ debug(dhtslib_unittest) unittest
     assert(fai.fetchSequence(Obho("CHROMOSOME_I:1-30")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
     assert(fai.fetchSequence(Zbc("CHROMOSOME_I:0-28")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
     assert(fai.fetchSequence(Obc("CHROMOSOME_I:1-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+
+    assert(fai.seqLen("CHROMOSOME_I") == 1009800);
+    assert(fai.nSeq == 7);
+
+    assert(fai.hasSeq("CHROMOSOME_I"));
+    assert(!fai.hasSeq("CHROMOSOME_"));
+
+    assert(fai.seqName(0) == "CHROMOSOME_I");
 }
