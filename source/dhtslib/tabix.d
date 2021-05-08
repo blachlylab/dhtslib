@@ -15,6 +15,7 @@ import core.stdc.stdlib : malloc, free;
 import htslib.hts;
 import htslib.kstring;
 import htslib.tbx;
+import dhtslib.coordinates;
 //import htslib.regidx;
 
 /** Encapsulates a position-sorted record-oriented NGS flat file,
@@ -88,12 +89,19 @@ struct TabixIndexedFile {
         return sequence_names;
     }
 
+    auto region(CoordSystem cs)(ChromCoordinates!cs region)
+    {
+        return region(region.chrom, region.coords);
+    }
+
     /** region(r)
      *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
      */
-    auto region(const(char)[] r)
+    auto region(CoordSystem cs)(string chrom, Coordinates!cs coords)
     {
-        struct Region {
+        auto newCoords = coords.to!(CoordSystem.zbho);
+        struct Region
+        {
 
             /** TODO: determine how thread-(un)safe this is (i.e., using a potentially shared *fp and *tbx) */
             private htsFile *fp;
@@ -108,12 +116,12 @@ struct TabixIndexedFile {
             // but first row was preloaded in this.next)
             private bool active;
 
-            this(htsFile *fp, tbx_t *tbx, const(char)[] r)
+            this(htsFile *fp, tbx_t *tbx, string chrom, Zbho coords)
             {
                 this.fp = fp;
                 this.tbx= tbx;
 
-                this.itr = tbx_itr_querys(tbx, toStringz(r) );
+                this.itr = tbx_itr_queryi(tbx, tbx_name2id(tbx, toStringz(chrom)), cast(int) coords.start, cast(int) coords.end);
                 debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
                 if (this.itr) {
                     // Load the first record
@@ -166,7 +174,23 @@ struct TabixIndexedFile {
             }
         }
 
-        return Region(this.fp, this.tbx, r);
+        return Region(this.fp, this.tbx, chrom, newCoords);
     }
 
 }
+
+// TODO: figure out how to make this unittest with just htslib files
+
+// debug(dhtslib_unittest) unittest
+// {
+//     import htslib.hts_log;
+//     import dhtslib.vcf;
+//     import std.path : buildPath, dirName;
+
+//     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+//     hts_log_info(__FUNCTION__, "Testing TabixIndexedFile");
+//     hts_log_info(__FUNCTION__, "Loading test file");
+//     auto vcf = VCFReader(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","index.vcf"));
+//     auto vcfw = VCFWriter()
+
+// }
