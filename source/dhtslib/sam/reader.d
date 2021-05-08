@@ -397,7 +397,7 @@ struct SAMReader
     {
         auto tid = this.header.targetId(ctg);
         auto end = this.header.targetLength(tid) + coords[1];
-        auto endCoord = ZeroBased(end);
+        auto endCoord = Zb(end);
         auto newEndCoord = endCoord.to!bs;
         auto c = Coordinates!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
         return query(tid, c);
@@ -406,7 +406,7 @@ struct SAMReader
     auto opIndex(Basis bs)(int tid, Tuple!(Coordinate!bs, OffsetType) coords)
     {
         auto end = this.header.targetLength(tid) + coords[1];
-        auto endCoord = ZeroBased(end);
+        auto endCoord = Zb(end);
         auto newEndCoord = endCoord.to!bs;
         auto c = Coordinates!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
         return query(tid, c);
@@ -825,16 +825,16 @@ debug(dhtslib_unittest) unittest
     // assert(bam["CHROMOSOME_V"].array.length == 0);
     assert(bam.query(Obc("CHROMOSOME_I:900-2000")).array.length == 14);
     assert(bam.query("CHROMOSOME_I", Zbho(900, 2000)) .array.length == 14);
-    assert(bam["CHROMOSOME_I",ZeroBased(900) .. ZeroBased(2000)].array.length == 14);
-    assert(bam["CHROMOSOME_I",[ZeroBased(900), ZeroBased(2000)]].array.length == 14);
-    assert(bam[0, [ZeroBased(900), ZeroBased(2000)]].array.length == 14);
+    assert(bam["CHROMOSOME_I",Zb(900) .. Zb(2000)].array.length == 14);
+    assert(bam["CHROMOSOME_I",[Zb(900), Zb(2000)]].array.length == 14);
+    assert(bam[0, [Zb(900), Zb(2000)]].array.length == 14);
 
-    assert(bam["CHROMOSOME_I",ZeroBased(940)].array.length == 2);
-    assert(bam[0, ZeroBased(940)].array.length == 2);
+    assert(bam["CHROMOSOME_I",Zb(940)].array.length == 2);
+    assert(bam[0, Zb(940)].array.length == 2);
 
 
-    assert(bam["CHROMOSOME_I",ZeroBased(900) .. $].array.length == 18);
-    assert(bam[0, ZeroBased(900) .. $].array.length == 18);
+    assert(bam["CHROMOSOME_I",Zb(900) .. $].array.length == 18);
+    assert(bam[0, Zb(900) .. $].array.length == 18);
     assert(bam["CHROMOSOME_I",$].array.length == 0);
     assert(bam[0, $].array.length == 0);
     assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);

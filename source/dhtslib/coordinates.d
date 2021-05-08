@@ -86,8 +86,8 @@ struct Coordinate(Basis bs)
     }
 }
 
-alias ZeroBased = Coordinate!(Basis.zero);
-alias OneBased = Coordinate!(Basis.zero);
+alias Zb = Coordinate!(Basis.zero);
+alias Ob = Coordinate!(Basis.zero);
 
 /// template to convert Basis, End enum combination to 
 /// respective CoordinateSystem enum
