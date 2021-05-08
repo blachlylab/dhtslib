@@ -291,18 +291,14 @@ struct SAMReader
     }
 
     /// ditto
-    auto opIndex(Basis bs)(string tid, Coordinate!bs[] pos)
+    auto opIndex(CoordSystem cs)(string tid, Coordinates!cs coords)
     {
-        assert(pos.length == 2);
-        auto coords = Coordinates!(getCoordinateSystem!(bs,End.open))(pos[0], pos[1]);
         return query(tid, coords);
     }
 
     /// ditto
-    auto opIndex(Basis bs)(int tid, Coordinate!bs[] pos)
+    auto opIndex(CoordSystem cs)(int tid, Coordinates!cs coords)
     {
-        assert(pos.length == 2);
-        auto coords = Coordinates!(getCoordinateSystem!(bs,End.open))(pos[0], pos[1]);
         return query(tid, coords);
     }
 
@@ -340,7 +336,7 @@ struct SAMReader
     auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, Coordinate!bs end) if(dim == 1)
     {
         assert(end > start);
-        return [start, end];
+        return Coordinates!(getCoordinateSystem!(bs, End.open))(start, end);
     }
 
 
@@ -826,8 +822,7 @@ debug(dhtslib_unittest) unittest
     assert(bam.query(Obc("CHROMOSOME_I:900-2000")).array.length == 14);
     assert(bam.query("CHROMOSOME_I", Zbho(900, 2000)) .array.length == 14);
     assert(bam["CHROMOSOME_I",Zb(900) .. Zb(2000)].array.length == 14);
-    assert(bam["CHROMOSOME_I",[Zb(900), Zb(2000)]].array.length == 14);
-    assert(bam[0, [Zb(900), Zb(2000)]].array.length == 14);
+    assert(bam[0, Zb(900) .. Zb(2000)].array.length == 14);
 
     assert(bam["CHROMOSOME_I",Zb(940)].array.length == 2);
     assert(bam[0, Zb(940)].array.length == 2);
