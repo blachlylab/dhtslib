@@ -87,7 +87,7 @@ struct Coordinate(Basis bs)
 }
 
 alias Zb = Coordinate!(Basis.zero);
-alias Ob = Coordinate!(Basis.zero);
+alias Ob = Coordinate!(Basis.one);
 
 /// template to convert Basis, End enum combination to 
 /// respective CoordinateSystem enum
@@ -330,7 +330,7 @@ auto Obc(T: long)(T start, T end)
     return Coordinates!(CoordSystem.obc)(start, end);
 }
 
-unittest
+debug(dhtslib_unittest) unittest
 {
     import std.stdio;
     auto c0 = Coordinates!(CoordSystem.zbho)(0, 100);
@@ -353,7 +353,7 @@ unittest
     // ...
 }
 
-unittest
+debug(dhtslib_unittest) unittest
 {
     import std.stdio;
     auto c0 = ChromCoordinates!(CoordSystem.zbho)("chrom1:0-100");
@@ -373,5 +373,39 @@ unittest
     writeln(c1);
     writeln(c2);
     writeln(c3);
+    // ...
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    auto c0 = Coordinates!(CoordSystem.zbho)(Zb(0), Zb(100));
+    assert(c0.size == 100);
+
+    auto c1 = c0.to!(CoordSystem.zbc);
+    auto c2 = c0.to!(CoordSystem.obc);
+    auto c3 = c0.to!(CoordSystem.obho);
+    auto c4 = c0.to!(CoordSystem.zbho);
+    
+    assert(c1 == Zbc(0, 99));
+    assert(c2 == Obc(1, 100));
+    assert(c3 == Obho(1, 101));
+    assert(c4 == Zbho(0, 100));
+}
+
+debug(dhtslib_unittest) unittest
+{
+    auto c0 = Coordinates!(CoordSystem.obho)(Ob(1), Ob(101));
+    assert(c0.size == 100);
+
+    auto c1 = c0.to!(CoordSystem.zbc);
+    auto c2 = c0.to!(CoordSystem.obc);
+    auto c3 = c0.to!(CoordSystem.obho);
+    auto c4 = c0.to!(CoordSystem.zbho);
+    
+    assert(c1 == Zbc(0, 99));
+    assert(c2 == Obc(1, 100));
+    assert(c3 == Obho(1, 101));
+    assert(c4 == Zbho(0, 100));
     // ...
 }
