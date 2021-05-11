@@ -52,10 +52,12 @@ jobs:
       - name: Setup additional test files
         run: |
             cd htslib
-            bgzip -c test/tabix/gff_file.gff > test/tabix/gff_file.gff.gz
-            tabix test/tabix/gff_file.gff.gz
-            bgzip -c test/tabix/bed_file.gff > test/tabix/bed_file.bed.gz
-            tabix test/tabix/bed_file.bed.gz
+            cd test
+            cd tabix
+            bgzip -c gff_file.gff > gff_file.gff.gz
+            tabix gff_file.gff.gz
+            bgzip -c bed_file.gff > bed_file.bed.gz
+            tabix bed_file.bed.gz
 
       - name: Run tests
         run: dub -q test -b=unittest-cov
