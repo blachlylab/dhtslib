@@ -12,6 +12,8 @@ import core.stdc.stdio : SEEK_SET;
 import std.parallelism : totalCPUs;
 import std.stdio : writeln, writefln;
 import std.string : fromStringz, toStringz;
+import std.range : inputRangeObject, InputRangeObject;
+import std.traits : ReturnType;
 
 import htslib.bgzf;
 import htslib.hfile: hseek, off_t;
@@ -171,4 +173,43 @@ debug(dhtslib_unittest) unittest
     assert(bg.byLineCopy.array.length == 500);
     assert(bg.byLine.array.length == 500);
     // assert(bg.array == ["122333444455555"]);
+}
+
+struct RecordReader(RecType)
+{
+    BGZFile file;
+    ReturnType!(this.initializeRange) range;
+    string header;
+
+    this(string fn)
+    {
+        this.file = BGZFile(fn);
+        this.range = this.initializeRange;
+        while(!this.range.empty && this.range.front.length > 0 && this.range.front[0] == '#')
+        {
+            header ~= this.range.front ~ "\n";
+            this.range.popFront;
+        }
+        this.header = this.header[0 .. $-1];
+    }
+
+    auto initializeRange()
+    {
+        return this.file.byLineCopy.inputRangeObject;
+    }
+
+    RecType front()
+    {
+        return RecType(this.range.front);
+    }
+
+    void popFront()
+    {
+        this.range.popFront;
+    }
+
+    auto empty()
+    {
+        return this.range.empty;
+    }
 }

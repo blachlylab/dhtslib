@@ -110,6 +110,11 @@ struct GTF_Record
         return (cast(string)this.raw.splitter('\t').drop(7).front).to!int;
     }
 
+    /// Column 9: backwards compatible GFF2 group field
+    @property group() const {
+        return cast(string)this.raw.splitter('\t').drop(8).front;
+    }
+
     /// Column 9: attributes; A list of ;-separated feature attributes in key=value form
     string attributes(const string field) const { return this.opIndex(field); }
 
