@@ -56,7 +56,7 @@ jobs:
             cd tabix
             bgzip -c gff_file.gff > gff_file.gff.gz
             tabix gff_file.gff.gz
-            bgzip -c bed_file.gff > bed_file.bed.gz
+            bgzip -c bed_file.bed > bed_file.bed.gz
             tabix bed_file.bed.gz
 
       - name: Run tests
