@@ -1,0 +1,1452 @@
+0a1,12
+> // htslib-1.9 hts.h as D module
+> // Changes include:
+> // In D, const on either LHS or RHS of function declaration applies to the function, not return value, unless parents included:
+> // changed ^const <type> <fnname> to ^const(<type>) <fnname>
+> /*  *      aliased typedef'd function pointers */
+> /*  *       changed C-style arrays (eg line 339, extern const char seq_nt16_str[];) to char[] seq_nt16_str */
+> /*  *           as update to above, seq_nt16_str needs to be char[16], as C and D style char[] imply different things */
+> module htslib.hts;
+> 
+> import std.bitmanip;
+> 
+> extern (C):
+4c16
+<     Copyright (C) 2012-2020 Genome Research Ltd.
+---
+>     Copyright (C) 2012-2019 Genome Research Ltd.
+28,30c40
+< import core.stdc.config;
+< import core.stdc.inttypes;
+< import core.stdc.limits;
+---
+> //#include <stddef.h>
+32,33c42,45
+< 
+< extern (C):
+---
+> /+
+> #include "hts_defs.h"
+> #include "hts_log.h"
+> +/
+35a48,57
+> version(Windows)
+> {
+>     enum HTS_PATH_SEPARATOR_CHAR = ';';
+>     enum HTS_PATH_SEPARATOR_STR = ";";
+> }
+> else
+> {
+>     enum HTS_PATH_SEPARATOR_CHAR = ':';
+>     enum HTS_PATH_SEPARATOR_STR = ":";
+> }
+37,40c59
+< enum HTS_PATH_SEPARATOR_CHAR = ':';
+< enum HTS_PATH_SEPARATOR_STR = ":";
+< 
+< struct BGZF;
+---
+> import htslib.bgzf;
+42,45c61,75
+< struct cram_fd;
+< struct hFILE;
+< struct hts_tpool;
+< struct sam_hdr_t;
+---
+> /// see cram.h, sam.h, sam.d
+> struct cram_fd; // @suppress(dscanner.style.phobos_naming_convention)
+> /// see hfile.d
+> //struct hFILE; // @suppress(dscanner.style.phobos_naming_convention)
+> import htslib.hfile: hFILE;
+> /// see thread_pool.d
+> struct hts_tpool; // @suppress(dscanner.style.phobos_naming_convention)
+> import htslib.sam : sam_hdr_t;
+> 
+> import htslib.kstring: kstring_t;
+> 
+> /+
+> #ifndef kroundup32
+> #define kroundup32(x) (--(x), (x)|=(x)>>1, (x)|=(x)>>2, (x)|=(x)>>4, (x)|=(x)>>8, (x)|=(x)>>16, ++(x))
+> #endif
+70a101,109
+> #define hts_expand(type_t, n, m, ptr) do {                              \
+>         if ((n) > (m)) {                                                \
+>             size_t hts_realloc_or_die(size_t, size_t, size_t, size_t,   \
+>                                       int, void **, const char *);      \
+>             (m) = hts_realloc_or_die((n) >= 1 ? (n) : 1, (m), sizeof(m), \
+>                                      sizeof(type_t),  0,                \
+>                                      (void **)&(ptr), __func__);        \
+>         }                                                               \
+>     } while (0)
+84c123
+<  *
+---
+>  * 
+92a132,143
+> 
+> #define hts_expand0(type_t, n, m, ptr) do {                             \
+>         if ((n) > (m)) {                                                \
+>             size_t hts_realloc_or_die(size_t, size_t, size_t, size_t,   \
+>                                       int, void **, const char *);      \
+>             (m) = hts_realloc_or_die((n) >= 1 ? (n) : 1, (m), sizeof(m), \
+>                                      sizeof(type_t), 1,                 \
+>                                      (void **)&(ptr), __func__);        \
+>         }                                                               \
+>     } while (0)
+> +/
+> 
+94,101c145,146
+< int hts_resize_array_ (
+<     size_t,
+<     size_t,
+<     size_t,
+<     void*,
+<     void**,
+<     int,
+<     const(char)*);
+---
+> int hts_resize_array_(size_t, size_t, size_t, void *, void **, int,
+>                       const(char) *);
+107c152
+<  * Macro to expand a dynamic array of a given type
+---
+>  * Template fn to expand a dynamic array of a given type
+109,111c154,156
+<  * @param         type_t    The type of the array elements
+<  * @param[in]     num       Requested number of elements of type type_t
+<  * @param[in,out] size_ptr  Pointer to where the size (in elements) of the
+---
+>  * @param         T         The type of the array elements
+>  * @param[in]     num       Requested number of elements of type T 
+>  * @param[in,out] size      Pointer to where the size (in elements) of the
+127,134c172,178
+< /// Release resources when dlclosing a dynamically loaded HTSlib
+< /** @discussion
+<  *  Normally HTSlib cleans up automatically when your program exits,
+<  *  whether that is via exit(3) or returning from main(). However if you
+<  *  have dlopen(3)ed HTSlib and wish to close it before your main program
+<  *  exits, you must call hts_lib_shutdown() before dlclose(3).
+< */
+< void hts_lib_shutdown ();
+---
+> pragma(inline,true)
+> int hts_resize(T)(size_t num, ref size_t size, T* ptr, int flags)
+> {
+>     return (num > size)
+>         ? hts_resize_array_(T.sizeof, num, size_t.sizeof, &size, cast(void **)&ptr, flags, __FUNCTION__)
+>         : 0;
+> }
+142c186
+< void hts_free (void* ptr);
+---
+> void hts_free(void *ptr);
+151,158c195,202
+< enum htsFormatCategory
+< {
+<     unknown_category = 0,
+<     sequence_data = 1, // Sequence data -- SAM, BAM, CRAM, etc
+<     variant_data = 2, // Variant calling data -- VCF, BCF, etc
+<     index_file = 3, // Index file associated with some data file
+<     region_list = 4, // Coordinate intervals or regions -- BED, etc
+<     category_maximum = 32767
+---
+> /// Broad format category (sequence data, variant data, index, regions, etc.)
+> enum htsFormatCategory { // @suppress(dscanner.style.phobos_naming_convention)
+>     unknown_category,
+>     sequence_data,    // Sequence data -- SAM, BAM, CRAM, etc
+>     variant_data,     // Variant calling data -- VCF, BCF, etc
+>     index_file,       // Index file associated with some data file
+>     region_list,      // Coordinate intervals or regions -- BED, etc
+>     category_maximum = 32_767
+161,185c205,214
+< enum htsExactFormat
+< {
+<     unknown_format = 0,
+<     binary_format = 1,
+<     text_format = 2,
+<     sam = 3,
+<     bam = 4,
+<     bai = 5,
+<     cram = 6,
+<     crai = 7,
+<     vcf = 8,
+<     bcf = 9,
+<     csi = 10,
+<     gzi = 11,
+<     tbi = 12,
+<     bed = 13,
+<     htsget = 14,
+<     json = 14,
+<     empty_format = 15, // File is empty (or empty after decompression)
+<     fasta_format = 16,
+<     fastq_format = 17,
+<     fai_format = 18,
+<     fqi_format = 19,
+<     hts_crypt4gh_format = 20,
+<     format_maximum = 32767
+---
+> /// Specific format (SAM, BAM, CRAM, BCF, VCF, TBI, BED, etc.)
+> enum htsExactFormat { // @suppress(dscanner.style.phobos_naming_convention)
+>     unknown_format,
+>     binary_format, text_format,
+>     sam, bam, bai, cram, crai, vcf, bcf, csi, gzi, tbi, bed,
+>     htsget,
+>     //deprecated("Use htsExactFormat 'htsget' instead") json = htsget,
+>     empty_format,  // File is empty (or empty after decompression)
+>     fasta_format, fastq_format, fai_format, fqi_format,
+>     format_maximum = 32_767
+188,196c217,220
+< enum htsCompression
+< {
+<     no_compression = 0,
+<     gzip = 1,
+<     bgzf = 2,
+<     custom = 3,
+<     bzip2_compression = 4,
+<     razf_compression = 5,
+<     compression_maximum = 32767
+---
+> /// Compression type
+> enum htsCompression { // @suppress(dscanner.style.phobos_naming_convention)
+>     no_compression, gzip, bgzf, custom, bzip2_compression,
+>     compression_maximum = 32_767
+199,213c223,233
+< struct htsFormat
+< {
+<     htsFormatCategory category;
+<     htsExactFormat format;
+< 
+<     struct _Anonymous_0
+<     {
+<         short major;
+<         short minor;
+<     }
+< 
+<     _Anonymous_0 version_;
+<     htsCompression compression;
+<     short compression_level; // currently unused
+<     void* specific; // format specific options; see struct hts_opt.
+---
+> /// hts file complete file format information
+> // NB: version is a reserved keyword in D -- changed to "vers"
+> struct htsFormat { // @suppress(dscanner.style.phobos_naming_convention)
+>     htsFormatCategory category; /// Broad format category (sequence data, variant data, index, regions, etc.)
+>     htsExactFormat format;      /// Specific format (SAM, BAM, CRAM, BCF, VCF, TBI, BED, etc.)
+>     /// format version
+>     struct Vers { short major, minor; } // @suppress(dscanner.style.undocumented_declaration)
+>     Vers v; /// format version
+>     htsCompression compression; /// Compression type
+>     short compression_level;/// currently unused
+>     void *specific;         /// format specific options; see struct hts_opt.
+216,217c236,238
+< struct hts_idx_t;
+< struct hts_filter_t;
+---
+> /// index data (opaque)
+> struct __hts_idx_t;
+> alias hts_idx_t = __hts_idx_t;
+219,225c240
+< /**
+<  * @brief File handle returned by hts_open() etc.
+<  * This structure should be considered opaque by end users. There should be
+<  * no need to access most fields directly in user code, and in cases where
+<  * it is desirable accessor functions such as hts_get_format() are provided.
+<  */
+< // Maintainers note htsFile cannot be an incomplete struct because some of its
+---
+> // Maintainers note htsFile cannot be an opaque structure because some of its
+232,238c247,249
+< //  - is_bgzf and is_cram flags indicate which fp union member to use.
+< //    Note is_bgzf being set does not indicate the flag is BGZF compressed,
+< //    nor even whether it is compressed at all (eg on naked BAMs).
+< struct htsFile
+< {
+<     import std.bitmanip : bitfields;
+< 
+---
+> /// Data and metadata for an hts file; part of public and private ABI
+> struct htsFile { // @suppress(dscanner.style.phobos_naming_convention)
+>     //uint32_t is_bin:1, is_write:1, is_be:1, is_cram:1, is_bgzf:1, dummy:27;
+240,256c251,265
+<         uint, "is_bin", 1,
+<         uint, "is_write", 1,
+<         uint, "is_be", 1,
+<         uint, "is_cram", 1,
+<         uint, "is_bgzf", 1,
+<         uint, "dummy", 27));
+< 
+<     long lineno;
+<     kstring_t line;
+<     char* fn;
+<     char* fn_aux;
+< 
+<     union _Anonymous_1
+<     {
+<         BGZF* bgzf;
+<         cram_fd* cram;
+<         hFILE* hfile;
+---
+>         bool, "is_bin", 1,
+>         bool, "is_write", 1,
+>         bool, "is_be", 1,
+>         bool, "is_cram", 1,
+>         bool, "is_bgzf", 1,
+>         uint, "padding27", 27 ));
+>     int64_t lineno; /// uncompressed(?) file line no.
+>     kstring_t line; /// buffer to hold line
+>     char *fn;       /// filename
+>     char *fn_aux;   /// auxillary (i.e, index) file name
+>     /// hFile plus any needed bgzf or CRAM (if applicable) structure data
+>     union FP {
+>         BGZF *bgzf;     /// see bgzf.d
+>         cram_fd *cram;  /// see cram.d
+>         hFILE *hfile;   /// see hfile.d
+258,265c267,272
+< 
+<     _Anonymous_1 fp;
+<     void* state; // format specific state information
+<     htsFormat format;
+<     hts_idx_t* idx;
+<     const(char)* fnidx;
+<     sam_hdr_t* bam_header;
+<     hts_filter_t* filter;
+---
+>     FP fp;              /// hFile plus any needed bgzf or CRAM (if applicable) structure data
+>     void *state;        /// format specific state information
+>     htsFormat format;   /// hts file complete file format information
+>     hts_idx_t *idx;
+>     const(char) *fnidx;
+>     sam_hdr_t *bam_header;
+268,278c275,284
+< // A combined thread pool and queue allocation size.
+< // The pool should already be defined, but qsize may be zero to
+< // indicate an appropriate queue size is taken from the pool.
+< //
+< // Reasons for explicitly setting it could be where many more file
+< // descriptors are in use than threads, so keeping memory low is
+< // important.
+< struct htsThreadPool
+< {
+<     hts_tpool* pool; // The shared thread pool itself
+<     int qsize; // Size of I/O queue to use for this fp
+---
+> /// A combined thread pool and queue allocation size.
+> /// The pool should already be defined, but qsize may be zero to
+> /// indicate an appropriate queue size is taken from the pool.
+> ///
+> /// Reasons for explicitly setting it could be where many more file
+> /// descriptors are in use than threads, so keeping memory low is
+> /// important.
+> struct htsThreadPool { // @suppress(dscanner.style.phobos_naming_convention)
+>     hts_tpool *pool;/// The shared thread pool itself
+>     int qsize;      /// Size of I/O queue to use for this fp
+281,283c287,288
+< // REQUIRED_FIELDS
+< enum sam_fields
+< {
+---
+> /// REQUIRED_FIELDS
+> enum sam_fields { // @suppress(dscanner.style.phobos_naming_convention)
+285c290
+<     SAM_FLAG = 0x00000002,
+---
+>     SAM_FLAG  = 0x00000002,
+287,288c292,293
+<     SAM_POS = 0x00000008,
+<     SAM_MAPQ = 0x00000010,
+---
+>     SAM_POS   = 0x00000008,
+>     SAM_MAPQ  = 0x00000010,
+292,296c297,301
+<     SAM_TLEN = 0x00000100,
+<     SAM_SEQ = 0x00000200,
+<     SAM_QUAL = 0x00000400,
+<     SAM_AUX = 0x00000800,
+<     SAM_RGAUX = 0x00001000
+---
+>     SAM_TLEN  = 0x00000100,
+>     SAM_SEQ   = 0x00000200,
+>     SAM_QUAL  = 0x00000400,
+>     SAM_AUX   = 0x00000800,
+>     SAM_RGAUX = 0x00001000,
+299,301c304,305
+< // Mostly CRAM only, but this could also include other format options
+< enum hts_fmt_option
+< {
+---
+> /// Mostly CRAM only, but this could also include other format options
+> enum hts_fmt_option { // @suppress(dscanner.style.phobos_naming_convention)
+303,330c307,329
+<     CRAM_OPT_DECODE_MD = 0,
+<     CRAM_OPT_PREFIX = 1,
+<     CRAM_OPT_VERBOSITY = 2, // obsolete, use hts_set_log_level() instead
+<     CRAM_OPT_SEQS_PER_SLICE = 3,
+<     CRAM_OPT_SLICES_PER_CONTAINER = 4,
+<     CRAM_OPT_RANGE = 5,
+<     CRAM_OPT_VERSION = 6, // rename to cram_version?
+<     CRAM_OPT_EMBED_REF = 7,
+<     CRAM_OPT_IGNORE_MD5 = 8,
+<     CRAM_OPT_REFERENCE = 9, // make general
+<     CRAM_OPT_MULTI_SEQ_PER_SLICE = 10,
+<     CRAM_OPT_NO_REF = 11,
+<     CRAM_OPT_USE_BZIP2 = 12,
+<     CRAM_OPT_SHARED_REF = 13,
+<     CRAM_OPT_NTHREADS = 14, // deprecated, use HTS_OPT_NTHREADS
+<     CRAM_OPT_THREAD_POOL = 15, // make general
+<     CRAM_OPT_USE_LZMA = 16,
+<     CRAM_OPT_USE_RANS = 17,
+<     CRAM_OPT_REQUIRED_FIELDS = 18,
+<     CRAM_OPT_LOSSY_NAMES = 19,
+<     CRAM_OPT_BASES_PER_SLICE = 20,
+<     CRAM_OPT_STORE_MD = 21,
+<     CRAM_OPT_STORE_NM = 22,
+<     CRAM_OPT_RANGE_NOSEEK = 23, // CRAM_OPT_RANGE minus the seek
+<     CRAM_OPT_USE_TOK = 24,
+<     CRAM_OPT_USE_FQZ = 25,
+<     CRAM_OPT_USE_ARITH = 26,
+<     CRAM_OPT_POS_DELTA = 27, // force delta for AP, even on non-pos sorted data
+---
+>     CRAM_OPT_DECODE_MD,
+>     CRAM_OPT_PREFIX,
+>     CRAM_OPT_VERBOSITY,  /// obsolete, use hts_set_log_level() instead
+>     CRAM_OPT_SEQS_PER_SLICE,
+>     CRAM_OPT_SLICES_PER_CONTAINER,
+>     CRAM_OPT_RANGE,
+>     CRAM_OPT_VERSION,    /// rename to cram_version?
+>     CRAM_OPT_EMBED_REF,
+>     CRAM_OPT_IGNORE_MD5,
+>     CRAM_OPT_REFERENCE,  // make general
+>     CRAM_OPT_MULTI_SEQ_PER_SLICE,
+>     CRAM_OPT_NO_REF,
+>     CRAM_OPT_USE_BZIP2,
+>     CRAM_OPT_SHARED_REF,
+>     CRAM_OPT_NTHREADS,   /// deprecated, use HTS_OPT_NTHREADS
+>     CRAM_OPT_THREAD_POOL,/// make general
+>     CRAM_OPT_USE_LZMA,
+>     CRAM_OPT_USE_RANS,
+>     CRAM_OPT_REQUIRED_FIELDS,
+>     CRAM_OPT_LOSSY_NAMES,
+>     CRAM_OPT_BASES_PER_SLICE,
+>     CRAM_OPT_STORE_MD,
+>     CRAM_OPT_STORE_NM,
+334,339c333,336
+<     HTS_OPT_NTHREADS = 101,
+<     HTS_OPT_THREAD_POOL = 102,
+<     HTS_OPT_CACHE_SIZE = 103,
+<     HTS_OPT_BLOCK_SIZE = 104,
+<     HTS_OPT_FILTER = 105,
+<     HTS_OPT_PROFILE = 106
+---
+>     HTS_OPT_NTHREADS,
+>     HTS_OPT_THREAD_POOL,
+>     HTS_OPT_CACHE_SIZE,
+>     HTS_OPT_BLOCK_SIZE,
+342,352c339
+< // Profile options for encoding; primarily used at present in CRAM
+< // but also usable in BAM as a synonym for deflate compression levels.
+< enum hts_profile_option
+< {
+<     HTS_PROFILE_FAST = 0,
+<     HTS_PROFILE_NORMAL = 1,
+<     HTS_PROFILE_SMALL = 2,
+<     HTS_PROFILE_ARCHIVE = 3
+< }
+< 
+< // For backwards compatibility
+---
+> /// For backwards compatibility
+355,363c342,349
+< struct hts_opt
+< {
+<     char* arg; // string form, strdup()ed
+<     hts_fmt_option opt; // tokenised key
+<     // ... and value
+<     union _Anonymous_2
+<     {
+<         int i;
+<         char* s;
+---
+> /// Options for cache, (de)compression, threads, CRAM, etc.
+> struct hts_opt { // @suppress(dscanner.style.phobos_naming_convention)
+>     char *arg;          /// string form, strdup()ed
+>     hts_fmt_option opt; /// tokenised key
+>     /// option value
+>     union VAL {         /// ... and value
+>         int i;          /// int value
+>         char *s;        /// string value
+365,367c351,352
+< 
+<     _Anonymous_2 val;
+<     hts_opt* next;
+---
+>     VAL val;            /// value
+>     hts_opt *next;      /// next option (linked list)
+370c355,358
+< /*
+---
+> //#define HTS_FILE_OPTS_INIT {{0},0}
+> // Not apparently used in htslib-1.7
+> 
+> /**
+374a363
+> 
+379c368
+< /*
+---
+> /**
+385c374
+< int hts_opt_add (hts_opt** opts, const(char)* c_arg);
+---
+> int hts_opt_add(hts_opt **opts, const(char) *c_arg);
+387c376
+< /*
+---
+> /**
+393c382
+< int hts_opt_apply (htsFile* fp, hts_opt* opts);
+---
+> int hts_opt_apply(htsFile *fp, hts_opt *opts);
+395c384
+< /*
+---
+> /**
+398c387
+< void hts_opt_free (hts_opt* opts);
+---
+> void hts_opt_free(hts_opt *opts);
+400c389
+< /*
+---
+> /**
+408c397
+< int hts_parse_format (htsFormat* opt, const(char)* str);
+---
+> int hts_parse_format(htsFormat *opt, const(char) *str);
+410c399
+< /*
+---
+> /**
+421c410
+< int hts_parse_opt_list (htsFormat* opt, const(char)* str);
+---
+> int hts_parse_opt_list(htsFormat *opt, const(char) *str);
+423c412
+< /*! @abstract Table for converting a nucleotide character to 4-bit encoding.
+---
+> /**! @abstract Table for converting a nucleotide character to 4-bit encoding.
+428d416
+< extern __gshared const(ubyte)[256] seq_nt16_table;
+430c418,442
+< /*! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
+---
+> version(Windows){
+>     const (char)[256] seq_nt16_table = [
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         1, 2, 4, 8, 15,15,15,15, 15,15,15,15, 15, 0 /*=*/,15,15,
+>         15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+>         15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+>         15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+>         15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+> 
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
+>     ];
+> }else{
+>     extern const(char)[256] seq_nt16_table;
+> }
+> 
+> /**! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
+433d444
+< extern __gshared const(char)[] seq_nt16_str;
+435c446,448
+< /*! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
+---
+> version(Windows) __gshared const (char)[16] seq_nt16_str = ['=','A','C','M','G','R','S','V','T','W','Y','H','K','D','B','N'];
+> else extern __gshared const(char)[16] seq_nt16_str;
+> /**! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
+438,440c451,453
+< extern __gshared const(int)[] seq_nt16_int;
+< 
+< /*!
+---
+> version(Windows) const (int)[16] seq_nt16_int = [ 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 ];
+> else extern const int[] seq_nt16_int;
+> /**!
+445c458
+< const(char)* hts_version ();
+---
+> const(char) *hts_version();
+457,494c470
+< enum HTS_VERSION = 101200;
+< 
+< /*! @abstract Introspection on the features enabled in htslib
+<  *
+<  * @return a bitfield of HTS_FEATURE_* macros.
+<  */
+< uint hts_features ();
+< 
+< const(char)* hts_test_feature (uint id);
+< 
+< /*! @abstract Introspection on the features enabled in htslib, string form
+<  *
+<  * @return a string describing htslib build features
+<  */
+< const(char)* hts_feature_string ();
+< 
+< // Whether ./configure was used or vanilla Makefile
+< enum HTS_FEATURE_CONFIGURE = 1;
+< 
+< // Whether --enable-plugins was used
+< enum HTS_FEATURE_PLUGINS = 2;
+< 
+< // Transport specific
+< enum HTS_FEATURE_LIBCURL = 1u << 10;
+< enum HTS_FEATURE_S3 = 1u << 11;
+< enum HTS_FEATURE_GCS = 1u << 12;
+< 
+< // Compression options
+< enum HTS_FEATURE_LIBDEFLATE = 1u << 20;
+< enum HTS_FEATURE_LZMA = 1u << 21;
+< enum HTS_FEATURE_BZIP2 = 1u << 22;
+< enum HTS_FEATURE_HTSCODECS = 1u << 23; // htscodecs library version
+< 
+< // Build params
+< enum HTS_FEATURE_CC = 1u << 27;
+< enum HTS_FEATURE_CFLAGS = 1u << 28;
+< enum HTS_FEATURE_CPPFLAGS = 1u << 29;
+< enum HTS_FEATURE_LDFLAGS = 1u << 30;
+---
+> enum HTS_VERSION = 101000; // @suppress(dscanner.style.number_literals)
+496c472
+< /*!
+---
+> /**!
+502c478
+< int hts_detect_format (hFILE* fp, htsFormat* fmt);
+---
+> int hts_detect_format(hFILE *fp, htsFormat *fmt);
+504c480
+< /*!
+---
+> /**!
+509c485
+< char* hts_format_description (const(htsFormat)* format);
+---
+> char *hts_format_description(const(htsFormat) *format);
+511c487
+< /*!
+---
+> /**!
+541c517
+< htsFile* hts_open (const(char)* fn, const(char)* mode);
+---
+> htsFile *hts_open(const(char) *fn, const(char) *mode);
+543c519
+< /*!
+---
+> /**!
+557,560c533
+< htsFile* hts_open_format (
+<     const(char)* fn,
+<     const(char)* mode,
+<     const(htsFormat)* fmt);
+---
+> htsFile *hts_open_format(const(char) *fn, const(char) *mode, const(htsFormat) *fmt);
+562c535
+< /*!
+---
+> /**!
+567c540
+< htsFile* hts_hopen (hFILE* fp, const(char)* fn, const(char)* mode);
+---
+> htsFile *hts_hopen(hFILE *fp, const(char) *fn, const(char) *mode);
+569c542
+< /*!
+---
+> /**!
+574c547
+< int hts_close (htsFile* fp);
+---
+> int hts_close(htsFile *fp);
+576c549
+< /*!
+---
+> /**!
+581c554
+< const(htsFormat)* hts_get_format (htsFile* fp);
+---
+> const(htsFormat *) hts_get_format(htsFile *fp);
+583c556
+< /*!
+---
+> /**!
+588c561
+< const(char)* hts_format_file_extension (const(htsFormat)* format);
+---
+> const(char *) hts_format_file_extension(const(htsFormat) *format);
+590c563
+< /*!
+---
+> /**!
+597c570
+< int hts_set_opt (htsFile* fp, hts_fmt_option opt, ...);
+---
+> int hts_set_opt(htsFile *fp, hts_fmt_option opt, ...);
+599,607c572,575
+< /*!
+<   @abstract         Read a line (and its \n or \r\n terminator) from a file
+<   @param fp         The file handle
+<   @param delimiter  Unused, but must be '\n' (or KS_SEP_LINE)
+<   @param str        The line (not including the terminator) is written here
+<   @return           Length of the string read;
+<                     -1 on end-of-file; <= -2 on error
+< */
+< int hts_getline (htsFile* fp, int delimiter, kstring_t* str);
+---
+> /// ?Get line as string from line-oriented flat file (undocumented in hts.h)
+> int hts_getline(htsFile *fp, int delimiter, kstring_t *str);
+> /// ?Get _n lines into buffer from line-oriented flat file; sets _n as number read (undocumented in hts.h)
+> char **hts_readlines(const(char) *fn, int *_n);
+609,610c577
+< char** hts_readlines (const(char)* fn, int* _n);
+< /*!
+---
+> /**!
+618c585
+< char** hts_readlist (const(char)* fn, int is_file, int* _n);
+---
+> char **hts_readlist(const(char) *fn, int is_file, int *_n);
+620c587
+< /*!
+---
+> /**!
+628c595
+< int hts_set_threads (htsFile* fp, int n);
+---
+> int hts_set_threads(htsFile *fp, int n);
+630c597
+< /*!
+---
+> /**!
+636c603
+< int hts_set_thread_pool (htsFile* fp, htsThreadPool* p);
+---
+> int hts_set_thread_pool(htsFile *fp, htsThreadPool *p);
+638c605
+< /*!
+---
+> /**!
+644c611
+< void hts_set_cache_size (htsFile* fp, int n);
+---
+> void hts_set_cache_size(htsFile *fp, int n);
+646c613
+< /*!
+---
+> /**!
+653c620
+< int hts_set_fai_filename (htsFile* fp, const(char)* fn_aux);
+---
+> int hts_set_fai_filename(htsFile *fp, const(char) *fn_aux);
+655,661d621
+< /*!
+<   @abstract  Sets a filter expression
+<   @return    0 for success, negative on failure
+<   @discussion
+<       To clear an existing filter, specifying expr as NULL.
+< */
+< int hts_set_filter_expression (htsFile* fp, const(char)* expr);
+663c623
+< /*!
+---
+> /**!
+673c633
+< int hts_check_EOF (htsFile* fp);
+---
+> int hts_check_EOF(htsFile *fp);
+689,698c649,657
+< enum HTS_IDX_NOCOOR = -2;
+< enum HTS_IDX_START = -3;
+< enum HTS_IDX_REST = -4;
+< enum HTS_IDX_NONE = -5;
+< 
+< enum HTS_FMT_CSI = 0;
+< enum HTS_FMT_BAI = 1;
+< enum HTS_FMT_TBI = 2;
+< enum HTS_FMT_CRAI = 3;
+< enum HTS_FMT_FAI = 4;
+---
+> enum HTS_IDX_NOCOOR = (-2); /// iterates over unmapped reads sorted at the end of the file
+> enum HTS_IDX_START  = (-3); /// iterates over the entire file
+> enum HTS_IDX_REST   = (-4); /// iterates from the current position to the end of the file
+> enum HTS_IDX_NONE   = (-5); /// always returns "no more alignment records"
+> 
+> enum int HTS_FMT_CSI = 0;   /// coordinate-sorted index (new)
+> enum int HTS_FMT_BAI = 1;   /// BAM index (old)
+> enum int HTS_FMT_TBI = 2;   /// Tabix index
+> enum int HTS_FMT_CRAI= 3;   /// CRAM index (not sure if superceded by CSI?)
+703,706c662,665
+< enum HTS_POS_MAX = ((cast(long) INT_MAX) << 32) | INT_MAX;
+< enum HTS_POS_MIN = INT64_MIN;
+< enum PRIhts_pos = PRId64;
+< alias hts_pos_t = c_long;
+---
+> enum HTS_POS_MAX = (((cast(int64_t)int.max)<<32)|int.max);
+> enum HTS_POS_MIN = int64_t.min;
+> //enum PRIhts_pos = PRId64;
+> alias hts_pos_t = int64_t;
+715,718c674,675
+< struct hts_pair_pos_t
+< {
+<     hts_pos_t beg;
+<     hts_pos_t end;
+---
+> struct hts_pair_pos_t {
+>     hts_pos_t beg, end;
+721c678
+< alias hts_pair32_t = hts_pair_pos_t; // For backwards compatibility
+---
+> alias hts_pair32_t = hts_pair_pos_t;    // For backwards compatibility
+723,726c680,682
+< struct hts_pair64_t
+< {
+<     ulong u;
+<     ulong v;
+---
+> struct hts_pair64_t { // @suppress(dscanner.style.phobos_naming_convention)
+>     /// start, end coordinates (64-bit)
+>     ulong u, v;
+729,732c685,689
+< struct hts_pair64_max_t
+< {
+<     ulong u;
+<     ulong v;
+---
+> /// 64-bit start, end coordinate pair tracking max (internally used in hts.c)
+> struct hts_pair64_max_t { // @suppress(dscanner.style.phobos_naming_convention)
+>     /// ?
+>     ulong u, v;
+>     /// ?
+736,743c693,700
+< struct hts_reglist_t
+< {
+<     const(char)* reg;
+<     hts_pair_pos_t* intervals;
+<     int tid;
+<     uint count;
+<     hts_pos_t min_beg;
+<     hts_pos_t max_end;
+---
+> /// Region list used in iterators (NB: apparently confined to single contig/tid)
+> struct hts_reglist_t { // @suppress(dscanner.style.phobos_naming_convention)
+>     const(char) *reg;   /// Region string
+>     hts_pair_pos_t *intervals;  /// (start,end) intervals
+>     int tid;            /// Contig id
+>     uint32_t count;                 /// How many intervals
+>     /// absolute bounds
+>     hts_pos_t min_beg, max_end;
+746,748c703,704
+< alias hts_readrec_func = int function (BGZF* fp, void* data, void* r, int* tid, hts_pos_t* beg, hts_pos_t* end);
+< alias hts_seek_func = int function (void* fp, long offset, int where);
+< alias hts_tell_func = c_long function (void* fp);
+---
+> //typedef int hts_readrec_func(BGZF *fp, void *data, void *r, int *tid, int *beg, int *end);
+> alias hts_readrec_func = int function(BGZF *fp, void *data, void *r, int *tid, hts_pos_t *beg, hts_pos_t *end);
+750,787c706,707
+< /**
+<  * @brief File iterator that can handle multiple target regions.
+<  * This structure should be considered opaque by end users.
+<  * It does both the stepping inside the file and the filtering of alignments.
+<  * It can operate in single or multi-region mode, and depending on this,
+<  * it uses different fields.
+<  *
+<  * read_rest (1) - read everything from the current offset, without filtering
+<  * finished  (1) - no more iterations
+<  * is_cram   (1) - current file has CRAM format
+<  * nocoor    (1) - read all unmapped reads
+<  *
+<  * multi     (1) - multi-region moode
+<  * reg_list  - List of target regions
+<  * n_reg     - Size of the above list
+<  * curr_reg  - List index of the current region of search
+<  * curr_intv - Interval index inside the current region; points to a (beg, end)
+<  * end       - Used for CRAM files, to preserve the max end coordinate
+<  *
+<  * multi     (0) - single-region mode
+<  * tid       - Reference id of the target region
+<  * beg       - Start position of the target region
+<  * end       - End position of the target region
+<  *
+<  * Common fields:
+<  * off        - List of file offsets computed from the index
+<  * n_off      - Size of the above list
+<  * i          - List index of the current file offset
+<  * curr_off   - File offset for the next file read
+<  * curr_tid   - Reference id of the current alignment
+<  * curr_beg   - Start position of the current alignment
+<  * curr_end   - End position of the current alignment
+<  * nocoor_off - File offset where the unmapped reads start
+<  *
+<  * readrec    - File specific function that reads an alignment
+<  * seek       - File specific function for changing the file offset
+<  * tell       - File specific function for indicating the file offset
+<  */
+---
+> //typedef int hts_seek_func(void *fp, int64_t offset, int where);
+> alias hts_seek_func = int function(void *fp, ulong offset, int where);
+789,791c709,710
+< struct hts_itr_t
+< {
+<     import std.bitmanip : bitfields;
+---
+> //typedef int64_t hts_tell_func(void *fp);
+> alias hts_tell_func = long function(void *fp);
+792a712,714
+> /// iterator
+> struct hts_itr_t { // @suppress(dscanner.style.phobos_naming_convention)
+>     // uint32_t read_rest:1, finished:1, is_cram:1, nocoor:1, multi:1, dummy:27;
+794,824c716,737
+<         uint, "read_rest", 1,
+<         uint, "finished", 1,
+<         uint, "is_cram", 1,
+<         uint, "nocoor", 1,
+<         uint, "multi", 1,
+<         uint, "dummy", 27));
+< 
+<     int tid;
+<     int n_off;
+<     int i;
+<     int n_reg;
+<     hts_pos_t beg;
+<     hts_pos_t end;
+<     hts_reglist_t* reg_list;
+<     int curr_tid;
+<     int curr_reg;
+<     int curr_intv;
+<     hts_pos_t curr_beg;
+<     hts_pos_t curr_end;
+<     ulong curr_off;
+<     ulong nocoor_off;
+<     hts_pair64_max_t* off;
+<     int function () readrec;
+<     int function () seek;
+<     long function () tell;
+< 
+<     struct _Anonymous_3
+<     {
+<         int n;
+<         int m;
+<         int* a;
+---
+>         bool, "read_rest", 1,
+>         bool, "finished",  1,
+>         bool, "is_cram",   1,
+>         bool, "nocoor",    1,
+>         bool, "multi",     1,
+>         uint, "dummy27", 27));
+>     /// iterator position data
+>     int tid, n_off, i, n_reg;
+>     hts_pos_t beg, end;
+>     hts_reglist_t *reg_list;
+>     int curr_tid, curr_reg, curr_intv;
+>     hts_pos_t curr_beg, curr_end;
+>     uint64_t curr_off, nocoor_off;
+>     hts_pair64_max_t *off;  /// ? (start, end) offset
+>     hts_readrec_func *readrec;  /// record parsing fn pointer
+>     hts_seek_func *seek;
+>     hts_tell_func *tell;
+>     /// ???
+>     struct Bins {
+>         /// ???
+>         int n, m;
+>         int *a; /// ???
+825a739,740
+>     Bins bins;  /// ???
+> }
+827c742,746
+<     _Anonymous_3 bins;
+---
+> /// ? index key
+> struct aux_key_t { // @suppress(dscanner.style.phobos_naming_convention)
+>     int key;    /// ???
+>     /// ???
+>     ulong min_off, max_off;
+832,840c751,757
+< extern (D) auto hts_bin_first(T)(auto ref T l)
+< {
+<     return ((1 << ((l << 1) + l)) - 1) / 7;
+< }
+< 
+< extern (D) auto hts_bin_parent(T)(auto ref T l)
+< {
+<     return (l - 1) >> 3;
+< }
+---
+>     pragma(inline, true)
+>     {
+>         /// ???
+>         auto hts_bin_first(T)(T l) { return (((1<<(((l)<<1) + (l))) - 1) / 7); }    //     #define hts_bin_first(l) (((1<<(((l)<<1) + (l))) - 1) / 7)
+>         /// ???
+>         auto hts_bin_parent(T)(T l){ return (((l) - 1) >> 3); }                     //     #define hts_bin_parent(l) (((l) - 1) >> 3)
+>     }
+841a759,768
+> /+
+>     /// Initialize index
+>     hts_idx_t *hts_idx_init(int n, int fmt, uint64_t offset0, int min_shift, int n_lvls);
+>     /// Destroy index
+>     void hts_idx_destroy(hts_idx_t *idx);
+>     /// Add to index
+>     int hts_idx_push(hts_idx_t *idx, int tid, int beg, int end, uint64_t offset, int is_mapped);
+>     /// ?finalize index
+>     void hts_idx_finish(hts_idx_t *idx, uint64_t final_offset);
+> +/
+856,861c783
+< hts_idx_t* hts_idx_init (
+<     int n,
+<     int fmt,
+<     ulong offset0,
+<     int min_shift,
+<     int n_lvls);
+---
+> hts_idx_t *hts_idx_init(int n, int fmt, uint64_t offset0, int min_shift, int n_lvls);
+866c788
+< void hts_idx_destroy (hts_idx_t* idx);
+---
+> void hts_idx_destroy(hts_idx_t *idx);
+880,886c802
+< int hts_idx_push (
+<     hts_idx_t* idx,
+<     int tid,
+<     hts_pos_t beg,
+<     hts_pos_t end,
+<     ulong offset,
+<     int is_mapped);
+---
+> int hts_idx_push(hts_idx_t *idx, int tid, hts_pos_t beg, hts_pos_t end, uint64_t offset, int is_mapped);
+893c809
+< int hts_idx_finish (hts_idx_t* idx, ulong final_offset);
+---
+> int hts_idx_finish(hts_idx_t *idx, uint64_t final_offset);
+899c815
+< int hts_idx_fmt (hts_idx_t* idx);
+---
+> int hts_idx_fmt(hts_idx_t *idx);
+907c823
+< int hts_idx_tbi_name (hts_idx_t* idx, int tid, const(char)* name);
+---
+> int hts_idx_tbi_name(hts_idx_t *idx, int tid, const(char) *name);
+910a827,828
+> 
+> 
+917c835
+< int hts_idx_save (const(hts_idx_t)* idx, const(char)* fn, int fmt);
+---
+> int hts_idx_save(const(hts_idx_t) *idx, const(char) *fn, int fmt);
+926,930c844,845
+< int hts_idx_save_as (
+<     const(hts_idx_t)* idx,
+<     const(char)* fn,
+<     const(char)* fnidx,
+<     int fmt);
+---
+> int hts_idx_save_as(const(hts_idx_t) *idx, const(char) *fn, const(char) *fnidx, int fmt);
+> 
+936a852
+> 
+963c879
+< hts_idx_t* hts_idx_load (const(char)* fn, int fmt);
+---
+> hts_idx_t *hts_idx_load(const(char) *fn, int fmt);
+974c890
+< hts_idx_t* hts_idx_load2 (const(char)* fn, const(char)* fnidx);
+---
+> hts_idx_t *hts_idx_load2(const(char) *fn, const(char) *fnidx);
+997,1001c913
+< hts_idx_t* hts_idx_load3 (
+<     const(char)* fn,
+<     const(char)* fnidx,
+<     int fmt,
+<     int flags);
+---
+> hts_idx_t *hts_idx_load3(const(char) *fn, const(char) *fnidx, int fmt, HTS_IDX_FLAG flags);
+1004,1005c916,919
+< enum HTS_IDX_SAVE_REMOTE = 1;
+< enum HTS_IDX_SILENT_FAIL = 2;
+---
+> enum HTS_IDX_FLAG : int {
+>     HTS_IDX_SAVE_REMOTE = 1,
+>     HTS_IDX_SILENT_FAIL = 2
+> }
+1021c935
+< ubyte* hts_idx_get_meta (hts_idx_t* idx, uint* l_meta);
+---
+> uint8_t *hts_idx_get_meta(hts_idx_t *idx, uint32_t *l_meta);
+1035c949
+< int hts_idx_set_meta (hts_idx_t* idx, uint l_meta, ubyte* meta, int is_copy);
+---
+> int hts_idx_set_meta(hts_idx_t *idx, uint32_t l_meta, uint8_t *meta, int is_copy);
+1047c961
+<     information if it is available.
+---
+>     infomation if it is available.
+1051,1055c965
+< int hts_idx_get_stat (
+<     const(hts_idx_t)* idx,
+<     int tid,
+<     ulong* mapped,
+<     ulong* unmapped);
+---
+> int hts_idx_get_stat(const(hts_idx_t)* idx, int tid, uint64_t* mapped, uint64_t* unmapped);
+1064c974
+< ulong hts_idx_get_n_no_coor (const(hts_idx_t)* idx);
+---
+> uint64_t hts_idx_get_n_no_coor(const(hts_idx_t)* idx);
+1069,1071c979,983
+< enum HTS_PARSE_THOUSANDS_SEP = 1; ///< Ignore ',' separators within numbers
+< enum HTS_PARSE_ONE_COORD = 2; ///< chr:pos means chr:pos-pos and not chr:pos-end
+< enum HTS_PARSE_LIST = 4; ///< Expect a comma separated list of regions. (Disables HTS_PARSE_THOUSANDS_SEP)
+---
+> enum HTS_PARSE_FLAGS : int {
+>     HTS_PARSE_THOUSANDS_SEP = 1, ///< Ignore ',' separators within numbers
+>     HTS_PARSE_ONE_COORD = 2,     ///< chr:pos means chr:pos-pos and not chr:pos-end
+>     HTS_PARSE_LIST = 4           ///< Expect a comma separated list of regions. (Disables HTS_PARSE_THOUSANDS_SEP)
+> }
+1085c997
+< long hts_parse_decimal (const(char)* str, char** strend, int flags);
+---
+> long hts_parse_decimal(const(char) *str, char **strend, HTS_PARSE_FLAGS flags);
+1087,1088c999,1000
+< alias hts_name2id_f = int function (void*, const(char)*);
+< alias hts_id2name_f = const(char)* function (void*, int);
+---
+> alias hts_name2id_f = int function(void*, const(char)*);
+> alias hts_id2name_f = const(char)* function(void*, int);
+1100c1012
+< const(char)* hts_parse_reg64 (const(char)* str, hts_pos_t* beg, hts_pos_t* end);
+---
+> const(char) *hts_parse_reg64(const(char) *str, hts_pos_t *beg, hts_pos_t *end);
+1109c1021
+< const(char)* hts_parse_reg (const(char)* str, int* beg, int* end);
+---
+> const(char) *hts_parse_reg(const(char) *str, int *beg, int *end);
+1172,1179c1084,1086
+< const(char)* hts_parse_region (
+<     const(char)* s,
+<     int* tid,
+<     hts_pos_t* beg,
+<     hts_pos_t* end,
+<     hts_name2id_f getid,
+<     void* hdr,
+<     int flags);
+---
+> const(char) *hts_parse_region(const(char)*s, int *tid, hts_pos_t *beg,
+>                              hts_pos_t *end, hts_name2id_f getid, void *hdr,
+>                              HTS_PARSE_FLAGS flags);
+1202,1207c1109
+< hts_itr_t* hts_itr_query (
+<     const(hts_idx_t)* idx,
+<     int tid,
+<     hts_pos_t beg,
+<     hts_pos_t end,
+<     int function () readrec);
+---
+> hts_itr_t *hts_itr_query(const(hts_idx_t)*idx, int tid, hts_pos_t beg, hts_pos_t end, hts_readrec_func readrec);
+1212c1114
+< void hts_itr_destroy (hts_itr_t* iter);
+---
+> void hts_itr_destroy(hts_itr_t *iter);
+1214c1116,1117
+< alias hts_itr_query_func = hts_itr_t* function (const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, int function () readrec);
+---
+> alias hts_itr_query_func =
+>     hts_itr_t * function(const(hts_idx_t)*idx, int tid, hts_pos_t beg, hts_pos_t end, hts_readrec_func readrec);
+1229,1235c1132,1133
+< hts_itr_t* hts_itr_querys (
+<     const(hts_idx_t)* idx,
+<     const(char)* reg,
+<     hts_name2id_f getid,
+<     void* hdr,
+<     hts_itr_t* function () itr_query,
+<     int function () readrec);
+---
+> hts_itr_t *hts_itr_querys(const(hts_idx_t) *idx, const(char) *reg, hts_name2id_f getid, void *hdr,
+>     hts_itr_query_func itr_query, hts_readrec_func readrec);
+1244c1142
+< int hts_itr_next (BGZF* fp, hts_itr_t* iter, void* r, void* data);
+---
+> int hts_itr_next(BGZF *fp, hts_itr_t *iter, void *r, void *data);
+1256,1260c1154
+< const(char*)* hts_idx_seqnames (
+<     const(hts_idx_t)* idx,
+<     int* n,
+<     hts_id2name_f getid,
+<     void* hdr); // free only the array, not the values
+---
+> const(char)** hts_idx_seqnames(const(hts_idx_t) *idx, int *n, hts_id2name_f getid, void *hdr); // free only the array, not the values
+1266,1268c1160,1162
+< alias hts_itr_multi_query_func = int function (const(hts_idx_t)* idx, hts_itr_t* itr);
+< int hts_itr_multi_bam (const(hts_idx_t)* idx, hts_itr_t* iter);
+< int hts_itr_multi_cram (const(hts_idx_t)* idx, hts_itr_t* iter);
+---
+> alias hts_itr_multi_query_func = int function(const(hts_idx_t) *idx, hts_itr_t *itr);
+> int hts_itr_multi_bam(const(hts_idx_t) *idx, hts_itr_t *iter);
+> int hts_itr_multi_cram(const(hts_idx_t) *idx, hts_itr_t *iter);
+1285,1294c1179,1180
+< hts_itr_t* hts_itr_regions (
+<     const(hts_idx_t)* idx,
+<     hts_reglist_t* reglist,
+<     int count,
+<     hts_name2id_f getid,
+<     void* hdr,
+<     int function () itr_specific,
+<     int function () readrec,
+<     int function () seek,
+<     long function () tell);
+---
+> hts_itr_t *hts_itr_regions(const(hts_idx_t) *idx, hts_reglist_t *reglist, int count, hts_name2id_f getid, void *hdr,
+>             hts_itr_multi_query_func itr_specific, hts_readrec_func readrec, hts_seek_func seek, hts_tell_func tell);
+1302c1188
+< int hts_itr_multi_next (htsFile* fd, hts_itr_t* iter, void* r);
+---
+> int hts_itr_multi_next(htsFile *fd, hts_itr_t *iter, void *r);
+1315,1320c1201
+< hts_reglist_t* hts_reglist_create (
+<     char** argv,
+<     int argc,
+<     int* r_count,
+<     void* hdr,
+<     hts_name2id_f getid);
+---
+> hts_reglist_t *hts_reglist_create(char **argv, int argc, int *r_count, void *hdr,  hts_name2id_f getid);
+1326c1207
+< void hts_reglist_free (hts_reglist_t* reglist, int count);
+---
+> void hts_reglist_free(hts_reglist_t *reglist, int count);
+1333,1345c1214,1228
+< /**
+<  * hts_file_type() - Convenience function to determine file type
+<  * DEPRECATED:  This function has been replaced by hts_detect_format().
+<  * It and these FT_* macros will be removed in a future HTSlib release.
+<  */
+< enum FT_UNKN = 0;
+< enum FT_GZ = 1;
+< enum FT_VCF = 2;
+< enum FT_VCF_GZ = FT_GZ | FT_VCF;
+< enum FT_BCF = 1 << 2;
+< enum FT_BCF_GZ = FT_GZ | FT_BCF;
+< enum FT_STDIN = 1 << 3;
+< int hts_file_type (const(char)* fname);
+---
+>     /**
+>      * hts_file_type() - Convenience function to determine file type
+>      * DEPRECATED:  This function has been replaced by hts_detect_format().
+>      * It and these FT_* macros will be removed in a future HTSlib release.
+>      */
+>     enum FT_UNKN   = 0;
+>     enum FT_GZ     = 1;                 /// ditto
+>     enum FT_VCF    = 2;                 /// ditto
+>     enum FT_VCF_GZ = (FT_GZ|FT_VCF);    /// ditto
+>     enum FT_BCF    = (1<<2);            /// ditto
+>     enum FT_BCF_GZ = (FT_GZ|FT_BCF);    /// ditto
+>     enum FT_STDIN  = (1<<3);            /// ditto
+>     deprecated("This function has been replaced by hts_detect_format(). "
+>     ~ "It and these FT_* macros will be removed in a future HTSlib release.")
+>     int hts_file_type(const(char) *fname);
+1346a1230
+> /+
+1351a1236
+> typedef struct errmod_t errmod_t;
+1353,1354c1238,1239
+< errmod_t* errmod_init (double depcorr);
+< void errmod_destroy (errmod_t* em);
+---
+> errmod_t *errmod_init(double depcorr);
+> void errmod_destroy(errmod_t *em);
+1362c1247,1248
+< int errmod_cal (const(errmod_t)* em, int n, int m, ushort* bases, float* q);
+---
+> int errmod_cal(const errmod_t *em, int n, int m, uint16_t *bases, float *q);
+> 
+1369,1372c1255,1256
+< struct probaln_par_t
+< {
+<     float d;
+<     float e;
+---
+> typedef struct probaln_par_t {
+>     float d, e;
+1374c1258
+< }
+---
+> } probaln_par_t;
+1400,1446c1284
+< int probaln_glocal (
+<     const(ubyte)* ref_,
+<     int l_ref,
+<     const(ubyte)* query,
+<     int l_query,
+<     const(ubyte)* iqual,
+<     const(probaln_par_t)* c,
+<     int* state,
+<     ubyte* q);
+< 
+< /**********************
+<  * MD5 implementation *
+<  **********************/
+< 
+< struct hts_md5_context;
+< 
+< /*! @abstract   Initialises an MD5 context.
+<  *  @discussion
+<  *    The expected use is to allocate an hts_md5_context using
+<  *    hts_md5_init().  This pointer is then passed into one or more calls
+<  *    of hts_md5_update() to compute successive internal portions of the
+<  *    MD5 sum, which can then be externalised as a full 16-byte MD5sum
+<  *    calculation by calling hts_md5_final().  This can then be turned
+<  *    into ASCII via hts_md5_hex().
+<  *
+<  *    To dealloate any resources created by hts_md5_init() call the
+<  *    hts_md5_destroy() function.
+<  *
+<  *  @return     hts_md5_context pointer on success, NULL otherwise.
+<  */
+< hts_md5_context* hts_md5_init ();
+< 
+< /*! @abstract Updates the context with the MD5 of the data. */
+< void hts_md5_update (hts_md5_context* ctx, const(void)* data, c_ulong size);
+< 
+< /*! @abstract Computes the final 128-bit MD5 hash from the given context */
+< void hts_md5_final (ubyte* digest, hts_md5_context* ctx);
+< 
+< /*! @abstract Resets an md5_context to the initial state, as returned
+<  *            by hts_md5_init().
+<  */
+< void hts_md5_reset (hts_md5_context* ctx);
+< 
+< /*! @abstract Converts a 128-bit MD5 hash into a 33-byte nul-termninated
+<  *            hex string.
+<  */
+< void hts_md5_hex (char* hex, const(ubyte)* digest);
+---
+> int probaln_glocal(const uint8_t *ref, int l_ref, const uint8_t *query, int l_query, const uint8_t *iqual, const probaln_par_t *c, int *state, uint8_t *q);
+1448,1449d1285
+< /*! @abstract Deallocates any memory allocated by hts_md5_init. */
+< void hts_md5_destroy (hts_md5_context* ctx);
+1451c1287,1328
+< int hts_reg2bin (hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls);
+---
+>     /**********************
+>      * MD5 implementation *
+>      **********************/
+> 
+>     struct hts_md5_context;
+>     typedef struct hts_md5_context hts_md5_context;
+> 
+>     /*! @abstract   Intialises an MD5 context.
+>      *  @discussion
+>      *    The expected use is to allocate an hts_md5_context using
+>      *    hts_md5_init().  This pointer is then passed into one or more calls
+>      *    of hts_md5_update() to compute successive internal portions of the
+>      *    MD5 sum, which can then be externalised as a full 16-byte MD5sum
+>      *    calculation by calling hts_md5_final().  This can then be turned
+>      *    into ASCII via hts_md5_hex().
+>      *
+>      *    To dealloate any resources created by hts_md5_init() call the
+>      *    hts_md5_destroy() function.
+>      *
+>      *  @return     hts_md5_context pointer on success, NULL otherwise.
+>      */
+>     hts_md5_context *hts_md5_init(void);
+> 
+>     /*! @abstract Updates the context with the MD5 of the data. */
+>     void hts_md5_update(hts_md5_context *ctx, const void *data, unsigned long size);
+> 
+>     /*! @abstract Computes the final 128-bit MD5 hash from the given context */
+>     void hts_md5_final(unsigned char *digest, hts_md5_context *ctx);
+> 
+>     /*! @abstract Resets an md5_context to the initial state, as returned
+>      *            by hts_md5_init().
+>      */
+>     void hts_md5_reset(hts_md5_context *ctx);
+> 
+>     /*! @abstract Converts a 128-bit MD5 hash into a 33-byte nul-termninated
+>      *            hex string.
+>      */
+>     void hts_md5_hex(char *hex, const unsigned char *digest);
+> 
+>     /*! @abstract Deallocates any memory allocated by hts_md5_init. */
+>     void hts_md5_destroy(hts_md5_context *ctx);
+> +/
+1453,1454c1330,1344
+< // compute the level of bin
+< int hts_bin_bot (int bin, int n_lvls);
+---
+> pragma(inline,true)
+> long hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls)
+> {
+>     int l, s = min_shift, t = ((1<<((n_lvls<<1) + n_lvls)) - 1) / 7;
+>     for (--end, l = n_lvls; l > 0; --l, s += 3, t -= 1<<((l<<1)+l))
+>         if (beg>>s == end>>s) return t + (beg>>s);
+>     return 0;
+> }
+> /+
+> static inline int hts_bin_bot(int bin, int n_lvls)
+> {
+>     int l, b;
+>     for (l = 0, b = bin; b; ++l, b = hts_bin_parent(b)); // compute the level of bin
+>     return (bin - hts_bin_first(l)) << (n_lvls - l) * 3;
+> }
+1460,1466c1350,1384
+< int ed_is_big ();
+< ushort ed_swap_2 (ushort v);
+< void* ed_swap_2p (void* x);
+< uint ed_swap_4 (uint v);
+< void* ed_swap_4p (void* x);
+< ulong ed_swap_8 (ulong v);
+< void* ed_swap_8p (void* x);
+---
+> static inline int ed_is_big(void)
+> {
+>     long one= 1;
+>     return !(*((char *)(&one)));
+> }
+> static inline uint16_t ed_swap_2(uint16_t v)
+> {
+>     return (uint16_t)(((v & 0x00FF00FFU) << 8) | ((v & 0xFF00FF00U) >> 8));
+> }
+> static inline void *ed_swap_2p(void *x)
+> {
+>     *(uint16_t*)x = ed_swap_2(*(uint16_t*)x);
+>     return x;
+> }
+> static inline uint32_t ed_swap_4(uint32_t v)
+> {
+>     v = ((v & 0x0000FFFFU) << 16) | (v >> 16);
+>     return ((v & 0x00FF00FFU) << 8) | ((v & 0xFF00FF00U) >> 8);
+> }
+> static inline void *ed_swap_4p(void *x)
+> {
+>     *(uint32_t*)x = ed_swap_4(*(uint32_t*)x);
+>     return x;
+> }
+> static inline uint64_t ed_swap_8(uint64_t v)
+> {
+>     v = ((v & 0x00000000FFFFFFFFLLU) << 32) | (v >> 32);
+>     v = ((v & 0x0000FFFF0000FFFFLLU) << 16) | ((v & 0xFFFF0000FFFF0000LLU) >> 16);
+>     return ((v & 0x00FF00FF00FF00FFLLU) << 8) | ((v & 0xFF00FF00FF00FF00LLU) >> 8);
+> }
+> static inline void *ed_swap_8p(void *x)
+> {
+>     *(uint64_t*)x = ed_swap_8(*(uint64_t*)x);
+>     return x;
+> }
+1467a1386
+> +/

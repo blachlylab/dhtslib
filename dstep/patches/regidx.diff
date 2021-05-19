@@ -1,0 +1,93 @@
+63a64,66
+> module htslib.regidx;
+> import htslib.hts : hts_pos_t;
+> 
+73c76
+< enum REGIDX_MAX = 1ULL << 35;
+---
+> enum REGIDX_MAX = 1UL << 35;
+96a100,104
+> /* Omitted due to symbol collission -- dstep does not recognize case sensitivity
+> #define REGITR_PAYLOAD(itr,type_t) ((type_t*)(itr).payload)
+> #define REGITR_OVERLAP(itr,from,to) regidx_overlap((itr));
+> */
+> 
+109,110c117,119
+< alias regidx_parse_f = int function (const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end, void* payload, void* usr);
+< alias regidx_free_f = void function (void* payload);
+---
+> alias regidx_parse_f = int function(const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end,
+>     void* payload, void* usr);
+> alias regidx_free_f = void function(void* payload);
+117c126
+< int regidx_parse_bed (
+---
+> int regidx_parse_bed(
+125c134
+< int regidx_parse_tab (
+---
+> int regidx_parse_tab(
+133c142
+< int regidx_parse_reg (
+---
+> int regidx_parse_reg(
+141c150
+< int regidx_parse_vcf (
+---
+> int regidx_parse_vcf(
+168c177
+< regidx_t* regidx_init (
+---
+> regidx_t* regidx_init(
+174c183
+< regidx_t* regidx_init_string (
+---
+> regidx_t* regidx_init_string(
+184c193
+< void regidx_destroy (regidx_t* idx);
+---
+> void regidx_destroy(regidx_t* idx);
+194c203
+< int regidx_overlap (
+---
+> int regidx_overlap(
+208,210c217,219
+< int regidx_insert (regidx_t* idx, char* line);
+< int regidx_insert_list (regidx_t* idx, char* line, char delim);
+< int regidx_push (
+---
+> int regidx_insert(regidx_t* idx, char* line);
+> int regidx_insert_list(regidx_t* idx, char* line, char delim);
+> int regidx_push(
+221c230
+< char** regidx_seq_names (regidx_t* idx, int* n);
+---
+> char** regidx_seq_names(regidx_t* idx, int* n);
+227c236
+< int regidx_seq_nregs (regidx_t* idx, const(char)* seq);
+---
+> int regidx_seq_nregs(regidx_t* idx, const(char)* seq);
+229c238
+< int regidx_nregs (regidx_t* idx);
+---
+> int regidx_nregs(regidx_t* idx);
+243,245c252,254
+< regitr_t* regitr_init (regidx_t* idx);
+< void regitr_destroy (regitr_t* itr);
+< void regitr_reset (regidx_t* idx, regitr_t* itr);
+---
+> regitr_t* regitr_init(regidx_t* idx);
+> void regitr_destroy(regitr_t* itr);
+> void regitr_reset(regidx_t* idx, regitr_t* itr);
+251c260
+< int regitr_overlap (regitr_t* itr);
+---
+> int regitr_overlap(regitr_t* itr);
+257c266
+< int regitr_loop (regitr_t* itr);
+---
+> int regitr_loop(regitr_t* itr);
+262c271
+< void regitr_copy (regitr_t* dst, regitr_t* src);
+---
+> void regitr_copy(regitr_t* dst, regitr_t* src);

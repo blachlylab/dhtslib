@@ -27,22 +27,7 @@
 /* The BGZF library was originally written by Bob Handsaker from the Broad
  * Institute. It was later improved by the SAMtools developers. */
 
-module htslib.bzf;
-
-import core.stdc.stdio;
-
 import core.sys.posix.sys.types;
-// ssize_t doesn't exist in core.sys.posix.sys.types for windows builds
-version(Windows){
-    version(Win32){
-        alias ssize_t = int;
-    }
-    version(Win64){
-        alias ssize_t = long;
-    }
-}
-
-import htslib.kstring;
 
 extern (C):
 
@@ -58,9 +43,9 @@ enum BGZF_ERR_CRC = 32;
 
 struct hFILE;
 struct hts_tpool;
+struct kstring_t;
 struct bgzf_mtaux_t;
-struct __bgzidx_t;
-alias bgzidx_t = __bgzidx_t;
+struct bgzidx_t;
 struct bgzf_cache_t;
 struct z_stream_s;
 
@@ -163,7 +148,7 @@ ssize_t bgzf_write (BGZF* fp, const(void)* data, size_t length);
 
 /**
  * Write _length_ bytes from _data_ to the file, the index will be used to
- * decide the amount of uncompressed data to be writen to each bgzip block.
+ * decide the amount of uncompressed data to be written to each bgzip block.
  * If no I/O errors occur, the complete _length_ bytes will be written (or
  * queued for writing).
  * @param fp     BGZF file handler
@@ -220,8 +205,10 @@ int bgzf_flush (BGZF* fp);
  * call to bgzf_seek can be used to position the file at the same point.
  * Return value is non-negative on success.
  */
-pragma(inline, true)
-ulong bgzf_tell(BGZF *fp) { return ((*fp).block_address << 16) | ((*fp).block_offset & 0xFFFF); }
+extern (D) auto bgzf_tell(T)(auto ref T fp)
+{
+    return (fp.block_address << 16) | (fp.block_offset & 0xFFFF);
+}
 
 /**
  * Set the file to read from the location specified by _pos_.
@@ -265,7 +252,6 @@ int bgzf_compression (BGZF* fp);
  * @param fn    file name
  * @return      1 if _fn_ is BGZF; 0 if not or on I/O error
  */
-deprecated("Use bgzf_compression() or hts_detect_format() instead")
 int bgzf_is_bgzf (const(char)* fn);
 
 /*********************
@@ -297,7 +283,7 @@ int bgzf_getc (BGZF* fp);
  * Read one line from a BGZF file. It is faster than bgzf_getc()
  *
  * @param fp     BGZF file handler
- * @param delim  delimitor
+ * @param delim  delimiter
  * @param str    string to write to; must be initialized
  * @return       length of the string; -1 on end-of-file; <= -2 on error
  */

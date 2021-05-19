@@ -1,0 +1,215 @@
+0a1,19
+> /** htslib-1.9 tbx.h as D module
+>  *
+>  *  Changes include:
+>  *      Removed if(n)defs
+>  *      Change numeric #defines to enum int
+>  *      Changed ^typedef struct {...} <name>$ to ^struct <name> {...}$
+>  *      extern const to __gshared
+>  *      made #define function macros into inline functions (tbx_itr* -> hts_itr*) 
+>  *      In D, const on either LHS or RHS of function declaration applies to the function, not return value, unless parents included:
+>  *      changed ^const <type> <fnname> to ^const(<type>) <fnname>
+>  */
+> module htslib.tbx;
+> 
+> import std.stdint : int32_t;
+> 
+> import htslib.hts;
+> import htslib.bgzf;
+> 
+> extern (C):
+6d24
+< 
+8d25
+< 
+15d31
+< 
+18d33
+< 
+27,74c42
+< extern (C):
+< 
+< enum TBX_MAX_SHIFT = 31;
+< 
+< enum TBX_GENERIC = 0;
+< enum TBX_SAM = 1;
+< enum TBX_VCF = 2;
+< enum TBX_UCSC = 0x10000;
+< 
+< struct tbx_conf_t
+< {
+<     int preset;
+<     int sc;
+<     int bc;
+<     int ec; // seq col., beg col. and end col.
+<     int meta_char;
+<     int line_skip;
+< }
+< 
+< struct tbx_t
+< {
+<     tbx_conf_t conf;
+<     hts_idx_t* idx;
+<     void* dict;
+< }
+< 
+< extern __gshared const tbx_conf_t tbx_conf_gff;
+< extern __gshared const tbx_conf_t tbx_conf_bed;
+< extern __gshared const tbx_conf_t tbx_conf_psltbl;
+< extern __gshared const tbx_conf_t tbx_conf_sam;
+< extern __gshared const tbx_conf_t tbx_conf_vcf;
+< 
+< alias tbx_itr_destroy = hts_itr_destroy;
+< 
+< extern (D) auto tbx_itr_queryi(T0, T1, T2, T3)(auto ref T0 tbx, auto ref T1 tid, auto ref T2 beg, auto ref T3 end)
+< {
+<     return hts_itr_query(tbx.idx, tid, beg, end, tbx_readrec);
+< }
+< 
+< extern (D) auto tbx_itr_querys(T0, T1)(auto ref T0 tbx, auto ref T1 s)
+< {
+<     return hts_itr_querys(tbx.idx, s, cast(hts_name2id_f) tbx_name2id, tbx, hts_itr_query, tbx_readrec);
+< }
+< 
+< extern (D) auto tbx_itr_next(T0, T1, T2, T3)(auto ref T0 htsfp, auto ref T1 tbx, auto ref T2 itr, auto ref T3 r)
+< {
+<     return hts_itr_next(hts_get_bgzfp(htsfp), itr, r, tbx);
+< }
+---
+> enum int TBX_MAX_SHIFT = 31;/// ???
+76,92c44,111
+< extern (D) auto tbx_bgzf_itr_next(T0, T1, T2, T3)(auto ref T0 bgzfp, auto ref T1 tbx, auto ref T2 itr, auto ref T3 r)
+< {
+<     return hts_itr_next(bgzfp, itr, r, tbx);
+< }
+< 
+< int tbx_name2id (tbx_t* tbx, const(char)* ss);
+< 
+< /* Internal helper function used by tbx_itr_next() */
+< BGZF* hts_get_bgzfp (htsFile* fp);
+< 
+< int tbx_readrec (
+<     BGZF* fp,
+<     void* tbxv,
+<     void* sv,
+<     int* tid,
+<     hts_pos_t* beg,
+<     hts_pos_t* end);
+---
+> enum int TBX_GENERIC = 0;   /// generic flat file
+> enum int TBX_SAM     = 1;   /// SAM
+> enum int TBX_VCF     = 2;   /// VCF
+> enum int TBX_UCSC    = 0x10000; /// ?UCSC flat file?
+> 
+> /// tabix config
+> struct tbx_conf_t {
+>     int32_t preset;     /// ?
+>     /// seq col., beg col. and end col.
+>     int32_t sc, bc, ec; // seq col., beg col. and end col.
+>     /// ?
+>     int32_t meta_char, line_skip;
+> }
+> 
+> /// tabix data
+> struct tbx_t {
+>     tbx_conf_t conf;    /// tabix config
+>     hts_idx_t *idx;     /// index data
+>     void *dict;         /// ?dictionary
+> }
+> 
+> //extern const tbx_conf_t tbx_conf_gff, tbx_conf_bed, tbx_conf_psltbl, tbx_conf_sam, tbx_conf_vcf;
+> /// prebaked TABIX config data for GFF3, BED, PSL table, SAM, VCF
+> extern (C) extern __gshared const tbx_conf_t tbx_conf_gff, tbx_conf_bed, tbx_conf_psltbl, tbx_conf_sam, tbx_conf_vcf;
+> 
+>     alias tbx_itr_destroy = hts_itr_destroy;
+> 
+>     /* hts_itr_t *hts_itr_query(const hts_idx_t *idx, int tid, int beg, int end, hts_readrec_func *readrec); */
+>     //#define tbx_itr_queryi(tbx, tid, beg, end) hts_itr_query((tbx)->idx, (tid), (beg), (end), tbx_readrec)
+>     /// tabix query by integer based tid(contig)/start/end
+>     pragma(inline, true)
+>     auto tbx_itr_queryi(const tbx_t *tbx, int tid, int beg, int end)
+>         { return hts_itr_query(tbx.idx, tid, beg, end, &tbx_readrec); }
+> 
+>     /* hts_itr_t *hts_itr_querys(const hts_idx_t *idx, const char *reg, hts_name2id_f getid, void *hdr, hts_itr_query_func *itr_query, hts_readrec_func *readrec); */
+>     //#define tbx_itr_querys(tbx, s) hts_itr_querys((tbx)->idx, (s), (hts_name2id_f)(tbx_name2id), (tbx), hts_itr_query, tbx_readrec)
+>     /// tabix query by string "chr:start-end"
+>     pragma(inline, true)
+>     auto tbx_itr_querys(const tbx_t *tbx, const char *s)
+>     {
+>         return hts_itr_querys(tbx.idx, s,
+>             cast(hts_name2id_f)(&tbx_name2id),
+>             cast(void*)tbx,
+>             &hts_itr_query,
+>             &tbx_readrec);
+>     }
+> 
+>     /* int hts_itr_next(BGZF *fp, hts_itr_t *iter, void *r, void *data) HTS_RESULT_USED; */
+>     //#define tbx_itr_next(htsfp, tbx, itr, r) hts_itr_next(hts_get_bgzfp(htsfp), (itr), (r), (tbx))
+>     /// advance tabix iterator
+>     pragma(inline, true)
+>     auto tbx_itr_next(htsFile *htsfp, tbx_t *tbx, hts_itr_t *itr, void *r)
+>         { return hts_itr_next(hts_get_bgzfp(htsfp), itr, r, tbx); }
+>     
+>     /* int hts_itr_next(BGZF *fp, hts_itr_t *iter, void *r, void *data) HTS_RESULT_USED; */
+>     //#define tbx_bgzf_itr_next(bgzfp, tbx, itr, r) hts_itr_next((bgzfp), (itr), (r), (tbx))
+>     /// advance tabix iterator
+>     pragma(inline, true)
+>     auto tbx_bgzf_itr_next(BGZF *bgzfp, tbx_t *tbx, hts_itr_t *itr, void *r)
+>         { return hts_itr_next(bgzfp, itr, r, tbx); }
+> 
+>     /// contig name to integer id
+>     int tbx_name2id(tbx_t *tbx, const char *ss);
+> 
+>     /** Internal helper function used by tbx_itr_next()  defined in hts.c -- do not use directly */
+>     BGZF *hts_get_bgzfp(htsFile *fp);
+>     /** Called by tabix iterator to read the next record */
+>     int tbx_readrec(BGZF *fp, void *tbxv, void *sv, int *tid, hts_pos_t *beg, hts_pos_t *end);
+98c117
+< tbx_t* tbx_index (BGZF* fp, int min_shift, const(tbx_conf_t)* conf);
+---
+>     tbx_t *tbx_index(BGZF *fp, int min_shift, const(tbx_conf_t) *conf);
+102,116c121,126
+< int tbx_index_build (const(char)* fn, int min_shift, const(tbx_conf_t)* conf);
+< 
+< int tbx_index_build2 (
+<     const(char)* fn,
+<     const(char)* fnidx,
+<     int min_shift,
+<     const(tbx_conf_t)* conf);
+< 
+< int tbx_index_build3 (
+<     const(char)* fn,
+<     const(char)* fnidx,
+<     int min_shift,
+<     int n_threads,
+<     const(tbx_conf_t)* conf);
+< 
+---
+>     int tbx_index_build(const(char) *fn, int min_shift, const(tbx_conf_t) *conf);
+>     /// ditto
+>     int tbx_index_build2(const(char) *fn, const(char) *fnidx, int min_shift, const(tbx_conf_t) *conf);
+>     /// ditto
+>     int tbx_index_build3(const(char) *fn, const(char) *fnidx, int min_shift, int n_threads, const(tbx_conf_t) *conf);
+>     
+122c132
+< tbx_t* tbx_index_load (const(char)* fn);
+---
+>     tbx_t *tbx_index_load(const(char) *fn);
+133c143
+< tbx_t* tbx_index_load2 (const(char)* fn, const(char)* fnidx);
+---
+>     tbx_t *tbx_index_load2(const(char) *fn, const(char) *fnidx);
+152,154c162
+< tbx_t* tbx_index_load3 (const(char)* fn, const(char)* fnidx, int flags);
+< 
+< const(char*)* tbx_seqnames (tbx_t* tbx, int* n); // free the array but not the values
+---
+>     tbx_t *tbx_index_load3(const(char) *fn, const(char) *fnidx, HTS_IDX_FLAG flags);
+156c164,165
+< void tbx_destroy (tbx_t* tbx);
+---
+>     /// return C-style array of sequence names (NB: free the array but not the values)
+>     const(char **) tbx_seqnames(tbx_t *tbx, int *n);  // free the array but not the values
+157a167,168
+>     /// destroy/dealloc tabix data
+>     void tbx_destroy(tbx_t *tbx);

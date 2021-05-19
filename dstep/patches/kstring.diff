@@ -1,3 +1,7 @@
+4c4
+<    Copyright (C) 2013-2014, 2016, 2018-2020 Genome Research Ltd.
+---
+>    Copyright (C) 2013-2014, 2016, 2018-2019 Genome Research Ltd.
 27,28c27,31
 < import core.stdc.config;
 < import core.stdc.stdio;
@@ -11,16 +15,13 @@
 > import core.stdc.string : memcpy, strlen;
 > 
 > alias ssize_t = ptrdiff_t;	// should be defined in core.stdc somewhere but is not :/
-33,38c39,50
-< /*  0 or  1 */
-< /*  1 or  2 */
-< /*  2 or  4 */
-< /*  4 or  8 */
-< /*  8 or 16 */
-< /* 16 or 32 */
+33c39
+< // __MINGW_PRINTF_FORMAT
 ---
 > // #define kroundup32(x) (--(x), (x)|=(x)>>1, (x)|=(x)>>2, (x)|=(x)>>4, (x)|=(x)>>8, (x)|=(x)>>16, ++(x))
-> 
+35c41,74
+< enum HAVE___BUILTIN_CLZ = 1;
+---
 > /// round 32 or 64 bit (u)int x to power of 2 that is equal or greater (JSB)
 > pragma(inline, true)
 > extern (D)
@@ -31,14 +32,10 @@
 > 	x |= (x >> 4);
 > 	x |= (x >> 8);
 > 	x |= (x >> 16);
-40c52,53
-< // __MINGW_PRINTF_FORMAT
----
+> 
 > 	static if (size_t.sizeof == 8)
 >         x |= (x >> 32);
-42c55,74
-< enum HAVE___BUILTIN_CLZ = 1;
----
+> 
 > 	++x;
 > }
 > 
@@ -59,26 +56,73 @@
 > #endif
 > #endif
 > +/
-95c127
-< int kgetline(kstring_t* s, char* function() fgets, void* fp);
+63c102
+< int kvsprintf (kstring_t* s, const(char)* fmt, va_list ap);
 ---
+> int kvsprintf(kstring_t* s, const(char)* fmt, va_list ap);
+65c104
+< int ksprintf (kstring_t* s, const(char)* fmt, ...);
+---
+> int ksprintf(kstring_t* s, const(char)* fmt, ...);
+67c106
+< int kputd (double d, kstring_t* s); // custom %g only handler
+---
+> int kputd(double d, kstring_t* s); // custom %g only handler
+69c108
+< int ksplit_core (char* s, int delimiter, int* _max, int** _offsets);
+---
+> int ksplit_core(char* s, int delimiter, int* _max, int** _offsets);
+71c110
+< char* kstrstr (const(char)* str, const(char)* pat, int** _prep);
+---
+> char* kstrstr(const(char)* str, const(char)* pat, int** _prep);
+73c112
+< char* kstrnstr (const(char)* str, const(char)* pat, int n, int** _prep);
+---
+> char* kstrnstr(const(char)* str, const(char)* pat, int n, int** _prep);
+75c114
+< void* kmemmem (const(void)* _str, int n, const(void)* _pat, int m, int** _prep);
+---
+> void* kmemmem(const(void)* _str, int n, const(void)* _pat, int m, int** _prep);
+81c120
+< char* kstrtok (const(char)* str, const(char)* sep, ks_tokaux_t* aux);
+---
+> char* kstrtok(const(char)* str, const(char)* sep, ks_tokaux_t* aux);
+84,95c123,131
+<  * or "\r\n"-terminated line from fp.  The line read is appended to the
+<  * kstring without its terminator and 0 is returned; EOF is returned at
+<  * EOF or on error (determined by querying fp, as per fgets()). */
+< alias kgets_func = char* function (char*, int, void*);
+< int kgetline (kstring_t* s, char* function () fgets_fn, void* fp);
+< 
+< /* kgetline2() uses the supplied hgetln()-like function to read a "\n"-
+<  * or "\r\n"-terminated line from fp.  The line read is appended to the
+<  * ksring without its terminator and 0 is returned; EOF is returned at
+<  * EOF or on error (determined by querying fp, as per fgets()). */
+< alias kgets_func2 = c_long function (char*, size_t, void*);
+< int kgetline2 (kstring_t* s, ssize_t function () fgets_fn, void* fp);
+---
+> 	 * or "\r\n"-terminated line from fp.  The line read is appended to the
+> 	 * kstring without its terminator and 0 is returned; EOF is returned at
+> 	 * EOF or on error (determined by querying fp, as per fgets()). */
+> alias kgets_func = char* function(char*, int, void*);
 > int kgetline(kstring_t* s, char* function(char*, int, void*) fgets, void* fp);
-99c131
-< int kgetline2(kstring_t* s, ssize_t function() fgets, void* fp);
----
+> 
+> // This matches the signature of hgetln(), apart from the last pointer
+> alias kgets_func2 = c_long function(char*, size_t, void*);
 > int kgetline2(kstring_t* s, ssize_t function(char*, size_t, void*) fgets, void* fp);
-101a134
+97a134
 > //#define KS_INITIALIZE { 0, 0, NULL }
-109c142,146
-< void ks_initialize(kstring_t* s);
+105c142,146
+< void ks_initialize (kstring_t* s);
 ---
 > void ks_initialize(kstring_t* s)
 > {
 >     s.l = s.m = 0;
 >     s.s = null;
 > }
-112c149,161
-< int ks_resize(kstring_t* s, size_t size);
+108c149,161
+< int ks_resize (kstring_t* s, size_t size);
 ---
 > int ks_resize(kstring_t* s, size_t size)
 > {
@@ -93,49 +137,49 @@
 > 	}
 > 	return 0;
 > }
-114a164,166
+110a164,166
 > int ks_expand(kstring_t* s, size_t expansion)
 > {
 >     size_t new_size = s.l + expansion;
-116,117c168,171
+112,113c168,171
 < // Overflow check
-< int ks_expand(kstring_t* s, size_t expansion);
+< int ks_expand (kstring_t* s, size_t expansion);
 ---
 >     if (new_size < s.l) // Overflow check
 >         return -1;
 >     return ks_resize(s, new_size);
 > }
-120c174,177
-< char* ks_str(kstring_t* s);
+116c174,177
+< char* ks_str (kstring_t* s);
 ---
 > char* ks_str(kstring_t* s)
 > {
 > 	return s.s;
 > }
-128c185,188
-< const(char)* ks_c_str(kstring_t* s);
+124c185,188
+< const(char)* ks_c_str (kstring_t* s);
 ---
 > const(char)* ks_c_str(kstring_t* s)
 > {
 >     return s.l && s.s ? s.s : "";
 > }
-130c190,193
-< size_t ks_len(kstring_t* s);
+126c190,193
+< size_t ks_len (kstring_t* s);
 ---
 > size_t ks_len(kstring_t* s)
 > {
 > 	return s.l;
 > }
-138c201,205
-< kstring_t* ks_clear(kstring_t* s);
+134c201,205
+< kstring_t* ks_clear (kstring_t* s);
 ---
 > kstring_t* ks_clear(kstring_t* s)
 > {
 >     s.l = 0;
 >     return s;
 > }
-144c211,217
-< char* ks_release(kstring_t* s);
+140c211,217
+< char* ks_release (kstring_t* s);
 ---
 > char* ks_release(kstring_t* s)
 > {
@@ -144,16 +188,16 @@
 > 	s.s = null;
 > 	return ss;
 > }
-147,155c220,226
-< void ks_free(kstring_t* s);
+143,151c220,226
+< void ks_free (kstring_t* s);
 < 
-< int kputsn(const(char)* p, size_t l, kstring_t* s);
+< int kputsn (const(char)* p, size_t l, kstring_t* s);
 < 
-< int kputs(const(char)* p, kstring_t* s);
+< int kputs (const(char)* p, kstring_t* s);
 < 
-< int kputc(int c, kstring_t* s);
+< int kputc (int c, kstring_t* s);
 < 
-< int kputc_(int c, kstring_t* s);
+< int kputc_ (int c, kstring_t* s);
 ---
 > void ks_free(kstring_t* s)
 > {
@@ -162,8 +206,8 @@
 >         ks_initialize(s);
 >     }
 > }
-157c228,237
-< int kputsn_(const(void)* p, size_t l, kstring_t* s);
+153c228,237
+< int kputsn_ (const(void)* p, size_t l, kstring_t* s);
 ---
 > int kputsn(const(char)* p, size_t l, kstring_t* s)
 > {
@@ -175,14 +219,14 @@
 > 	s.s[s.l] = 0;
 > 	return cast(int)l;	// no implicit down casting
 > }
-159c239,242
+155c239,242
 < // Trivial case - also prevents __builtin_clz(0), which is undefined
 ---
 > int kputs(const(char)* p, kstring_t* s)
 > {
 > 	return kputsn(p, strlen(p), s);
 > }
-161c244,251
+157c244,251
 < // Find out how many digits are to be printed.
 ---
 > int kputc(int c, kstring_t* s)
@@ -193,7 +237,7 @@
 > 	s.s[s.l] = 0;
 > 	return cast(ubyte)c;
 > }
-163,170c253,259
+159,166c253,259
 < /*
 <  * Table method - should be quick if clz can be done in hardware.
 <  * Find the most significant bit of the value to print and look
@@ -210,7 +254,7 @@
 > 	s.s[s.l++] = cast(char)c;	// no implicit down casting
 > 	return 1;
 > }
-172c261,269
+168c261,269
 < // Fallback for when clz is not available
 ---
 > int kputsn_(const(void)* p, size_t l, kstring_t* s)
@@ -222,7 +266,7 @@
 > 	s.l += l;
 > 	return cast(int)l;	// no implicit down casting
 > }
-174c271,358
+170c271,358
 < // Add digits two at a time
 ---
 > // htslib 1.10 replaced this function with a higher performance
@@ -313,9 +357,9 @@
 >     s.s[s.l] = 0;
 >     return 0;
 > }
-176,177c360,368
+172,173c360,368
 < // Last one (if necessary).  We know that x < 10 by now.
-< int kputuw(uint x, kstring_t* s);
+< int kputuw (uint x, kstring_t* s);
 ---
 > int kputw(int c, kstring_t* s)
 > {
@@ -326,13 +370,13 @@
 >             return EOF;
 >         s.s[s.l++] = '-';
 >     }
-179c370,371
-< int kputw(int c, kstring_t* s);
+175c370,371
+< int kputw (int c, kstring_t* s);
 ---
 >     return kputuw(x, s);
 > }
-181c373,386
-< int kputll(long c, kstring_t* s);
+177c373,386
+< int kputll (long c, kstring_t* s);
 ---
 > int kputll(long c, kstring_t* s)
 > {
@@ -348,14 +392,18 @@
 > 	s.s[s.l] = 0;
 > 	return 0;
 > }
-183c388,390
-< int kputl(c_long c, kstring_t* s);
+179c388,390
+< int kputl (c_long c, kstring_t* s);
 ---
 > int kputl(c_long c, kstring_t* s) {
 >     return kputll(c, s);
 > }
-189c396,403
-< int* ksplit(kstring_t* s, int delimiter, int* n);
+183c394
+<  *         NULL on failure.
+---
+>  *         NULL on failue.
+185c396,403
+< int* ksplit (kstring_t* s, int delimiter, int* n);
 ---
 > int* ksplit(kstring_t* s, int delimiter, int* n)
 > {

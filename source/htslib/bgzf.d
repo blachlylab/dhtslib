@@ -31,6 +31,7 @@ module htslib.bgzf;
 
 import core.stdc.stdio;
 import htslib.hfile: hFILE;
+import htslib.kstring: kstring_t; 
 
 import core.sys.posix.sys.types;
 // ssize_t doesn't exist in core.sys.posix.sys.types for windows builds
@@ -163,7 +164,7 @@ ssize_t bgzf_write (BGZF* fp, const(void)* data, size_t length);
 
 /**
  * Write _length_ bytes from _data_ to the file, the index will be used to
- * decide the amount of uncompressed data to be writen to each bgzip block.
+ * decide the amount of uncompressed data to be written to each bgzip block.
  * If no I/O errors occur, the complete _length_ bytes will be written (or
  * queued for writing).
  * @param fp     BGZF file handler
@@ -221,7 +222,10 @@ int bgzf_flush (BGZF* fp);
  * Return value is non-negative on success.
  */
 pragma(inline, true)
-ulong bgzf_tell(BGZF *fp) { return ((*fp).block_address << 16) | ((*fp).block_offset & 0xFFFF); }
+extern (D) auto bgzf_tell(T)(auto ref T fp)
+{
+    return (fp.block_address << 16) | (fp.block_offset & 0xFFFF);
+}
 
 /**
  * Set the file to read from the location specified by _pos_.
@@ -297,7 +301,7 @@ int bgzf_getc (BGZF* fp);
  * Read one line from a BGZF file. It is faster than bgzf_getc()
  *
  * @param fp     BGZF file handler
- * @param delim  delimitor
+ * @param delim  delimiter
  * @param str    string to write to; must be initialized
  * @return       length of the string; -1 on end-of-file; <= -2 on error
  */

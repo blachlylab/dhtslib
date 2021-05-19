@@ -1,0 +1,109 @@
+0a1,3
+> module htslib.hts_log;
+> import std.string: toStringz;
+> 
+29c32
+< extern (C):
+---
+> extern(C):
+32,39c35,41
+< enum htsLogLevel
+< {
+<     HTS_LOG_OFF = 0, ///< All logging disabled.
+<     HTS_LOG_ERROR = 1, ///< Logging of errors only.
+<     HTS_LOG_WARNING = 3, ///< Logging of errors and warnings.
+<     HTS_LOG_INFO = 4, ///< Logging of errors, warnings, and normal but significant events.
+<     HTS_LOG_DEBUG = 5, ///< Logging of all except the most detailed debug events.
+<     HTS_LOG_TRACE = 6 ///< All logging enabled.
+---
+> enum htsLogLevel {          // @suppress(dscanner.style.phobos_naming_convention)
+>     HTS_LOG_OFF,            ///< All logging disabled.
+>     HTS_LOG_ERROR,          ///< Logging of errors only.
+>     HTS_LOG_WARNING = 3,    ///< Logging of errors and warnings.
+>     HTS_LOG_INFO,           ///< Logging of errors, warnings, and normal but significant events.
+>     HTS_LOG_DEBUG,          ///< Logging of all except the most detailed debug events.
+>     HTS_LOG_TRACE           ///< All logging enabled.
+43c45
+< void hts_set_log_level (htsLogLevel level);
+---
+> void hts_set_log_level(htsLogLevel level);
+46c48
+< htsLogLevel hts_get_log_level ();
+---
+> htsLogLevel hts_get_log_level();
+55c57
+< /*! Logs an event.
+---
+> /**! Logs an event.
+65,69c67
+< void hts_log (
+<     htsLogLevel severity,
+<     const(char)* context,
+<     const(char)* format,
+<     ...);
+---
+> void hts_log(htsLogLevel severity, const(char) *context, const(char) *format, ...);
+71c69,83
+< /*! Logs an event with severity HTS_LOG_ERROR and default context. Parameters: format, ... */
+---
+> pragma(inline, true):
+> /**! Logs an event with severity HTS_LOG_ERROR and default context. Parameters: format, ... */
+> //#define hts_log_error(...) hts_log(HTS_LOG_ERROR, __func__, __VA_ARGS__)
+> void hts_log_error(const(char)[] ctx, string msg)
+> {
+>     string colormsg = "\x1b[0;31m" ~ msg ~ "\x1b[0m";
+>     hts_log(htsLogLevel.HTS_LOG_ERROR, toStringz(ctx), toStringz(colormsg));
+> }
+> /**! Logs an event with severity HTS_LOG_WARNING and default context. Parameters: format, ... */
+> //#define hts_log_warning(...) hts_log(HTS_LOG_WARNING, __func__, __VA_ARGS__)
+> void hts_log_warning(const(char)[] ctx, string msg)
+> {
+>     string colormsg = "\x1b[0;33m" ~ msg ~ "\x1b[0m";
+>     hts_log(htsLogLevel.HTS_LOG_WARNING, toStringz(ctx), toStringz(colormsg));
+> }
+73c85,91
+< /*! Logs an event with severity HTS_LOG_WARNING and default context. Parameters: format, ... */
+---
+> /**! Logs an event with severity HTS_LOG_INFO and default context. Parameters: format, ... */
+> //#define hts_log_info(...) hts_log(HTS_LOG_INFO, __func__, __VA_ARGS__)
+> void hts_log_info(const(char)[] ctx, string msg)
+> {
+>     string colormsg = "\x1b[0;32m" ~ msg ~ "\x1b[0m";
+>     hts_log(htsLogLevel.HTS_LOG_INFO, toStringz(ctx), toStringz(colormsg));
+> }
+75c93,99
+< /*! Logs an event with severity HTS_LOG_INFO and default context. Parameters: format, ... */
+---
+> /**! Logs an event with severity HTS_LOG_DEBUG and default context. Parameters: format, ... */
+> //#define hts_log_debug(...) hts_log(HTS_LOG_DEBUG, __func__, __VA_ARGS__)
+> void hts_log_debug(const(char)[] ctx, string msg)
+> {
+>     string colormsg = "\x1b[0;36m" ~ msg ~ "\x1b[0m";
+>     hts_log(htsLogLevel.HTS_LOG_DEBUG, toStringz(ctx), toStringz(colormsg));
+> }
+77c101,107
+< /*! Logs an event with severity HTS_LOG_DEBUG and default context. Parameters: format, ... */
+---
+> /**! Logs an event with severity HTS_LOG_TRACE and default context. Parameters: format, ... */
+> //#define hts_log_trace(...) hts_log(HTS_LOG_TRACE, __func__, __VA_ARGS__)
+> void hts_log_trace(const(char)[] ctx, string msg)
+> {
+>     string colormsg = "\x1b[1;36m" ~ msg ~ "\x1b[0m";
+>     hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), toStringz(colormsg));
+> }
+79c109,112
+< /*! Logs an event with severity HTS_LOG_TRACE and default context. Parameters: format, ... */
+---
+> ///
+> debug(dhtslib_unittest) unittest
+> {
+>     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+81c114,119
+< // #ifndef HTS_LOG_H
+---
+>     hts_log_trace(__FUNCTION__, "Test: trace");
+>     hts_log_debug(__FUNCTION__, "Test: debug");
+>     hts_log_info(__FUNCTION__,  "Test: info");
+>     hts_log_warning(__FUNCTION__,"Test: warning");
+>     hts_log_error(__FUNCTION__, "Test: error");
+> }

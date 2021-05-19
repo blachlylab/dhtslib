@@ -1,0 +1,229 @@
+4c4
+<     Copyright (c) 2013-2017, 2019, 2020 Genome Research Ltd.
+---
+>     Copyright (c) 2013-2017, 2019 Genome Research Ltd.
+46a47,48
+> module htslib.thread_pool;
+> 
+56c58
+< /*
+---
+> /**
+71c73
+< /*
+---
+> /**
+80c82
+< /*
+---
+> /**
+89c91
+< /*
+---
+> /**
+98c100
+< hts_tpool* hts_tpool_init (int n);
+---
+> hts_tpool* hts_tpool_init(int n);
+100c102
+< /*
+---
+> /**
+103c105
+< int hts_tpool_size (hts_tpool* p);
+---
+> int hts_tpool_size(hts_tpool* p);
+115c117
+< int hts_tpool_dispatch (
+---
+> int hts_tpool_dispatch(
+118c120
+<     void* function (void* arg) func,
+---
+>     void* function(void* arg) func,
+139c141
+< int hts_tpool_dispatch2 (
+---
+> int hts_tpool_dispatch2(
+142c144
+<     void* function (void* arg) func,
+---
+>     void* function(void* arg) func,
+181c183
+<  * For jobs that are processed normally, it is the responsibility of
+---
+>  * For jobs that are processed normally, it is the resposibility of
+185c187
+< int hts_tpool_dispatch3 (
+---
+> int hts_tpool_dispatch3(
+188c190
+<     void* function (void* arg) exec_func,
+---
+>     void* function(void* arg) exec_func,
+190,191c192,193
+<     void function (void* arg) job_cleanup,
+<     void function (void* data) result_cleanup,
+---
+>     void function(void* arg) job_cleanup,
+>     void function(void* data) result_cleanup,
+194c196
+< /*
+---
+> /**
+198c200
+< void hts_tpool_wake_dispatch (hts_tpool_process* q);
+---
+> void hts_tpool_wake_dispatch(hts_tpool_process* q);
+200c202
+< /*
+---
+> /**
+211c213
+< int hts_tpool_process_flush (hts_tpool_process* q);
+---
+> int hts_tpool_process_flush(hts_tpool_process* q);
+213c215
+< /*
+---
+> /**
+225c227
+< int hts_tpool_process_reset (hts_tpool_process* q, int free_results);
+---
+> int hts_tpool_process_reset(hts_tpool_process* q, int free_results);
+227,228c229,230
+< /* Returns the process queue size */
+< int hts_tpool_process_qsize (hts_tpool_process* q);
+---
+> /** Returns the process queue size */
+> int hts_tpool_process_qsize(hts_tpool_process* q);
+230c232
+< /*
+---
+> /**
+234c236
+< void hts_tpool_destroy (hts_tpool* p);
+---
+> void hts_tpool_destroy(hts_tpool* p);
+236c238
+< /*
+---
+> /**
+240c242
+< void hts_tpool_kill (hts_tpool* p);
+---
+> void hts_tpool_kill(hts_tpool* p);
+242c244
+< /*
+---
+> /**
+252c254
+< hts_tpool_result* hts_tpool_next_result (hts_tpool_process* q);
+---
+> hts_tpool_result* hts_tpool_next_result(hts_tpool_process* q);
+254c256
+< /*
+---
+> /**
+264c266
+< hts_tpool_result* hts_tpool_next_result_wait (hts_tpool_process* q);
+---
+> hts_tpool_result* hts_tpool_next_result_wait(hts_tpool_process* q);
+266c268
+< /*
+---
+> /**
+270c272
+< void hts_tpool_delete_result (hts_tpool_result* r, int free_data);
+---
+> void hts_tpool_delete_result(hts_tpool_result* r, int free_data);
+272c274
+< /*
+---
+> /**
+276c278
+< void* hts_tpool_result_data (hts_tpool_result* r);
+---
+> void* hts_tpool_result_data(hts_tpool_result* r);
+278c280
+< /*
+---
+> /**
+291,294c293
+< hts_tpool_process* hts_tpool_process_init (
+<     hts_tpool* p,
+<     int qsize,
+<     int in_only);
+---
+> hts_tpool_process* hts_tpool_process_init(hts_tpool* p, int qsize, int in_only);
+296c295
+< /* Deallocates memory for a thread process-queue.
+---
+> /** Deallocates memory for a thread process-queue.
+299c298
+< void hts_tpool_process_destroy (hts_tpool_process* q);
+---
+> void hts_tpool_process_destroy(hts_tpool_process* q);
+301c300
+< /*
+---
+> /**
+305c304
+< int hts_tpool_process_empty (hts_tpool_process* q);
+---
+> int hts_tpool_process_empty(hts_tpool_process* q);
+307c306
+< /*
+---
+> /**
+310c309
+< int hts_tpool_process_len (hts_tpool_process* q);
+---
+> int hts_tpool_process_len(hts_tpool_process* q);
+312c311
+< /*
+---
+> /**
+316c315
+< int hts_tpool_process_sz (hts_tpool_process* q);
+---
+> int hts_tpool_process_sz(hts_tpool_process* q);
+318c317
+< /*
+---
+> /**
+324c323
+< void hts_tpool_process_shutdown (hts_tpool_process* q);
+---
+> void hts_tpool_process_shutdown(hts_tpool_process* q);
+326,333c325
+< /*
+<  * Returns whether this process queue has been shutdown.
+<  * Return value of 1 signifies normal shutdown while >1 signifies it
+<  * was shutdown due to an error condition.
+<  */
+< int hts_tpool_process_is_shutdown (hts_tpool_process* q);
+< 
+< /*
+---
+> /**
+341c333
+< void hts_tpool_process_attach (hts_tpool* p, hts_tpool_process* q);
+---
+> void hts_tpool_process_attach(hts_tpool* p, hts_tpool_process* q);
+343c335
+< void hts_tpool_process_detach (hts_tpool* p, hts_tpool_process* q);
+---
+> void hts_tpool_process_detach(hts_tpool* p, hts_tpool_process* q);
+345c337
+< /*
+---
+> /**
+351c343
+< void hts_tpool_process_ref_incr (hts_tpool_process* q);
+---
+> void hts_tpool_process_ref_incr(hts_tpool_process* q);
+353c345
+< void hts_tpool_process_ref_decr (hts_tpool_process* q);
+---
+> void hts_tpool_process_ref_decr(hts_tpool_process* q);

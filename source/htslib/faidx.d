@@ -1,7 +1,7 @@
 /// @file htslib/faidx.h
 /// FASTA random access.
 /*
-   Copyright (C) 2008, 2009, 2013, 2014, 2016, 2017-2019 Genome Research Ltd.
+   Copyright (C) 2008, 2009, 2013, 2014, 2016, 2017-2020 Genome Research Ltd.
 
    Author: Heng Li <lh3@sanger.ac.uk>
 
@@ -27,9 +27,7 @@
 */
 
 module htslib.faidx;
-
-import htslib.hts;
-
+import htslib.hts: hts_pos_t;
 extern (C):
 
 /** @file
@@ -83,7 +81,7 @@ If fnfai is NULL, ".fai" will be appended to fn to make the FAI file name.
 If fngzi is NULL, ".gzi" will be appended to fn for the GZI file.  The GZI
 file will only be built if fn is bgzip-compressed.
 */
-int fai_build3(const(char)* fn, const(char)* fnfai, const(char)* fngzi);
+int fai_build3 (const(char)* fn, const(char)* fnfai, const(char)* fngzi);
 
 /// Build index for a FASTA or FASTQ or bgzip-compressed FASTA or FASTQ file.
 /** @param  fn  FASTA/FASTQ file name
@@ -92,10 +90,10 @@ int fai_build3(const(char)* fn, const(char)* fnfai, const(char)* fngzi);
 File "fn.fai" will be generated.  This function is equivalent to
 fai_build3(fn, NULL, NULL);
 */
-int fai_build(const(char)* fn);
+int fai_build (const(char)* fn);
 
 /// Destroy a faidx_t struct
-void fai_destroy(faidx_t* fai);
+void fai_destroy (faidx_t* fai);
 
 enum fai_load_options
 {
@@ -119,7 +117,7 @@ fai_build3() if they are not already present.
 The struct returned by a successful call should be freed via fai_destroy()
 when it is no longer needed.
 */
-faidx_t* fai_load3(
+faidx_t* fai_load3 (
     const(char)* fn,
     const(char)* fnfai,
     const(char)* fngzi,
@@ -131,7 +129,7 @@ faidx_t* fai_load3(
 
 This function is equivalent to fai_load3(fn, NULL, NULL, FAI_CREATE|FAI_CACHE);
 */
-faidx_t* fai_load(const(char)* fn);
+faidx_t* fai_load (const(char)* fn);
 
 /// Load FASTA or FASTQ indexes.
 /** @param  fn  File name of the FASTA/FASTQ file (can be compressed with bgzip).
@@ -151,7 +149,7 @@ fai_build3() if they are not already present.
 The struct returned by a successful call should be freed via fai_destroy()
 when it is no longer needed.
 */
-faidx_t* fai_load3_format(
+faidx_t* fai_load3_format (
     const(char)* fn,
     const(char)* fnfai,
     const(char)* fngzi,
@@ -165,7 +163,7 @@ faidx_t* fai_load3_format(
 
 This function is equivalent to fai_load3_format(fn, NULL, NULL, FAI_CREATE|FAI_CACHE, format);
 */
-faidx_t* fai_load_format(const(char)* fn, fai_format_options format);
+faidx_t* fai_load_format (const(char)* fn, fai_format_options format);
 
 /// Fetch the sequence in a region
 /** @param  fai  Pointer to the faidx_t struct
@@ -180,8 +178,8 @@ To work around ambiguous parsing issues, eg both "chr1" and "chr1:100-200"
 are reference names, quote using curly braces.
 Thus "{chr1}:100-200" and "{chr1:100-200}" disambiguate the above example.
 */
-char* fai_fetch(const(faidx_t)* fai, const(char)* reg, int* len);
-char* fai_fetch64(const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+char* fai_fetch (const(faidx_t)* fai, const(char)* reg, int* len);
+char* fai_fetch64 (const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
 
 /// Fetch the quality string for a region for FASTQ files
 /** @param  fai  Pointer to the faidx_t struct
@@ -194,15 +192,14 @@ destroyed by end users by calling `free()` on it.
 
 Region names can be quoted with curly braces, as for fai_fetch().
 */
-char* fai_fetchqual(const(faidx_t)* fai, const(char)* reg, int* len);
-char* fai_fetchqual64(const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+char* fai_fetchqual (const(faidx_t)* fai, const(char)* reg, int* len);
+char* fai_fetchqual64 (const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
 
 /// Fetch the number of sequences
 /** @param  fai  Pointer to the faidx_t struct
     @return      The number of sequences
 */
-deprecated("Please use faidx_nseq instead")
-int faidx_fetch_nseq(const(faidx_t)* fai);
+int faidx_fetch_nseq (const(faidx_t)* fai);
 
 /// Fetch the sequence in a region
 /** @param  fai  Pointer to the faidx_t struct
@@ -215,7 +212,7 @@ int faidx_fetch_nseq(const(faidx_t)* fai);
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char* faidx_fetch_seq(
+char* faidx_fetch_seq (
     const(faidx_t)* fai,
     const(char)* c_name,
     int p_beg_i,
@@ -233,7 +230,7 @@ char* faidx_fetch_seq(
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char* faidx_fetch_seq64(
+char* faidx_fetch_seq64 (
     const(faidx_t)* fai,
     const(char)* c_name,
     hts_pos_t p_beg_i,
@@ -251,7 +248,7 @@ char* faidx_fetch_seq64(
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char* faidx_fetch_qual(
+char* faidx_fetch_qual (
     const(faidx_t)* fai,
     const(char)* c_name,
     int p_beg_i,
@@ -269,7 +266,7 @@ char* faidx_fetch_qual(
 The returned sequence is allocated by `malloc()` family and should be destroyed
 by end users by calling `free()` on it.
 */
-char* faidx_fetch_qual64(
+char* faidx_fetch_qual64 (
     const(faidx_t)* fai,
     const(char)* c_name,
     hts_pos_t p_beg_i,
@@ -281,16 +278,16 @@ char* faidx_fetch_qual64(
       @param  seq  Sequence name
       @return      1 if present or 0 if absent
 */
-int faidx_has_seq(const(faidx_t)* fai, const(char)* seq);
+int faidx_has_seq (const(faidx_t)* fai, const(char)* seq);
 
 /// Return number of sequences in fai index
-int faidx_nseq(const(faidx_t)* fai);
+int faidx_nseq (const(faidx_t)* fai);
 
 /// Return name of i-th sequence
-const(char)* faidx_iseq(const(faidx_t)* fai, int i);
+const(char)* faidx_iseq (const(faidx_t)* fai, int i);
 
 /// Return sequence length, -1 if not present
-int faidx_seq_len(const(faidx_t)* fai, const(char)* seq);
+int faidx_seq_len (const(faidx_t)* fai, const(char)* seq);
 
 /// Parses a region string.
 /** @param  fai   Pointer to the faidx_t struct
@@ -299,13 +296,13 @@ int faidx_seq_len(const(faidx_t)* fai, const(char)* seq);
     @param  beg   Returns the start of the region (0 based)
     @param  end   Returns the one past last of the region (0 based)
     @param  flags Parsing method, see HTS_PARSE_* in hts.h.
-    @return      pointer to end of parsed s if successs, NULL if not.
+    @return       Pointer to end of parsed s if successful, NULL if not.
 
     To work around ambiguous parsing issues, eg both "chr1" and "chr1:100-200"
     are reference names, quote using curly braces.
     Thus "{chr1}:100-200" and "{chr1:100-200}" disambiguate the above example.
 */
-const(char)* fai_parse_region(
+const(char)* fai_parse_region (
     const(faidx_t)* fai,
     const(char)* s,
     int* tid,
@@ -317,5 +314,20 @@ const(char)* fai_parse_region(
 /** @param  fai         Pointer to the faidx_t struct
  *  @param  cache_size  Selected cache size in bytes
  */
-void fai_set_cache_size(faidx_t* fai, int cache_size);
+void fai_set_cache_size (faidx_t* fai, int cache_size);
+
+/// Determines the path to the reference index file
+/** @param  fa    String with the path to the reference file
+ *  @return       String with the path to the reference index file, or NULL on failure
+
+    If the reference path has the format reference.fa##idx##index.fa.fai,
+    the index path is taken directly from it as index.fa.fai.
+    If the reference file is local and the index file cannot be found, it
+    will be created alongside the reference file.
+    If the reference file is remote and the index file cannot be found,
+    the method returns NULL.
+
+    The returned string has to be freed by the user at the end of its scope.
+ */
+char* fai_path (const(char)* fa);
 
