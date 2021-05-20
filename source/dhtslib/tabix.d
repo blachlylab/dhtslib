@@ -89,6 +89,9 @@ struct TabixIndexedFile {
         return sequence_names;
     }
 
+    /** region(r)
+     *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
+     */
     auto region(CoordSystem cs)(string chrom, Coordinates!cs coords)
     {
         auto region = ChromCoordinates!cs(chrom, coords);
@@ -175,7 +178,7 @@ struct TabixIndexedFile {
             }
         }
 
-        return Region(this.fp, this.tbx, chrom, newCoords);
+        return Region(this.fp, this.tbx, newRegion);
     }
 
 }
