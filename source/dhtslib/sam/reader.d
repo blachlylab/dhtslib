@@ -833,4 +833,19 @@ debug(dhtslib_unittest) unittest
     assert(bam["CHROMOSOME_I",$].array.length == 0);
     assert(bam[0, $].array.length == 0);
     assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
+
+    assert(bam.query(OBC("CHROMOSOME_I:900-2000")).array.length == 14);
+    assert(bam.query("CHROMOSOME_I", OBHO(901, 2000)) .array.length == 14);
+    assert(bam["CHROMOSOME_I",OB(901) .. OB(2001)].array.length == 14);
+    assert(bam[0, OB(901) .. OB(2001)].array.length == 14);
+
+    assert(bam["CHROMOSOME_I",OB(941)].array.length == 2);
+    assert(bam[0, OB(941)].array.length == 2);
+
+
+    assert(bam["CHROMOSOME_I",OB(901) .. $].array.length == 18);
+    assert(bam[0, OB(901) .. $].array.length == 18);
+    assert(bam["CHROMOSOME_I",$].array.length == 0);
+    assert(bam[0, $].array.length == 0);
+    assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
 }
