@@ -30,13 +30,13 @@ extern (C):
  * \log{\Gamma(z)}
  * AS245, 2nd algorithm, http://lib.stat.cmu.edu/apstat/245
  */
-double kf_lgamma (double z);
+double kf_lgamma(double z);
 
 /* complementary error function
  * \frac{2}{\sqrt{\pi}} \int_x^{\infty} e^{-t^2} dt
  * AS66, 2nd algorithm, http://lib.stat.cmu.edu/apstat/66
  */
-double kf_erfc (double x);
+double kf_erfc(double x);
 
 /* The following computes regularized incomplete gamma functions.
  * Formulas are taken from Wiki, with additional input from Numerical
@@ -51,8 +51,8 @@ double kf_erfc (double x);
  * kf_gammaq(s,z)*tgamma(s).
  */
 
-double kf_gammap (double s, double z);
-double kf_gammaq (double s, double z);
+double kf_gammap(double s, double z);
+double kf_gammaq(double s, double z);
 
 /* Regularized incomplete beta function. The method is taken from
  * Numerical Recipe in C, 2nd edition, section 6.4. The following web
@@ -61,7 +61,7 @@ double kf_gammaq (double s, double z);
  *
  *   http://www.danielsoper.com/statcalc/calc36.aspx
  */
-double kf_betai (double a, double b, double x);
+double kf_betai(double a, double b, double x);
 
 /*
  *    n11  n12  | n1_
@@ -69,7 +69,7 @@ double kf_betai (double a, double b, double x);
  *   -----------+----
  *    n_1  n_2  | n
  */
-double kt_fisher_exact (
+double kt_fisher_exact(
     int n11,
     int n12,
     int n21,

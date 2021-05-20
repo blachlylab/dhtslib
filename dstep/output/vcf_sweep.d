@@ -27,13 +27,13 @@ extern (C):
 
 struct bcf_sweep_t;
 
-bcf_sweep_t* bcf_sweep_init (const(char)* fname);
+bcf_sweep_t* bcf_sweep_init(const(char)* fname);
 
-void bcf_sweep_destroy (bcf_sweep_t* sw);
+void bcf_sweep_destroy(bcf_sweep_t* sw);
 
-bcf_hdr_t* bcf_sweep_hdr (bcf_sweep_t* sw);
+bcf_hdr_t* bcf_sweep_hdr(bcf_sweep_t* sw);
 
-bcf1_t* bcf_sweep_fwd (bcf_sweep_t* sw);
+bcf1_t* bcf_sweep_fwd(bcf_sweep_t* sw);
 
-bcf1_t* bcf_sweep_bwd (bcf_sweep_t* sw);
+bcf1_t* bcf_sweep_bwd(bcf_sweep_t* sw);
 

@@ -106,15 +106,15 @@ extern (D) auto REGITR_END(T)(auto ref T itr)
  *
  *  Return value: 0 on success, -1 to skip a record, -2 on fatal error.
  */
-alias regidx_parse_f = int function (const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end, void* payload, void* usr);
-alias regidx_free_f = void function (void* payload);
+alias regidx_parse_f = int function(const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end, void* payload, void* usr);
+alias regidx_free_f = void function(void* payload);
 
 /*
  *  A note about the parsers:
  *      - leading spaces are ignored
  *      - lines starting with "#" are ignored
  */
-int regidx_parse_bed (
+int regidx_parse_bed(
     const(char)*,
     char**,
     char**,
@@ -122,7 +122,7 @@ int regidx_parse_bed (
     hts_pos_t*,
     void*,
     void*); // CHROM or whitespace-sepatated CHROM,FROM,TO (0-based,right-open)
-int regidx_parse_tab (
+int regidx_parse_tab(
     const(char)*,
     char**,
     char**,
@@ -130,7 +130,7 @@ int regidx_parse_tab (
     hts_pos_t*,
     void*,
     void*); // CHROM or whitespace-separated CHROM,POS (1-based, inclusive)
-int regidx_parse_reg (
+int regidx_parse_reg(
     const(char)*,
     char**,
     char**,
@@ -138,7 +138,7 @@ int regidx_parse_reg (
     hts_pos_t*,
     void*,
     void*); // CHROM, CHROM:POS, CHROM:FROM-TO, CHROM:FROM- (1-based, inclusive)
-int regidx_parse_vcf (
+int regidx_parse_vcf(
     const(char)*,
     char**,
     char**,
@@ -165,13 +165,13 @@ int regidx_parse_vcf (
  *  The regidx_t index struct returned by a successful call should be freed
  *  via regidx_destroy() when it is no longer needed.
  */
-regidx_t* regidx_init (
+regidx_t* regidx_init(
     const(char)* fname,
     regidx_parse_f parsef,
     regidx_free_f freef,
     size_t payload_size,
     void* usr);
-regidx_t* regidx_init_string (
+regidx_t* regidx_init_string(
     const(char)* string,
     regidx_parse_f parsef,
     regidx_free_f freef,
@@ -181,7 +181,7 @@ regidx_t* regidx_init_string (
 /*
  *  regidx_destroy() - free memory allocated by regidx_init
  */
-void regidx_destroy (regidx_t* idx);
+void regidx_destroy(regidx_t* idx);
 
 /*
  *  regidx_overlap() - check overlap of the location chr:from-to with regions
@@ -191,7 +191,7 @@ void regidx_destroy (regidx_t* idx);
  *  Returns 0 if there is no overlap or 1 if overlap is found. The overlapping
  *  regions can be iterated as shown in the example above.
  */
-int regidx_overlap (
+int regidx_overlap(
     regidx_t* idx,
     const(char)* chr,
     hts_pos_t beg,
@@ -205,9 +205,9 @@ int regidx_overlap (
  *
  *  Returns 0 on success or -1 on error.
  */
-int regidx_insert (regidx_t* idx, char* line);
-int regidx_insert_list (regidx_t* idx, char* line, char delim);
-int regidx_push (
+int regidx_insert(regidx_t* idx, char* line);
+int regidx_insert_list(regidx_t* idx, char* line, char delim);
+int regidx_push(
     regidx_t* idx,
     char* chr_beg,
     char* chr_end,
@@ -218,15 +218,15 @@ int regidx_push (
 /*
  *  regidx_seq_names() - return list of all sequence names
  */
-char** regidx_seq_names (regidx_t* idx, int* n);
+char** regidx_seq_names(regidx_t* idx, int* n);
 
 /*
  *  regidx_seq_nregs() - number of regions
  *  regidx_nregs()  - total number of regions
  */
-int regidx_seq_nregs (regidx_t* idx, const(char)* seq);
+int regidx_seq_nregs(regidx_t* idx, const(char)* seq);
 
-int regidx_nregs (regidx_t* idx);
+int regidx_nregs(regidx_t* idx);
 
 /*
  *  regitr_init() - initialize an iterator. The idx parameter is required only
@@ -240,24 +240,24 @@ int regidx_nregs (regidx_t* idx);
  *  regitr_reset() - initialize an iterator for a repeated regitr_loop cycle.
  *                  Not required with regitr_overlap.
  */
-regitr_t* regitr_init (regidx_t* idx);
-void regitr_destroy (regitr_t* itr);
-void regitr_reset (regidx_t* idx, regitr_t* itr);
+regitr_t* regitr_init(regidx_t* idx);
+void regitr_destroy(regitr_t* itr);
+void regitr_reset(regidx_t* idx, regitr_t* itr);
 
 /*
  *  regitr_overlap() - next overlapping region
  *  Returns 0 when done or 1 when itr is set to next region
  */
-int regitr_overlap (regitr_t* itr);
+int regitr_overlap(regitr_t* itr);
 
 /*
  *  regitr_loop() - loop over all regions
  *  Returns 0 when done or 1 when itr is set to next region
  */
-int regitr_loop (regitr_t* itr);
+int regitr_loop(regitr_t* itr);
 
 /*
  *  regitr_copy() - create a copy of an iterator for a repeated iteration with regitr_loop
  */
-void regitr_copy (regitr_t* dst, regitr_t* src);
+void regitr_copy(regitr_t* dst, regitr_t* src);
 

@@ -30,6 +30,7 @@ import core.stdc.stdarg;
 import core.stdc.stdio : EOF;
 import core.stdc.stdlib;
 import core.stdc.string : memcpy, strlen;
+
 import htslib.kroundup;
 
 alias ssize_t = ptrdiff_t;	// should be defined in core.stdc somewhere but is not :/
@@ -66,39 +67,39 @@ struct ks_tokaux_t
     const(char)* p; // end of the current token
 }
 
-int kvsprintf (kstring_t* s, const(char)* fmt, va_list ap);
+int kvsprintf(kstring_t* s, const(char)* fmt, va_list ap);
 
-int ksprintf (kstring_t* s, const(char)* fmt, ...);
+int ksprintf(kstring_t* s, const(char)* fmt, ...);
 
-int kputd (double d, kstring_t* s); // custom %g only handler
+int kputd(double d, kstring_t* s); // custom %g only handler
 
-int ksplit_core (char* s, int delimiter, int* _max, int** _offsets);
+int ksplit_core(char* s, int delimiter, int* _max, int** _offsets);
 
-char* kstrstr (const(char)* str, const(char)* pat, int** _prep);
+char* kstrstr(const(char)* str, const(char)* pat, int** _prep);
 
-char* kstrnstr (const(char)* str, const(char)* pat, int n, int** _prep);
+char* kstrnstr(const(char)* str, const(char)* pat, int n, int** _prep);
 
-void* kmemmem (const(void)* _str, int n, const(void)* _pat, int m, int** _prep);
+void* kmemmem(const(void)* _str, int n, const(void)* _pat, int m, int** _prep);
 
 /* kstrtok() is similar to strtok_r() except that str is not
 	 * modified and both str and sep can be NULL. For efficiency, it is
 	 * actually recommended to set both to NULL in the subsequent calls
 	 * if sep is not changed. */
-char* kstrtok (const(char)* str, const(char)* sep, ks_tokaux_t* aux);
+char* kstrtok(const(char)* str, const(char)* sep, ks_tokaux_t* aux);
 
 /* kgetline() uses the supplied fgets()-like function to read a "\n"-
  * or "\r\n"-terminated line from fp.  The line read is appended to the
  * kstring without its terminator and 0 is returned; EOF is returned at
  * EOF or on error (determined by querying fp, as per fgets()). */
-alias kgets_func = char* function (char*, int, void*);
-int kgetline (kstring_t* s, char* function () fgets_fn, void* fp);
+alias kgets_func = char* function(char*, int, void*);
+int kgetline(kstring_t* s, char* function() fgets_fn, void* fp);
 
 /* kgetline2() uses the supplied hgetln()-like function to read a "\n"-
  * or "\r\n"-terminated line from fp.  The line read is appended to the
  * ksring without its terminator and 0 is returned; EOF is returned at
  * EOF or on error (determined by querying fp, as per fgets()). */
-alias kgets_func2 = c_long function (char*, size_t, void*);
-int kgetline2 (kstring_t* s, ssize_t function () fgets_fn, void* fp);
+alias kgets_func2 = c_long function(char*, size_t, void*);
+int kgetline2(kstring_t* s, ssize_t function() fgets_fn, void* fp);
 
 /// kstring initializer for structure assignment
 
@@ -360,7 +361,7 @@ int kputl(c_long c, kstring_t* s) {
 
 /*
  * Returns 's' split by delimiter, with *n being the number of components;
- *         NULL on failue.
+ *         NULL on failure.
  */
 int* ksplit(kstring_t* s, int delimiter, int* n)
 {

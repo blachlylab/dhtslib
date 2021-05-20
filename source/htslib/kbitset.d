@@ -76,7 +76,7 @@ struct kbitset_t
     c_ulong[1] b;
 }
 
-pragma(inline, true)
+pragma(inline, true):
 /// (For internal use only.) Returns a mask (like 00011111) showing
 /// which bits are in use in the last slot (for the given ni) set.
 c_ulong kbs_last_mask (size_t ni)

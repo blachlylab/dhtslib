@@ -37,7 +37,7 @@ struct kbitset_t;
  *      -1 .. some allele index is out of bounds
  *      -2 .. could not remove alleles
  */
-int bcf_trim_alleles (const(bcf_hdr_t)* header, bcf1_t* line);
+int bcf_trim_alleles(const(bcf_hdr_t)* header, bcf1_t* line);
 
 /**
  *  bcf_remove_alleles() - remove ALT alleles according to bitmask @mask
@@ -49,7 +49,7 @@ int bcf_trim_alleles (const(bcf_hdr_t)* header, bcf1_t* line);
  *  overflow, so use bcf_remove_allele_set instead
  *  Returns 0 on success, <0 on error
  */
-int bcf_remove_alleles (const(bcf_hdr_t)* header, bcf1_t* line, int mask);
+int bcf_remove_alleles(const(bcf_hdr_t)* header, bcf1_t* line, int mask);
 
 /**
  *  bcf_remove_allele_set() - remove ALT alleles according to bitset @rm_set
@@ -62,7 +62,7 @@ int bcf_remove_alleles (const(bcf_hdr_t)* header, bcf1_t* line, int mask);
  *
  *  Number=A,R,G INFO and FORMAT fields will be updated accordingly.
  */
-int bcf_remove_allele_set (
+int bcf_remove_allele_set(
     const(bcf_hdr_t)* header,
     bcf1_t* line,
     const(kbitset_t)* rm_set);
@@ -80,7 +80,7 @@ int bcf_remove_allele_set (
  *  The value of @which determines if existing INFO/AC,AN can be
  *  used (BCF_UN_INFO) and and if indv fields can be split (BCF_UN_FMT).
  */
-int bcf_calc_ac (const(bcf_hdr_t)* header, bcf1_t* line, int* ac, int which);
+int bcf_calc_ac(const(bcf_hdr_t)* header, bcf1_t* line, int* ac, int which);
 
 /**
  * bcf_gt_type() - determines type of the genotype
@@ -104,9 +104,9 @@ enum GT_HET_AA = 3;
 enum GT_HAPL_R = 4;
 enum GT_HAPL_A = 5;
 enum GT_UNKN = 6;
-int bcf_gt_type (bcf_fmt_t* fmt_ptr, int isample, int* ial, int* jal);
+int bcf_gt_type(bcf_fmt_t* fmt_ptr, int isample, int* ial, int* jal);
 
-int bcf_acgt2int (char c);
+int bcf_acgt2int(char c);
 
 extern (D) auto bcf_int2acgt(T)(auto ref T i)
 {

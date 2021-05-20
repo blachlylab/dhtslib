@@ -28,11 +28,12 @@ module htslib.sam;
 
 import core.stdc.stddef;
 import core.stdc.stdlib;
-import htslib.bgzf: BGZF;
-import htslib.kstring: kstring_t, ssize_t;
+import std.format: format;
+
 import htslib.hts;
 import htslib.hts_log;
-import std.format: format;
+import htslib.bgzf : BGZF;
+import htslib.kstring : kstring_t, ssize_t;
 
 extern (C):
 
@@ -399,7 +400,7 @@ extern (D) auto bam_seqi(T0, T1)(auto ref T0 s, auto ref T1 i)
  * The sam_hdr_t struct returned by a successful call should be freed
  * via sam_hdr_destroy() when it is no longer needed.
  */
-sam_hdr_t* sam_hdr_init ();
+sam_hdr_t* sam_hdr_init();
 
 /// Read the header from a BAM compressed file.
 /*!
@@ -412,7 +413,7 @@ sam_hdr_t* sam_hdr_init ();
  * The sam_hdr_t struct returned by a successful call should be freed
  * via sam_hdr_destroy() when it is no longer needed.
  */
-sam_hdr_t* bam_hdr_read (BGZF* fp);
+sam_hdr_t* bam_hdr_read(BGZF* fp);
 
 /// Writes the header to a BAM file.
 /*!
@@ -423,12 +424,12 @@ sam_hdr_t* bam_hdr_read (BGZF* fp);
  * This function only works with BAM files.  Use sam_hdr_write() to
  * write in any of the SAM, BAM or CRAM formats.
  */
-int bam_hdr_write (BGZF* fp, const(sam_hdr_t)* h);
+int bam_hdr_write(BGZF* fp, const(sam_hdr_t)* h);
 
 /*!
  * Frees the resources associated with a header.
  */
-void sam_hdr_destroy (sam_hdr_t* h);
+void sam_hdr_destroy(sam_hdr_t* h);
 
 /// Duplicate a header structure.
 /*!
@@ -437,7 +438,7 @@ void sam_hdr_destroy (sam_hdr_t* h);
  * The sam_hdr_t struct returned by a successful call should be freed
  * via sam_hdr_destroy() when it is no longer needed.
  */
-sam_hdr_t* sam_hdr_dup (const(sam_hdr_t)* h0);
+sam_hdr_t* sam_hdr_dup(const(sam_hdr_t)* h0);
 
 /*!
  * @abstract Old names for compatibility with existing code.
@@ -464,7 +465,7 @@ alias samFile = htsFile;
  * The sam_hdr_t struct returned by a successful call should be freed
  * via sam_hdr_destroy() when it is no longer needed.
  */
-sam_hdr_t* sam_hdr_parse (size_t l_text, const(char)* text);
+sam_hdr_t* sam_hdr_parse(size_t l_text, const(char)* text);
 
 /// Read a header from a SAM, BAM or CRAM file.
 /*!
@@ -474,7 +475,7 @@ sam_hdr_t* sam_hdr_parse (size_t l_text, const(char)* text);
  * The sam_hdr_t struct returned by a successful call should be freed
  * via sam_hdr_destroy() when it is no longer needed.
  */
-sam_hdr_t* sam_hdr_read (samFile* fp);
+sam_hdr_t* sam_hdr_read(samFile* fp);
 
 /// Write a header to a SAM, BAM or CRAM file.
 /*!
@@ -482,13 +483,13 @@ sam_hdr_t* sam_hdr_read (samFile* fp);
  * @param h     Header structure to write
  * @return  0 on success; -1 on failure
  */
-int sam_hdr_write (samFile* fp, const(sam_hdr_t)* h);
+int sam_hdr_write(samFile* fp, const(sam_hdr_t)* h);
 
 /// Returns the current length of the header text.
 /*!
  * @return  >= 0 on success, SIZE_MAX on failure
  */
-size_t sam_hdr_length (sam_hdr_t* h);
+size_t sam_hdr_length(sam_hdr_t* h);
 
 /// Returns the text representation of the header.
 /*!
@@ -500,13 +501,13 @@ size_t sam_hdr_length (sam_hdr_t* h);
  *
  * The caller should not attempt to free or realloc this pointer.
  */
-const(char)* sam_hdr_str (sam_hdr_t* h);
+const(char)* sam_hdr_str(sam_hdr_t* h);
 
 /// Returns the number of references in the header.
 /*!
  * @return  >= 0 on success, -1 on failure
  */
-int sam_hdr_nref (const(sam_hdr_t)* h);
+int sam_hdr_nref(const(sam_hdr_t)* h);
 
 /* ==== Line level methods ==== */
 
@@ -523,7 +524,7 @@ int sam_hdr_nref (const(sam_hdr_t)* h);
  * The lines will be appended to the end of the existing header
  * (apart from HD, which always comes first).
  */
-int sam_hdr_add_lines (sam_hdr_t* h, const(char)* lines, size_t len);
+int sam_hdr_add_lines(sam_hdr_t* h, const(char)* lines, size_t len);
 
 /// Adds a single line to an existing header.
 /*!
@@ -538,7 +539,7 @@ int sam_hdr_add_lines (sam_hdr_t* h, const(char)* lines, size_t len);
  * given type currently exist.  The exception is HD lines, which always
  * come first.  If an HD line already exists, it will be replaced.
  */
-int sam_hdr_add_line (sam_hdr_t* h, const(char)* type, ...);
+int sam_hdr_add_line(sam_hdr_t* h, const(char)* type, ...);
 
 /// Returns a complete line of formatted text for a given type and ID.
 /*!
@@ -556,7 +557,7 @@ int sam_hdr_add_line (sam_hdr_t* h, const(char)* type, ...);
  *
  * Any existing content in @p ks will be overwritten.
  */
-int sam_hdr_find_line_id (
+int sam_hdr_find_line_id(
     sam_hdr_t* h,
     const(char)* type,
     const(char)* ID_key,
@@ -577,7 +578,7 @@ int sam_hdr_find_line_id (
  *
  * Any existing content in @p ks will be overwritten.
  */
-int sam_hdr_find_line_pos (
+int sam_hdr_find_line_pos(
     sam_hdr_t* h,
     const(char)* type,
     int pos,
@@ -604,7 +605,7 @@ int sam_hdr_find_line_pos (
  *
  * @note Removing \@PG lines is currently unsupported.
  */
-int sam_hdr_remove_line_id (
+int sam_hdr_remove_line_id(
     sam_hdr_t* h,
     const(char)* type,
     const(char)* ID_key,
@@ -619,7 +620,7 @@ int sam_hdr_remove_line_id (
  * Remove a line from the header by specifying the position in the type
  * group, i.e. 3rd @SQ line.
  */
-int sam_hdr_remove_line_pos (sam_hdr_t* h, const(char)* type, int position);
+int sam_hdr_remove_line_pos(sam_hdr_t* h, const(char)* type, int position);
 
 /// Add or update tag key,value pairs in a header line.
 /*!
@@ -645,7 +646,7 @@ int sam_hdr_remove_line_pos (sam_hdr_t* h, const(char)* type, int position);
  *
  * Attempting to change an @PG ID tag is not permitted.
  */
-int sam_hdr_update_line (
+int sam_hdr_update_line(
     sam_hdr_t* h,
     const(char)* type,
     const(char)* ID_key,
@@ -665,7 +666,7 @@ int sam_hdr_update_line (
  * If no line matches the key:value ID, all lines of the given type are removed.
  * To remove all lines of a given type, use NULL for both ID_key and ID_value.
  */
-int sam_hdr_remove_except (
+int sam_hdr_remove_except(
     sam_hdr_t* h,
     const(char)* type,
     const(char)* ID_key,
@@ -708,7 +709,7 @@ int sam_hdr_remove_except (
  * @endcode
  *
  */
-int sam_hdr_remove_lines (
+int sam_hdr_remove_lines(
     sam_hdr_t* h,
     const(char)* type,
     const(char)* id,
@@ -720,7 +721,7 @@ int sam_hdr_remove_lines (
  * @param type  Header type to count. Eg. "RG"
  * @return  Number of lines of this type on success; -1 on failure
  */
-int sam_hdr_count_lines (sam_hdr_t* h, const(char)* type);
+int sam_hdr_count_lines(sam_hdr_t* h, const(char)* type);
 
 /// Index of the line for the types that have dedicated look-up tables (SQ, RG, PG)
 /*!
@@ -729,7 +730,7 @@ int sam_hdr_count_lines (sam_hdr_t* h, const(char)* type);
  * @param key   The value of the identifying key. Eg. "rg1"
  * @return  0-based index on success; -1 if line does not exist; -2 on failure
  */
-int sam_hdr_line_index (sam_hdr_t* bh, const(char)* type, const(char)* key);
+int sam_hdr_line_index(sam_hdr_t* bh, const(char)* type, const(char)* key);
 
 /// Id key of the line for the types that have dedicated look-up tables (SQ, RG, PG)
 /*!
@@ -738,7 +739,7 @@ int sam_hdr_line_index (sam_hdr_t* bh, const(char)* type, const(char)* key);
  * @param pos   Zero-based index inside the type group. Eg. 2 (for the third RG line)
  * @return  Valid key string on success; NULL on failure
  */
-const(char)* sam_hdr_line_name (sam_hdr_t* bh, const(char)* type, int pos);
+const(char)* sam_hdr_line_name(sam_hdr_t* bh, const(char)* type, int pos);
 
 /* ==== Key:val level methods ==== */
 
@@ -758,7 +759,7 @@ const(char)* sam_hdr_line_name (sam_hdr_t* bh, const(char)* type, int pos);
  * and ID_value parameters.  Any pre-existing content in @p ks will be
  * overwritten.
  */
-int sam_hdr_find_tag_id (
+int sam_hdr_find_tag_id(
     sam_hdr_t* h,
     const(char)* type,
     const(char)* ID_key,
@@ -781,7 +782,7 @@ int sam_hdr_find_tag_id (
  * and @p position parameters.  Any pre-existing content in @p ks will be
  * overwritten.
  */
-int sam_hdr_find_tag_pos (
+int sam_hdr_find_tag_pos(
     sam_hdr_t* h,
     const(char)* type,
     int pos,
@@ -796,7 +797,7 @@ int sam_hdr_find_tag_pos (
  * @param key       Key of the targeted tag. Eg. "M5"
  * @return          1 if the key was removed; 0 if it was not present; -1 on error
  */
-int sam_hdr_remove_tag_id (
+int sam_hdr_remove_tag_id(
     sam_hdr_t* h,
     const(char)* type,
     const(char)* ID_key,
@@ -813,7 +814,7 @@ int sam_hdr_remove_tag_id (
  * Looks up a reference sequence by name in the reference hash table
  * and returns the numerical target id.
  */
-int sam_hdr_name2tid (sam_hdr_t* h, const(char)* ref_);
+int sam_hdr_name2tid(sam_hdr_t* h, const(char)* ref_);
 
 /// Get the reference sequence name from a target index
 /*!
@@ -823,7 +824,7 @@ int sam_hdr_name2tid (sam_hdr_t* h, const(char)* ref_);
  * Fetch the reference sequence name from the target name array,
  * using the numerical target id.
  */
-const(char)* sam_hdr_tid2name (const(sam_hdr_t)* h, int tid);
+const(char)* sam_hdr_tid2name(const(sam_hdr_t)* h, int tid);
 
 /// Get the reference sequence length from a target index
 /*!
@@ -833,7 +834,7 @@ const(char)* sam_hdr_tid2name (const(sam_hdr_t)* h, int tid);
  * Fetch the reference sequence length from the target length array,
  * using the numerical target id.
  */
-hts_pos_t sam_hdr_tid2len (const(sam_hdr_t)* h, int tid);
+hts_pos_t sam_hdr_tid2len(const(sam_hdr_t)* h, int tid);
 
 /// Alias of sam_hdr_name2tid(), for backwards compatibility.
 /*!
@@ -854,7 +855,7 @@ int bam_name2id(sam_hdr_t* h, const(char)* ref_) { return sam_hdr_name2tid(h, re
  * valid until the next call to this function, or the header is destroyed.
  * The caller should not attempt to free() or realloc() it.
  */
-const(char)* sam_hdr_pg_id (sam_hdr_t* h, const(char)* name);
+const(char)* sam_hdr_pg_id(sam_hdr_t* h, const(char)* name);
 
 /// Add an \@PG line.
 /*!
@@ -871,7 +872,7 @@ const(char)* sam_hdr_pg_id (sam_hdr_t* h, const(char)* name);
  * Call it as per sam_hdr_add_line() with a series of key,value pairs ending
  * in NULL.
  */
-int sam_hdr_add_pg (sam_hdr_t* h, const(char)* name, ...);
+int sam_hdr_add_pg(sam_hdr_t* h, const(char)* name, ...);
 
 /*!
  * A function to help with construction of CL tags in @PG records.
@@ -882,14 +883,14 @@ int sam_hdr_add_pg (sam_hdr_t* h, const(char)* name, ...);
  * Returns malloced char * on success;
  *         NULL on failure
  */
-char* stringify_argv (int argc, char** argv);
+char* stringify_argv(int argc, char** argv);
 
 /// Increments the reference count on a header
 /*!
  * This permits multiple files to share the same header, all calling
  * sam_hdr_destroy when done, without causing errors for other open files.
  */
-void sam_hdr_incr_ref (sam_hdr_t* h);
+void sam_hdr_incr_ref(sam_hdr_t* h);
 
 /*
  * Macros for changing the \@HD line. They eliminate the need to use NULL method arguments.
@@ -930,7 +931,7 @@ extern (D) auto sam_hdr_remove_tag_hd(T0, T1)(auto ref T0 h, auto ref T1 key)
    The bam1_t struct returned by a successful call should be freed
    via bam_destroy1() when it is no longer needed.
  */
-bam1_t* bam_init1 ();
+bam1_t* bam_init1();
 
 /// Destroy a bam1_t structure
 /**
@@ -940,7 +941,7 @@ bam1_t* bam_init1 ();
    will be freed, along with the structure itself.  @p b should not be
    accessed after calling this function.
  */
-void bam_destroy1 (bam1_t* b);
+void bam_destroy1(bam1_t* b);
 
 enum BAM_USER_OWNS_STRUCT = 1;
 enum BAM_USER_OWNS_DATA = 2;
@@ -1029,6 +1030,7 @@ enum BAM_USER_OWNS_DATA = 2;
 
    \endcode
 */
+pragma(inline,true)
 void bam_set_mempolicy(bam1_t* b, uint policy) {
     b.mempolicy = policy;
 }
@@ -1038,6 +1040,7 @@ void bam_set_mempolicy(bam1_t* b, uint policy) {
 
     See bam_set_mempolicy()
  */
+pragma(inline,true)
 uint bam_get_mempolicy(bam1_t* b) {
     return b.mempolicy;
 }
@@ -1053,7 +1056,7 @@ uint bam_get_mempolicy(bam1_t* b) {
    This function can only read BAM format files.  Most code should use
    sam_read1() instead, which can be used with BAM, SAM and CRAM formats.
 */
-int bam_read1 (BGZF* fp, bam1_t* b);
+int bam_read1(BGZF* fp, bam1_t* b);
 
 /// Write a BAM format alignment record
 /**
@@ -1065,7 +1068,7 @@ int bam_read1 (BGZF* fp, bam1_t* b);
    This function can only write BAM format files.  Most code should use
    sam_write1() instead, which can be used with BAM, SAM and CRAM formats.
 */
-int bam_write1 (BGZF* fp, const(bam1_t)* b);
+int bam_write1(BGZF* fp, const(bam1_t)* b);
 
 /// Copy alignment record data
 /**
@@ -1073,7 +1076,7 @@ int bam_write1 (BGZF* fp, const(bam1_t)* b);
    @param bsrc  Source alignment record
    @return bdst on success; NULL on failure
  */
-bam1_t* bam_copy1 (bam1_t* bdst, const(bam1_t)* bsrc);
+bam1_t* bam_copy1(bam1_t* bdst, const(bam1_t)* bsrc);
 
 /// Create a duplicate alignment record
 /**
@@ -1083,7 +1086,7 @@ bam1_t* bam_copy1 (bam1_t* bdst, const(bam1_t)* bsrc);
    The bam1_t struct returned by a successful call should be freed
    via bam_destroy1() when it is no longer needed.
  */
-bam1_t* bam_dup1 (const(bam1_t)* bsrc);
+bam1_t* bam_dup1(const(bam1_t)* bsrc);
 
 /// Sets all components of an alignment structure
 /**
@@ -1107,7 +1110,7 @@ bam1_t* bam_dup1 (const(bam1_t)* bsrc);
 
    @return >= 0 on success (number of bytes written to bam->data), negative (with errno set) on failure.
 */
-int bam_set1 (
+int bam_set1(
     bam1_t* bam,
     size_t l_qname,
     const(char)* qname,
@@ -1145,7 +1148,7 @@ int bam_set1 (
    of bam1_core_t::l_qseq and bam1_t::data) limit the maximum query sequence
    length supported by HTSlib to fewer than INT_MAX bases.
  */
-hts_pos_t bam_cigar2qlen (int n_cigar, const(uint)* cigar);
+hts_pos_t bam_cigar2qlen(int n_cigar, const(uint)* cigar);
 
 /// Calculate reference length from CIGAR data
 /**
@@ -1161,7 +1164,7 @@ hts_pos_t bam_cigar2qlen (int n_cigar, const(uint)* cigar);
    operations in @p cigar (these are the operations that "consume" reference
    bases).  All other operations (including invalid ones) are ignored.
  */
-hts_pos_t bam_cigar2rlen (int n_cigar, const(uint)* cigar);
+hts_pos_t bam_cigar2rlen(int n_cigar, const(uint)* cigar);
 
 /*!
       @abstract Calculate the rightmost base position of an alignment on the
@@ -1175,18 +1178,18 @@ hts_pos_t bam_cigar2rlen (int n_cigar, const(uint)* cigar);
       string) or a read whose cigar string consumes no reference bases at all,
       we return b->core.pos + 1 by convention.
  */
-hts_pos_t bam_endpos (const(bam1_t)* b);
+hts_pos_t bam_endpos(const(bam1_t)* b);
 
-int bam_str2flag (const(char)* str); /** returns negative value on error */
+int bam_str2flag(const(char)* str); /** returns negative value on error */
 
-char* bam_flag2str (int flag); /** The string must be freed by the user */
+char* bam_flag2str(int flag); /** The string must be freed by the user */
 
 /*! @function
  @abstract  Set the name of the query
  @param  b  pointer to an alignment
  @return    0 on success, -1 on failure
  */
-int bam_set_qname (bam1_t* b, const(char)* qname);
+int bam_set_qname(bam1_t* b, const(char)* qname);
 
 /*! @function
  @abstract  Parse a CIGAR string into a uint32_t array
@@ -1197,7 +1200,7 @@ int bam_set_qname (bam1_t* b, const(char)* qname);
  @param  a_mem   [in/out]  address of the allocated number of buffer elements
  @return         number of processed CIGAR operators; -1 on error
  */
-ssize_t sam_parse_cigar (
+ssize_t sam_parse_cigar(
     const(char)* in_,
     char** end,
     uint** a_cigar,
@@ -1211,7 +1214,7 @@ ssize_t sam_parse_cigar (
  @param  b       [in/out]  address of the destination bam1_t struct
  @return         number of processed CIGAR operators; -1 on error
  */
-ssize_t bam_parse_cigar (const(char)* in_, char** end, bam1_t* b);
+ssize_t bam_parse_cigar(const(char)* in_, char** end, bam1_t* b);
 
 /*************************
  *** BAM/CRAM indexing ***
@@ -1231,13 +1234,11 @@ extern (D) auto bam_itr_next(T0, T1, T2)(auto ref T0 htsfp, auto ref T1 itr, aut
 
 // Load/build .csi or .bai BAM index file.  Does not work with CRAM.
 // It is recommended to use the sam_index_* functions below instead.
-pragma(inline, true)
 extern (D) auto bam_index_load(T)(auto ref T fn)
 {
     return hts_idx_load(fn, HTS_FMT_BAI);
 }
 
-pragma(inline, true)
 extern (D) auto bam_index_build(T0, T1)(auto ref T0 fn, auto ref T1 min_shift)
 {
     return sam_index_build(fn, min_shift);
@@ -1254,13 +1255,13 @@ extern (D) auto bam_index_build(T0, T1)(auto ref T0 fn, auto ref T1 min_shift)
     @note This must be called after the header has been written, but before
           any other data.
 */
-int sam_idx_init (htsFile* fp, sam_hdr_t* h, int min_shift, const(char)* fnidx);
+int sam_idx_init(htsFile* fp, sam_hdr_t* h, int min_shift, const(char)* fnidx);
 
 /// Writes the index initialised with sam_idx_init to disk.
 /** @param fp        File handle for the data file being written.
     @return          0 on success, <0 on filaure.
 */
-int sam_idx_save (htsFile* fp);
+int sam_idx_save(htsFile* fp);
 
 /// Load a BAM (.csi or .bai) or CRAM (.crai) index file
 /** @param fp  File handle of the data file whose index is being opened
@@ -1269,7 +1270,7 @@ int sam_idx_save (htsFile* fp);
 
 Equivalent to sam_index_load3(fp, fn, NULL, HTS_IDX_SAVE_REMOTE);
 */
-hts_idx_t* sam_index_load (htsFile* fp, const(char)* fn);
+hts_idx_t* sam_index_load(htsFile* fp, const(char)* fn);
 
 /// Load a specific BAM (.csi or .bai) or CRAM (.crai) index file
 /** @param fp     File handle of the data file whose index is being opened
@@ -1279,7 +1280,7 @@ hts_idx_t* sam_index_load (htsFile* fp, const(char)* fn);
 
 Equivalent to sam_index_load3(fp, fn, fnidx, HTS_IDX_SAVE_REMOTE);
 */
-hts_idx_t* sam_index_load2 (htsFile* fp, const(char)* fn, const(char)* fnidx);
+hts_idx_t* sam_index_load2(htsFile* fp, const(char)* fn, const(char)* fnidx);
 
 /// Load or stream a BAM (.csi or .bai) or CRAM (.crai) index file
 /** @param fp     File handle of the data file whose index is being opened
@@ -1299,7 +1300,7 @@ are always downloaded and never cached locally.
 The index struct returned by a successful call should be freed
 via hts_idx_destroy() when it is no longer needed.
 */
-hts_idx_t* sam_index_load3 (
+hts_idx_t* sam_index_load3(
     htsFile* fp,
     const(char)* fn,
     const(char)* fnidx,
@@ -1312,7 +1313,7 @@ hts_idx_t* sam_index_load3 (
              -2: opening fn failed; -3: format not indexable; -4:
              failed to create and/or save the index)
 */
-int sam_index_build (const(char)* fn, int min_shift);
+int sam_index_build(const(char)* fn, int min_shift);
 
 /// Generate and save an index to a specific file
 /** @param fn        Input BAM/CRAM/etc filename
@@ -1321,7 +1322,7 @@ int sam_index_build (const(char)* fn, int min_shift);
     @return  0 if successful, or negative if an error occurred (see
              sam_index_build for error codes)
 */
-int sam_index_build2 (const(char)* fn, const(char)* fnidx, int min_shift);
+int sam_index_build2(const(char)* fn, const(char)* fnidx, int min_shift);
 
 /// Generate and save an index to a specific file
 /** @param fn        Input BAM/CRAM/etc filename
@@ -1331,7 +1332,7 @@ int sam_index_build2 (const(char)* fn, const(char)* fnidx, int min_shift);
     @return  0 if successful, or negative if an error occurred (see
              sam_index_build for error codes)
 */
-int sam_index_build3 (
+int sam_index_build3(
     const(char)* fn,
     const(char)* fnidx,
     int min_shift,
@@ -1358,7 +1359,7 @@ When using one of these values, @p beg and @p end are ignored.
 
 When using HTS_IDX_REST or HTS_IDX_NONE, NULL can be passed in to @p idx.
  */
-hts_itr_t* sam_itr_queryi (
+hts_itr_t* sam_itr_queryi(
     const(hts_idx_t)* idx,
     int tid,
     hts_pos_t beg,
@@ -1386,7 +1387,7 @@ The form `REF:` should be used when the reference name itself contains a colon.
 
 Note that SAM files must be bgzf-compressed for iterators to work.
  */
-hts_itr_t* sam_itr_querys (
+hts_itr_t* sam_itr_querys(
     const(hts_idx_t)* idx,
     sam_hdr_t* hdr,
     const(char)* region);
@@ -1405,7 +1406,7 @@ in.
 The iterator will return all reads overlapping the given regions.  If a read
 overlaps more than one region, it will only be returned once.
  */
-hts_itr_t* sam_itr_regions (
+hts_itr_t* sam_itr_regions(
     const(hts_idx_t)* idx,
     sam_hdr_t* hdr,
     hts_reglist_t* reglist,
@@ -1435,7 +1436,7 @@ The form `REF:` should be used when the reference name itself contains a colon.
 The iterator will return all reads overlapping the given regions.  If a read
 overlaps more than one region, it will only be returned once.
  */
-hts_itr_t* sam_itr_regarray (
+hts_itr_t* sam_itr_regarray(
     const(hts_idx_t)* idx,
     sam_hdr_t* hdr,
     char** regarray,
@@ -1447,6 +1448,7 @@ hts_itr_t* sam_itr_regarray (
     @param r           Pointer to a bam1_t struct
     @return >= 0 on success; -1 when there is no more data; < -1 on error
  */
+pragma(inline,true)
 int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r) {
     if (!htsfp.is_bgzf && !htsfp.is_cram) {
         hts_log_error(__FUNCTION__, format("%s not BGZF compressed", htsfp.fn ? htsfp.fn : "File"));
@@ -1471,7 +1473,7 @@ int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r) {
  */
 alias sam_itr_multi_next = sam_itr_next;
 
-const(char)* sam_parse_region (
+const(char)* sam_parse_region(
     sam_hdr_t* h,
     const(char)* s,
     int* tid,
@@ -1488,20 +1490,20 @@ alias sam_open_format = hts_open_format;
 
 alias sam_close = hts_close;
 
-int sam_open_mode (char* mode, const(char)* fn, const(char)* format);
+int sam_open_mode(char* mode, const(char)* fn, const(char)* format);
 
 // A version of sam_open_mode that can handle ,key=value options.
 // The format string is allocated and returned, to be freed by the caller.
 // Prefix should be "r" or "w",
-char* sam_open_mode_opts (
+char* sam_open_mode_opts(
     const(char)* fn,
     const(char)* mode,
     const(char)* format);
 
-int sam_hdr_change_HD (sam_hdr_t* h, const(char)* key, const(char)* val);
+int sam_hdr_change_HD(sam_hdr_t* h, const(char)* key, const(char)* val);
 
-int sam_parse1 (kstring_t* s, sam_hdr_t* h, bam1_t* b);
-int sam_format1 (const(sam_hdr_t)* h, const(bam1_t)* b, kstring_t* str);
+int sam_parse1(kstring_t* s, sam_hdr_t* h, bam1_t* b);
+int sam_format1(const(sam_hdr_t)* h, const(bam1_t)* b, kstring_t* str);
 
 /// sam_read1 - Read a record from a file
 /** @param fp   Pointer to the source file
@@ -1509,14 +1511,14 @@ int sam_format1 (const(sam_hdr_t)* h, const(bam1_t)* b, kstring_t* str);
  *  @param b    Pointer to the record placeholder
  *  @return >= 0 on successfully reading a new record, -1 on end of stream, < -1 on error
  */
-int sam_read1 (samFile* fp, sam_hdr_t* h, bam1_t* b);
+int sam_read1(samFile* fp, sam_hdr_t* h, bam1_t* b);
 /// sam_write1 - Write a record to a file
 /** @param fp    Pointer to the destination file
  *  @param h     Pointer to the header structure previously read
  *  @param b     Pointer to the record to be written
  *  @return >= 0 on successfully writing the record, -1 on error
  */
-int sam_write1 (samFile* fp, const(sam_hdr_t)* h, const(bam1_t)* b);
+int sam_write1(samFile* fp, const(sam_hdr_t)* h, const(bam1_t)* b);
 
 // Forward declaration, see hts_expr.h for full.
 struct hts_filter_t;
@@ -1527,7 +1529,7 @@ struct hts_filter_t;
  *  @param filt   Pointer to the filter, created from hts_filter_init.
  *  @return       1 if passes, 0 if not, and <0 on error.
  */
-int sam_passes_filter (
+int sam_passes_filter(
     const(sam_hdr_t)* h,
     const(bam1_t)* b,
     hts_filter_t* filt);
@@ -1570,7 +1572,7 @@ int sam_passes_filter (
 // write the type
 
 // Unknown type
-const(ubyte)* sam_format_aux1 (
+const(ubyte)* sam_format_aux1(
     const(ubyte)* key,
     const ubyte type,
     const(ubyte)* tag,
@@ -1586,7 +1588,7 @@ const(ubyte)* sam_format_aux1 (
     invalid type, or the last record is incomplete) then errno is set to
     EINVAL and NULL is returned.
  */
-ubyte* bam_aux_get (const(bam1_t)* b, ref const(char)[2] tag);
+ubyte* bam_aux_get(const(bam1_t)* b, ref const(char)[2] tag);
 
 /// Return a SAM formatting string containing a BAM tag
 /** @param b   Pointer to the bam record
@@ -1597,7 +1599,7 @@ ubyte* bam_aux_get (const(bam1_t)* b, ref const(char)[2] tag);
             0 on no tag found with errno = ENOENT,
            -1 on error (errno will be either EINVAL or ENOMEM).
  */
-int bam_aux_get_str (const(bam1_t)* b, ref const(char)[2] tag, kstring_t* s);
+int bam_aux_get_str(const(bam1_t)* b, ref const(char)[2] tag, kstring_t* s);
 
 /// Get an integer aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get()
@@ -1605,7 +1607,7 @@ int bam_aux_get_str (const(bam1_t)* b, ref const(char)[2] tag, kstring_t* s);
     If the tag is not an integer type, errno is set to EINVAL.  This function
     will not return the value of floating-point tags.
 */
-long bam_aux2i (const(ubyte)* s);
+long bam_aux2i(const(ubyte)* s);
 
 /// Get an integer aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get()
@@ -1613,28 +1615,28 @@ long bam_aux2i (const(ubyte)* s);
     If the tag is not an numeric type, errno is set to EINVAL.  The value of
     integer flags will be returned cast to a double.
 */
-double bam_aux2f (const(ubyte)* s);
+double bam_aux2f(const(ubyte)* s);
 
 /// Get a character aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get().
     @return The value, or 0 if the tag was not a character ('A') type
     If the tag is not a character type, errno is set to EINVAL.
 */
-char bam_aux2A (const(ubyte)* s);
+char bam_aux2A(const(ubyte)* s);
 
 /// Get a string aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get().
     @return Pointer to the string, or NULL if the tag was not a string type
     If the tag is not a string type ('Z' or 'H'), errno is set to EINVAL.
 */
-char* bam_aux2Z (const(ubyte)* s);
+char* bam_aux2Z(const(ubyte)* s);
 
 /// Get the length of an array-type ('B') tag
 /** @param s Pointer to the tag data, as returned by bam_aux_get().
     @return The length of the array, or 0 if the tag is not an array type.
     If the tag is not an array type, errno is set to EINVAL.
  */
-uint bam_auxB_len (const(ubyte)* s);
+uint bam_auxB_len(const(ubyte)* s);
 
 /// Get an integer value from an array-type tag
 /** @param s   Pointer to the tag data, as returned by bam_aux_get().
@@ -1644,7 +1646,7 @@ uint bam_auxB_len (const(ubyte)* s);
     is greater than or equal to  the value returned by bam_auxB_len(s),
     errno is set to ERANGE.  In both cases, 0 will be returned.
  */
-long bam_auxB2i (const(ubyte)* s, uint idx);
+long bam_auxB2i(const(ubyte)* s, uint idx);
 
 /// Get a floating-point value from an array-type tag
 /** @param s   Pointer to the tag data, as returned by bam_aux_get().
@@ -1655,7 +1657,7 @@ long bam_auxB2i (const(ubyte)* s, uint idx);
     idx is greater than or equal to  the value returned by bam_auxB_len(s),
     errno is set to ERANGE.  In both cases, 0.0 will be returned.
  */
-double bam_auxB2f (const(ubyte)* s, uint idx);
+double bam_auxB2f(const(ubyte)* s, uint idx);
 
 /// Append tag data to a bam record
 /* @param b    The bam record to append to.
@@ -1668,7 +1670,7 @@ If there is not enough space to store the additional tag, errno is set to
 ENOMEM.  If the type is invalid, errno may be set to EINVAL.  errno is
 also set to EINVAL if the bam record's aux data is corrupt.
 */
-int bam_aux_append (
+int bam_aux_append(
     bam1_t* b,
     ref const(char)[2] tag,
     char type,
@@ -1682,7 +1684,7 @@ int bam_aux_append (
    If the bam record's aux data is corrupt, errno is set to EINVAL and this
    function returns -1;
 */
-int bam_aux_del (bam1_t* b, ubyte* s);
+int bam_aux_del(bam1_t* b, ubyte* s);
 
 /// Update or add a string-type tag
 /* @param b    The bam record to update
@@ -1711,7 +1713,7 @@ int bam_aux_del (bam1_t* b, ubyte* s);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_str (
+int bam_aux_update_str(
     bam1_t* b,
     ref const(char)[2] tag,
     int len,
@@ -1738,7 +1740,7 @@ int bam_aux_update_str (
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_int (bam1_t* b, ref const(char)[2] tag, long val);
+int bam_aux_update_int(bam1_t* b, ref const(char)[2] tag, long val);
 
 /// Update or add a floating-point tag
 /* @param b    The bam record to update
@@ -1757,7 +1759,7 @@ int bam_aux_update_int (bam1_t* b, ref const(char)[2] tag, long val);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_float (bam1_t* b, ref const(char)[2] tag, float val);
+int bam_aux_update_float(bam1_t* b, ref const(char)[2] tag, float val);
 
 /// Update or add an array tag
 /* @param b     The bam record to update
@@ -1795,7 +1797,7 @@ int bam_aux_update_float (bam1_t* b, ref const(char)[2] tag, float val);
    reallocate the data buffer failed or the resulting buffer would be
    longer than the maximum size allowed in a bam record (2Gbytes).
 */
-int bam_aux_update_array (
+int bam_aux_update_array(
     bam1_t* b,
     ref const(char)[2] tag,
     ubyte type,
@@ -1863,7 +1865,7 @@ struct bam_pileup1_t
     int cigar_ind;
 }
 
-alias bam_plp_auto_f = int function (void* data, bam1_t* b);
+alias bam_plp_auto_f = int function(void* data, bam1_t* b);
 
 struct bam_plp_s;
 alias bam_plp_t = bam_plp_s*;
@@ -1880,39 +1882,39 @@ alias bam_mplp_t = bam_mplp_s*;
  *  The struct returned by a successful call should be freed
  *  via bam_plp_destroy() when it is no longer needed.
  */
-bam_plp_t bam_plp_init (bam_plp_auto_f func, void* data);
+bam_plp_t bam_plp_init(bam_plp_auto_f func, void* data);
 
-void bam_plp_destroy (bam_plp_t iter);
+void bam_plp_destroy(bam_plp_t iter);
 
-int bam_plp_push (bam_plp_t iter, const(bam1_t)* b);
+int bam_plp_push(bam_plp_t iter, const(bam1_t)* b);
 
-const(bam_pileup1_t)* bam_plp_next (
+const(bam_pileup1_t)* bam_plp_next(
     bam_plp_t iter,
     int* _tid,
     int* _pos,
     int* _n_plp);
 
-const(bam_pileup1_t)* bam_plp_auto (
+const(bam_pileup1_t)* bam_plp_auto(
     bam_plp_t iter,
     int* _tid,
     int* _pos,
     int* _n_plp);
 
-const(bam_pileup1_t)* bam_plp64_next (
+const(bam_pileup1_t)* bam_plp64_next(
     bam_plp_t iter,
     int* _tid,
     hts_pos_t* _pos,
     int* _n_plp);
 
-const(bam_pileup1_t)* bam_plp64_auto (
+const(bam_pileup1_t)* bam_plp64_auto(
     bam_plp_t iter,
     int* _tid,
     hts_pos_t* _pos,
     int* _n_plp);
 
-void bam_plp_set_maxcnt (bam_plp_t iter, int maxcnt);
+void bam_plp_set_maxcnt(bam_plp_t iter, int maxcnt);
 
-void bam_plp_reset (bam_plp_t iter);
+void bam_plp_reset(bam_plp_t iter);
 
 /**
  *  bam_plp_constructor() - sets a callback to initialise any per-pileup1_t fields.
@@ -1922,12 +1924,12 @@ void bam_plp_reset (bam_plp_t iter);
  *              a pointer to a locally allocated bam_pileup_cd union.  This union
  *              will also be present in each bam_pileup1_t created.
  */
-void bam_plp_constructor (
+void bam_plp_constructor(
     bam_plp_t plp,
-    int function (void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
-void bam_plp_destructor (
+    int function(void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
+void bam_plp_destructor(
     bam_plp_t plp,
-    int function (void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
+    int function(void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
 
 /// Get pileup padded insertion sequence
 /**
@@ -1942,13 +1944,13 @@ void bam_plp_destructor (
  * If del_len is not NULL, the location pointed to is set to the length of
  * any deletion immediately following the insertion, or zero if none.
  */
-int bam_plp_insertion (const(bam_pileup1_t)* p, kstring_t* ins, int* del_len);
+int bam_plp_insertion(const(bam_pileup1_t)* p, kstring_t* ins, int* del_len);
 
 /// Create a new bam_mplp_t structure
 /** The struct returned by a successful call should be freed
  *  via bam_mplp_destroy() when it is no longer needed.
  */
-bam_mplp_t bam_mplp_init (int n, bam_plp_auto_f func, void** data);
+bam_mplp_t bam_mplp_init(int n, bam_plp_auto_f func, void** data);
 
 /// Set up mpileup overlap detection
 /**
@@ -1962,35 +1964,35 @@ bam_mplp_t bam_mplp_init (int n, bam_plp_auto_f func, void** data);
  *  is increased to the sum of their qualities (capped at 200), otherwise
  *  it is multiplied by 0.8.
  */
-int bam_mplp_init_overlaps (bam_mplp_t iter);
+int bam_mplp_init_overlaps(bam_mplp_t iter);
 
-void bam_mplp_destroy (bam_mplp_t iter);
+void bam_mplp_destroy(bam_mplp_t iter);
 
-void bam_mplp_set_maxcnt (bam_mplp_t iter, int maxcnt);
+void bam_mplp_set_maxcnt(bam_mplp_t iter, int maxcnt);
 
-int bam_mplp_auto (
+int bam_mplp_auto(
     bam_mplp_t iter,
     int* _tid,
     int* _pos,
     int* n_plp,
     const(bam_pileup1_t*)* plp);
 
-int bam_mplp64_auto (
+int bam_mplp64_auto(
     bam_mplp_t iter,
     int* _tid,
     hts_pos_t* _pos,
     int* n_plp,
     const(bam_pileup1_t*)* plp);
 
-void bam_mplp_reset (bam_mplp_t iter);
+void bam_mplp_reset(bam_mplp_t iter);
 
-void bam_mplp_constructor (
+void bam_mplp_constructor(
     bam_mplp_t iter,
-    int function (void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
+    int function(void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
 
-void bam_mplp_destructor (
+void bam_mplp_destructor(
     bam_mplp_t iter,
-    int function (void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
+    int function(void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
 
 // ~!defined(BAM_NO_PILEUP)
 
@@ -1998,7 +2000,7 @@ void bam_mplp_destructor (
  * BAQ calculation and realignment *
  ***********************************/
 
-int sam_cap_mapq (bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int thres);
+int sam_cap_mapq(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int thres);
 
 /// Calculate BAQ scores
 /** @param b   BAM record
@@ -2040,5 +2042,5 @@ Depending on what previous processing happened, this may or may not be the
 correct thing to do.  It would be wise to avoid this situation if possible.
 */
 
-int sam_prob_realn (bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int flag);
+int sam_prob_realn(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int flag);
 

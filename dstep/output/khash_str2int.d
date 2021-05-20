@@ -36,42 +36,42 @@ struct kh_str2int_s
 }
 
 alias kh_str2int_t = kh_str2int_s;
-kh_str2int_t* kh_init_str2int ();
-void kh_destroy_str2int (kh_str2int_t* h);
-void kh_clear_str2int (kh_str2int_t* h);
-khint_t kh_get_str2int (const(kh_str2int_t)* h, kh_cstr_t key);
-int kh_resize_str2int (kh_str2int_t* h, khint_t new_n_buckets);
-khint_t kh_put_str2int (kh_str2int_t* h, kh_cstr_t key, int* ret);
-void kh_del_str2int (kh_str2int_t* h, khint_t x);
+kh_str2int_t* kh_init_str2int();
+void kh_destroy_str2int(kh_str2int_t* h);
+void kh_clear_str2int(kh_str2int_t* h);
+khint_t kh_get_str2int(const(kh_str2int_t)* h, kh_cstr_t key);
+int kh_resize_str2int(kh_str2int_t* h, khint_t new_n_buckets);
+khint_t kh_put_str2int(kh_str2int_t* h, kh_cstr_t key, int* ret);
+void kh_del_str2int(kh_str2int_t* h, khint_t x);
 
 /*
  *  Wrappers for khash dictionaries used by mpileup.
  */
 
-void* khash_str2int_init ();
+void* khash_str2int_init();
 
 /*
  *  Destroy the hash structure, but not the keys
  */
 
 // Note that strings are not freed.
-void khash_str2int_destroy (void* _hash);
+void khash_str2int_destroy(void* _hash);
 
 /*
  *  Destroys both the hash structure and the keys
  */
-void khash_str2int_destroy_free (void* _hash);
+void khash_str2int_destroy_free(void* _hash);
 
 /*
  *  Returns 1 if key exists or 0 if not
  */
-int khash_str2int_has_key (void* _hash, const(char)* str);
+int khash_str2int_has_key(void* _hash, const(char)* str);
 
 /*
  *  Returns 0 on success and -1 when the key is not present. On success,
  *  *value is set, unless NULL is passed.
  */
-int khash_str2int_get (void* _hash, const(char)* str, int* value);
+int khash_str2int_get(void* _hash, const(char)* str, int* value);
 
 /*
  *  Add a new string to the dictionary, auto-incrementing the value.
@@ -79,17 +79,17 @@ int khash_str2int_get (void* _hash, const(char)* str, int* value);
  *  is returned. Note that the key must continue to exist throughout
  *  the whole life of _hash.
  */
-int khash_str2int_inc (void* _hash, const(char)* str);
+int khash_str2int_inc(void* _hash, const(char)* str);
 
 /*
  *  Set a new key,value pair. On success returns the bin index, on
  *  error -1 is returned. Note that the key must continue to exist
  *  throughout the whole life of _hash.
  */
-int khash_str2int_set (void* _hash, const(char)* str, int value);
+int khash_str2int_set(void* _hash, const(char)* str, int value);
 
 /*
  *  Return the number of keys in the hash table.
  */
-int khash_str2int_size (void* _hash);
+int khash_str2int_size(void* _hash);
 

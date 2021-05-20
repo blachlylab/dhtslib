@@ -1,119 +1,97 @@
-4c4
-<    Copyright (C) 2008, 2009, 2013, 2014, 2016, 2017-2020 Genome Research Ltd.
----
->    Copyright (C) 2008, 2009, 2013, 2014, 2016, 2017-2019 Genome Research Ltd.
-28a29,32
+28a29,30
 > module htslib.faidx;
-> 
-> import htslib.hts;
-> 
-60c64
+> import htslib.hts: hts_pos_t;
+60c62
 < struct faidx_t;
 ---
 > struct __faidx_t;
-61a66
+61a64
 > alias faidx_t = __faidx_t;
-81c86
-< int fai_build3 (const(char)* fn, const(char)* fnfai, const(char)* fngzi);
+81c84
+< int fai_build3(const(char)* fn, const(char)* fnfai, const(char)* fngzi);
 ---
-> int fai_build3(const(char)* fn, const(char)* fnfai, const(char)* fngzi);
-90c95
-< int fai_build (const(char)* fn);
+> int fai_build3 (const(char)* fn, const(char)* fnfai, const(char)* fngzi);
+90c93
+< int fai_build(const(char)* fn);
 ---
-> int fai_build(const(char)* fn);
-93c98
-< void fai_destroy (faidx_t* fai);
+> int fai_build (const(char)* fn);
+93c96
+< void fai_destroy(faidx_t* fai);
 ---
-> void fai_destroy(faidx_t* fai);
-117c122
-< faidx_t* fai_load3 (
+> void fai_destroy (faidx_t* fai);
+117c120
+< faidx_t* fai_load3(
 ---
-> faidx_t* fai_load3(
-129c134
-< faidx_t* fai_load (const(char)* fn);
+> faidx_t* fai_load3 (
+129c132
+< faidx_t* fai_load(const(char)* fn);
 ---
-> faidx_t* fai_load(const(char)* fn);
-149c154
-< faidx_t* fai_load3_format (
+> faidx_t* fai_load (const(char)* fn);
+149c152
+< faidx_t* fai_load3_format(
 ---
-> faidx_t* fai_load3_format(
-163c168
-< faidx_t* fai_load_format (const(char)* fn, fai_format_options format);
+> faidx_t* fai_load3_format (
+163c166
+< faidx_t* fai_load_format(const(char)* fn, fai_format_options format);
 ---
-> faidx_t* fai_load_format(const(char)* fn, fai_format_options format);
-178,179c183,184
-< char* fai_fetch (const(faidx_t)* fai, const(char)* reg, int* len);
-< char* fai_fetch64 (const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+> faidx_t* fai_load_format (const(char)* fn, fai_format_options format);
+178,179c181,182
+< char* fai_fetch(const(faidx_t)* fai, const(char)* reg, int* len);
+< char* fai_fetch64(const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
 ---
-> char* fai_fetch(const(faidx_t)* fai, const(char)* reg, int* len);
-> char* fai_fetch64(const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
-192,193c197,198
-< char* fai_fetchqual (const(faidx_t)* fai, const(char)* reg, int* len);
-< char* fai_fetchqual64 (const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+> char* fai_fetch (const(faidx_t)* fai, const(char)* reg, int* len);
+> char* fai_fetch64 (const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+192,193c195,196
+< char* fai_fetchqual(const(faidx_t)* fai, const(char)* reg, int* len);
+< char* fai_fetchqual64(const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
 ---
-> char* fai_fetchqual(const(faidx_t)* fai, const(char)* reg, int* len);
-> char* fai_fetchqual64(const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
-199c204,205
-< int faidx_fetch_nseq (const(faidx_t)* fai);
+> char* fai_fetchqual (const(faidx_t)* fai, const(char)* reg, int* len);
+> char* fai_fetchqual64 (const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+199c202
+< int faidx_fetch_nseq(const(faidx_t)* fai);
 ---
-> deprecated("Please use faidx_nseq instead")
-> int faidx_fetch_nseq(const(faidx_t)* fai);
-212c218
-< char* faidx_fetch_seq (
+> int faidx_fetch_nseq (const(faidx_t)* fai);
+212c215
+< char* faidx_fetch_seq(
 ---
-> char* faidx_fetch_seq(
-230c236
-< char* faidx_fetch_seq64 (
+> char* faidx_fetch_seq (
+230c233
+< char* faidx_fetch_seq64(
 ---
-> char* faidx_fetch_seq64(
-248c254
-< char* faidx_fetch_qual (
+> char* faidx_fetch_seq64 (
+248c251
+< char* faidx_fetch_qual(
 ---
-> char* faidx_fetch_qual(
-266c272
-< char* faidx_fetch_qual64 (
+> char* faidx_fetch_qual (
+266c269
+< char* faidx_fetch_qual64(
 ---
-> char* faidx_fetch_qual64(
-278c284
-< int faidx_has_seq (const(faidx_t)* fai, const(char)* seq);
+> char* faidx_fetch_qual64 (
+278c281
+< int faidx_has_seq(const(faidx_t)* fai, const(char)* seq);
 ---
-> int faidx_has_seq(const(faidx_t)* fai, const(char)* seq);
-281c287
-< int faidx_nseq (const(faidx_t)* fai);
+> int faidx_has_seq (const(faidx_t)* fai, const(char)* seq);
+281c284
+< int faidx_nseq(const(faidx_t)* fai);
 ---
-> int faidx_nseq(const(faidx_t)* fai);
-284c290
-< const(char)* faidx_iseq (const(faidx_t)* fai, int i);
+> int faidx_nseq (const(faidx_t)* fai);
+284c287
+< const(char)* faidx_iseq(const(faidx_t)* fai, int i);
 ---
-> const(char)* faidx_iseq(const(faidx_t)* fai, int i);
-287c293
-< int faidx_seq_len (const(faidx_t)* fai, const(char)* seq);
+> const(char)* faidx_iseq (const(faidx_t)* fai, int i);
+287c290
+< int faidx_seq_len(const(faidx_t)* fai, const(char)* seq);
 ---
-> int faidx_seq_len(const(faidx_t)* fai, const(char)* seq);
-296c302
-<     @return       Pointer to end of parsed s if successful, NULL if not.
+> int faidx_seq_len (const(faidx_t)* fai, const(char)* seq);
+302c305
+< const(char)* fai_parse_region(
 ---
->     @return      pointer to end of parsed s if successs, NULL if not.
-302c308
-< const(char)* fai_parse_region (
+> const(char)* fai_parse_region (
+314c317
+< void fai_set_cache_size(faidx_t* fai, int cache_size);
 ---
-> const(char)* fai_parse_region(
-314,329c320
-< void fai_set_cache_size (faidx_t* fai, int cache_size);
-< 
-< /// Determines the path to the reference index file
-< /** @param  fa    String with the path to the reference file
-<  *  @return       String with the path to the reference index file, or NULL on failure
-< 
-<     If the reference path has the format reference.fa##idx##index.fa.fai,
-<     the index path is taken directly from it as index.fa.fai.
-<     If the reference file is local and the index file cannot be found, it
-<     will be created alongside the reference file.
-<     If the reference file is remote and the index file cannot be found,
-<     the method returns NULL.
-< 
-<     The returned string has to be freed by the user at the end of its scope.
-<  */
-< char* fai_path (const(char)* fa);
+> void fai_set_cache_size (faidx_t* fai, int cache_size);
+329c332
+< char* fai_path(const(char)* fa);
 ---
-> void fai_set_cache_size(faidx_t* fai, int cache_size);
+> char* fai_path (const(char)* fa);

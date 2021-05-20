@@ -33,12 +33,14 @@ DEALINGS IN THE SOFTWARE.  */
  */
 
 module htslib.cram;
+
 import core.stdc.stdio;
 import core.stdc.stdlib;
-import htslib.hfile: hFILE;
+import core.stdc.stdarg : va_list;
+
 import htslib.sam;
 import htslib.hts;
-import core.stdc.stdarg: va_list;
+import htslib.hfile : hFILE;
 
 extern (C):
 
@@ -106,67 +108,67 @@ struct refs_t;
  *-----------------------------------------------------------------------------
  * cram_fd
  */
-sam_hdr_t* cram_fd_get_header (cram_fd* fd);
+sam_hdr_t* cram_fd_get_header(cram_fd* fd);
 
-void cram_fd_set_header (cram_fd* fd, sam_hdr_t* hdr);
+void cram_fd_set_header(cram_fd* fd, sam_hdr_t* hdr);
 
-int cram_fd_get_version (cram_fd* fd);
+int cram_fd_get_version(cram_fd* fd);
 
-void cram_fd_set_version (cram_fd* fd, int vers);
+void cram_fd_set_version(cram_fd* fd, int vers);
 
-int cram_major_vers (cram_fd* fd);
-int cram_minor_vers (cram_fd* fd);
+int cram_major_vers(cram_fd* fd);
+int cram_minor_vers(cram_fd* fd);
 
-hFILE* cram_fd_get_fp (cram_fd* fd);
-void cram_fd_set_fp (cram_fd* fd, hFILE* fp);
+hFILE* cram_fd_get_fp(cram_fd* fd);
+void cram_fd_set_fp(cram_fd* fd, hFILE* fp);
 
 /*
  *-----------------------------------------------------------------------------
  * cram_container
  */
-int cram_container_get_length (cram_container* c);
-void cram_container_set_length (cram_container* c, int length);
-int cram_container_get_num_blocks (cram_container* c);
-void cram_container_set_num_blocks (cram_container* c, int num_blocks);
-int* cram_container_get_landmarks (cram_container* c, int* num_landmarks);
-void cram_container_set_landmarks (
+int cram_container_get_length(cram_container* c);
+void cram_container_set_length(cram_container* c, int length);
+int cram_container_get_num_blocks(cram_container* c);
+void cram_container_set_num_blocks(cram_container* c, int num_blocks);
+int* cram_container_get_landmarks(cram_container* c, int* num_landmarks);
+void cram_container_set_landmarks(
     cram_container* c,
     int num_landmarks,
     int* landmarks);
 
 /* Returns true if the container is empty (EOF marker) */
-int cram_container_is_empty (cram_fd* fd);
+int cram_container_is_empty(cram_fd* fd);
 
 /*
  *-----------------------------------------------------------------------------
  * cram_block
  */
-int cram_block_get_content_id (cram_block* b);
-int cram_block_get_comp_size (cram_block* b);
-int cram_block_get_uncomp_size (cram_block* b);
-int cram_block_get_crc32 (cram_block* b);
-void* cram_block_get_data (cram_block* b);
+int cram_block_get_content_id(cram_block* b);
+int cram_block_get_comp_size(cram_block* b);
+int cram_block_get_uncomp_size(cram_block* b);
+int cram_block_get_crc32(cram_block* b);
+void* cram_block_get_data(cram_block* b);
 
-cram_content_type cram_block_get_content_type (cram_block* b);
+cram_content_type cram_block_get_content_type(cram_block* b);
 
-void cram_block_set_content_id (cram_block* b, int id);
-void cram_block_set_comp_size (cram_block* b, int size);
-void cram_block_set_uncomp_size (cram_block* b, int size);
-void cram_block_set_crc32 (cram_block* b, int crc);
-void cram_block_set_data (cram_block* b, void* data);
+void cram_block_set_content_id(cram_block* b, int id);
+void cram_block_set_comp_size(cram_block* b, int size);
+void cram_block_set_uncomp_size(cram_block* b, int size);
+void cram_block_set_crc32(cram_block* b, int crc);
+void cram_block_set_data(cram_block* b, void* data);
 
-int cram_block_append (cram_block* b, const(void)* data, int size);
-void cram_block_update_size (cram_block* b);
+int cram_block_append(cram_block* b, const(void)* data, int size);
+void cram_block_update_size(cram_block* b);
 
 // Offset is known as "size" internally, but it can be confusing.
-size_t cram_block_get_offset (cram_block* b);
-void cram_block_set_offset (cram_block* b, size_t offset);
+size_t cram_block_get_offset(cram_block* b);
+void cram_block_set_offset(cram_block* b, size_t offset);
 
 /*
  * Computes the size of a cram block, including the block
  * header itself.
  */
-uint cram_block_size (cram_block* b);
+uint cram_block_size(cram_block* b);
 
 /*
  * Renumbers RG numbers in a cram compression header.
@@ -198,7 +200,7 @@ uint cram_block_size (cram_block* b);
  *        -1 if unable to edit;
  *        -2 on other errors (eg I/O).
  */
-int cram_transcode_rg (
+int cram_transcode_rg(
     cram_fd* in_,
     cram_fd* out_,
     cram_container* c,
@@ -215,7 +217,7 @@ int cram_transcode_rg (
  * Returns 0 on success
  *        -1 on failure
  */
-int cram_copy_slice (cram_fd* in_, cram_fd* out_, int num_slice);
+int cram_copy_slice(cram_fd* in_, cram_fd* out_, int num_slice);
 
 /*
  *-----------------------------------------------------------------------------
@@ -240,7 +242,7 @@ int cram_copy_slice (cram_fd* in_, cram_fd* out_, int num_slice);
  * The cram_block struct returned by a successful call should be freed
  * via cram_free_block() when it is no longer needed.
  */
-cram_block* cram_new_block (cram_content_type content_type, int content_id);
+cram_block* cram_new_block(cram_content_type content_type, int content_id);
 
 /*! Reads a block from a cram file.
  *
@@ -251,7 +253,7 @@ cram_block* cram_new_block (cram_content_type content_type, int content_id);
  * The cram_block struct returned by a successful call should be freed
  * via cram_free_block() when it is no longer needed.
  */
-cram_block* cram_read_block (cram_fd* fd);
+cram_block* cram_read_block(cram_fd* fd);
 
 /*! Writes a CRAM block.
  *
@@ -259,11 +261,11 @@ cram_block* cram_read_block (cram_fd* fd);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_write_block (cram_fd* fd, cram_block* b);
+int cram_write_block(cram_fd* fd, cram_block* b);
 
 /*! Frees a CRAM block, deallocating internal data too.
  */
-void cram_free_block (cram_block* b);
+void cram_free_block(cram_block* b);
 
 /*! Uncompresses a CRAM block, if compressed.
  *
@@ -271,7 +273,7 @@ void cram_free_block (cram_block* b);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_uncompress_block (cram_block* b);
+int cram_uncompress_block(cram_block* b);
 
 /*! Compresses a block.
  *
@@ -286,13 +288,13 @@ int cram_uncompress_block (cram_block* b);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_compress_block (
+int cram_compress_block(
     cram_fd* fd,
     cram_block* b,
     cram_metrics* metrics,
     int method,
     int level);
-int cram_compress_block2 (
+int cram_compress_block2(
     cram_fd* fd,
     cram_slice* s,
     cram_block* b,
@@ -315,8 +317,8 @@ int cram_compress_block2 (
  * The cram_container struct returned by a successful call should be freed
  * via cram_free_container() when it is no longer needed.
  */
-cram_container* cram_new_container (int nrec, int nslice);
-void cram_free_container (cram_container* c);
+cram_container* cram_new_container(int nrec, int nslice);
+void cram_free_container(cram_container* c);
 
 /*! Reads a container header.
  *
@@ -327,7 +329,7 @@ void cram_free_container (cram_container* c);
  * The cram_container struct returned by a successful call should be freed
  * via cram_free_container() when it is no longer needed.
  */
-cram_container* cram_read_container (cram_fd* fd);
+cram_container* cram_read_container(cram_fd* fd);
 
 /*! Writes a container structure.
  *
@@ -335,7 +337,7 @@ cram_container* cram_read_container (cram_fd* fd);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_write_container (cram_fd* fd, cram_container* h);
+int cram_write_container(cram_fd* fd, cram_container* h);
 
 /*
  * Stores the container structure in dat and returns *size as the
@@ -345,9 +347,9 @@ int cram_write_container (cram_fd* fd, cram_container* h);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_store_container (cram_fd* fd, cram_container* c, char* dat, int* size);
+int cram_store_container(cram_fd* fd, cram_container* c, char* dat, int* size);
 
-int cram_container_size (cram_container* c);
+int cram_container_size(cram_container* c);
 
 /**@}*/
 /**@{ ----------------------------------------------------------------------
@@ -362,7 +364,7 @@ int cram_container_size (cram_container* c);
  * Returns file handle on success;
  *         NULL on failure.
  */
-cram_fd* cram_open (const(char)* filename, const(char)* mode);
+cram_fd* cram_open(const(char)* filename, const(char)* mode);
 
 /*! Opens an existing stream for reading or writing.
  *
@@ -370,7 +372,7 @@ cram_fd* cram_open (const(char)* filename, const(char)* mode);
  * Returns file handle on success;
  *         NULL on failure.
  */
-cram_fd* cram_dopen (hFILE* fp, const(char)* filename, const(char)* mode);
+cram_fd* cram_dopen(hFILE* fp, const(char)* filename, const(char)* mode);
 
 /*! Closes a CRAM file.
  *
@@ -378,7 +380,7 @@ cram_fd* cram_dopen (hFILE* fp, const(char)* filename, const(char)* mode);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_close (cram_fd* fd);
+int cram_close(cram_fd* fd);
 
 /*
  * Seek within a CRAM file.
@@ -386,7 +388,7 @@ int cram_close (cram_fd* fd);
  * Returns 0 on success
  *        -1 on failure
  */
-int cram_seek (cram_fd* fd, off_t offset, int whence);
+int cram_seek(cram_fd* fd, off_t offset, int whence);
 
 /*
  * Flushes a CRAM file.
@@ -395,7 +397,7 @@ int cram_seek (cram_fd* fd, off_t offset, int whence);
  * Returns 0 on success
  *        -1 on failure
  */
-int cram_flush (cram_fd* fd);
+int cram_flush(cram_fd* fd);
 
 /*! Checks for end of file on a cram_fd stream.
  *
@@ -404,7 +406,7 @@ int cram_flush (cram_fd* fd);
  *         1 if we hit an expected EOF (end of range or EOF block)
  *         2 for other EOF (end of stream without EOF block)
  */
-int cram_eof (cram_fd* fd);
+int cram_eof(cram_fd* fd);
 
 /*! Sets options on the cram_fd.
  *
@@ -415,7 +417,7 @@ int cram_eof (cram_fd* fd);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_set_option (cram_fd* fd, hts_fmt_option opt, ...);
+int cram_set_option(cram_fd* fd, hts_fmt_option opt, ...);
 
 /*! Sets options on the cram_fd.
  *
@@ -426,7 +428,7 @@ int cram_set_option (cram_fd* fd, hts_fmt_option opt, ...);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_set_voption (cram_fd* fd, hts_fmt_option opt, va_list args);
+int cram_set_voption(cram_fd* fd, hts_fmt_option opt, va_list args);
 
 /*!
  * Attaches a header to a cram_fd.
@@ -439,7 +441,7 @@ int cram_set_voption (cram_fd* fd, hts_fmt_option opt, va_list args);
  * Returns 0 on success;
  *        -1 on failure
  */
-int cram_set_header (cram_fd* fd, sam_hdr_t* hdr);
+int cram_set_header(cram_fd* fd, sam_hdr_t* hdr);
 
 /*! Check if this file has a proper EOF block
  *
@@ -451,10 +453,10 @@ int cram_set_header (cram_fd* fd, sam_hdr_t* hdr);
  *        -1 if an error occurred whilst reading the file or we could not seek back to where we were
  *
  */
-int cram_check_EOF (cram_fd* fd);
+int cram_check_EOF(cram_fd* fd);
 
 /* As int32_decoded/encode, but from/to blocks instead of cram_fd */
-int int32_put_blk (cram_block* b, int val);
+int int32_put_blk(cram_block* b, int val);
 
 /**@}*/
 /**@{ -------------------------------------------------------------------
@@ -472,7 +474,8 @@ alias SAM_hdr = sam_hdr_t;
  * Returns a SAM_hdr struct on success (free with sam_hdr_free());
  *         NULL on failure
  */
-SAM_hdr* sam_hdr_parse_ (const(char)* hdr, size_t len);
+pragma(inline, true)
+SAM_hdr* sam_hdr_parse_(const (char)* hdr, size_t len) { return sam_hdr_parse(len, hdr); }
 
 /*! Deallocates all storage used by a SAM_hdr struct.
  *
@@ -480,7 +483,8 @@ SAM_hdr* sam_hdr_parse_ (const(char)* hdr, size_t len);
  * it is still non-zero then the header is assumed to be in use by another
  * caller and the free is not done.
  */
-void sam_hdr_free (SAM_hdr* hdr);
+pragma(inline, true)
+void sam_hdr_free(SAM_hdr* hdr) { sam_hdr_destroy(hdr); }
 
 /* sam_hdr_length() and sam_hdr_str() are now provided by sam.h. */
 
@@ -513,7 +517,7 @@ alias sam_hdr_add_PG = sam_hdr_add_pg;
  * @return
  * Returns NULL if none exists or the file handle is not a CRAM file.
  */
-refs_t* cram_get_refs (htsFile* fd);
+refs_t* cram_get_refs(htsFile* fd);
 
 /**@}*/
 

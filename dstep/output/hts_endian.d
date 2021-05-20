@@ -79,39 +79,39 @@ alias uint64_u = c_ulong;
  *  @return A 16 bit unsigned integer
  *  The input is read in little-endian byte order.
  */
-ushort le_to_u16 (const(ubyte)* buf);
+ushort le_to_u16(const(ubyte)* buf);
 
 /// Get a uint32_t value from an unsigned byte array
 /** @param buf Pointer to source byte array, may be unaligned
  *  @return A 32 bit unsigned integer
  *  The input is read in little-endian byte order.
  */
-uint le_to_u32 (const(ubyte)* buf);
+uint le_to_u32(const(ubyte)* buf);
 
 /// Get a uint64_t value from an unsigned byte array
 /** @param buf Pointer to source byte array, may be unaligned
  *  @return A 64 bit unsigned integer
  *  The input is read in little-endian byte order.
  */
-ulong le_to_u64 (const(ubyte)* buf);
+ulong le_to_u64(const(ubyte)* buf);
 
 /// Store a uint16_t value in little-endian byte order
 /** @param val The value to store
  *  @param buf Where to store it (may be unaligned)
  */
-void u16_to_le (ushort val, ubyte* buf);
+void u16_to_le(ushort val, ubyte* buf);
 
 /// Store a uint32_t value in little-endian byte order
 /** @param val The value to store
  *  @param buf Where to store it (may be unaligned)
  */
-void u32_to_le (uint val, ubyte* buf);
+void u32_to_le(uint val, ubyte* buf);
 
 /// Store a uint64_t value in little-endian byte order
 /** @param val The value to store
  *  @param buf Where to store it (may be unaligned)
  */
-void u64_to_le (ulong val, ubyte* buf);
+void u64_to_le(ulong val, ubyte* buf);
 
 /* Signed values.  Grab the data as unsigned, then convert to signed without
  * triggering undefined behaviour.  On any sensible platform, the conversion
@@ -123,7 +123,7 @@ void u64_to_le (ulong val, ubyte* buf);
  *  @return A 8 bit signed integer
  *  The input data is interpreted as 2's complement representation.
  */
-byte le_to_i8 (const(ubyte)* buf);
+byte le_to_i8(const(ubyte)* buf);
 
 /// Get an int16_t value from an unsigned byte array
 /** @param buf Pointer to source byte array, may be unaligned
@@ -131,7 +131,7 @@ byte le_to_i8 (const(ubyte)* buf);
  *  The input data is interpreted as 2's complement representation in
  *  little-endian byte order.
  */
-short le_to_i16 (const(ubyte)* buf);
+short le_to_i16(const(ubyte)* buf);
 
 /// Get an int32_t value from an unsigned byte array
 /** @param buf Pointer to source byte array, may be unaligned
@@ -139,7 +139,7 @@ short le_to_i16 (const(ubyte)* buf);
  *  The input data is interpreted as 2's complement representation in
  *  little-endian byte order.
  */
-int le_to_i32 (const(ubyte)* buf);
+int le_to_i32(const(ubyte)* buf);
 
 /// Get an int64_t value from an unsigned byte array
 /** @param buf Pointer to source byte array, may be unaligned
@@ -147,7 +147,7 @@ int le_to_i32 (const(ubyte)* buf);
  *  The input data is interpreted as 2's complement representation in
  *  little-endian byte order.
  */
-long le_to_i64 (const(ubyte)* buf);
+long le_to_i64(const(ubyte)* buf);
 
 // Converting the other way is easier as signed -> unsigned is well defined.
 
@@ -155,19 +155,19 @@ long le_to_i64 (const(ubyte)* buf);
 /** @param val The value to store
  *  @param buf Where to store it (may be unaligned)
  */
-void i16_to_le (short val, ubyte* buf);
+void i16_to_le(short val, ubyte* buf);
 
 /// Store a uint32_t value in little-endian byte order
 /** @param val The value to store
  *  @param buf Where to store it (may be unaligned)
  */
-void i32_to_le (int val, ubyte* buf);
+void i32_to_le(int val, ubyte* buf);
 
 /// Store a uint64_t value in little-endian byte order
 /** @param val The value to store
  *  @param buf Where to store it (may be unaligned)
  */
-void i64_to_le (long val, ubyte* buf);
+void i64_to_le(long val, ubyte* buf);
 
 /* Floating point.  Assumptions:
  *  Platform uses IEEE 754 format
@@ -183,7 +183,7 @@ void i64_to_le (long val, ubyte* buf);
  *  The input is interpreted as an IEEE 754 format float in little-endian
  *  byte order.
  */
-float le_to_float (const(ubyte)* buf);
+float le_to_float(const(ubyte)* buf);
 
 /// Get a double value from an unsigned byte array
 /** @param buf Pointer to source byte array, may be unaligned
@@ -191,18 +191,18 @@ float le_to_float (const(ubyte)* buf);
  *  The input is interpreted as an IEEE 754 format double in little-endian
  *  byte order.
  */
-double le_to_double (const(ubyte)* buf);
+double le_to_double(const(ubyte)* buf);
 
 /// Store a float value in little-endian byte order
 /** @param val The value to store
  *  @param buf Where to store it (may be unaligned)
  */
-void float_to_le (float val, ubyte* buf);
+void float_to_le(float val, ubyte* buf);
 
 /// Store a double value in little-endian byte order
 /** @param val The value to store
  *  @param buf Where to store it (may be unaligned)
  */
-void double_to_le (double val, ubyte* buf);
+void double_to_le(double val, ubyte* buf);
 
 /* HTS_ENDIAN_H */

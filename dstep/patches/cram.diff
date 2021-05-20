@@ -1,42 +1,15 @@
-4c4
-<     Copyright (C) 2015, 2016, 2018-2020 Genome Research Ltd.
----
->     Copyright (C) 2015, 2016, 2018-2019 Genome Research Ltd.
-35,36c35
-< import core.stdc.stdio;
-< import core.stdc.stdlib;
----
+34a35
 > module htslib.cram;
-38c37,41
-< extern (C):
----
-> import core.stdc.stdarg;
-> import core.sys.posix.sys.types;
-> 
-> import htslib.hts;
+36a38,41
+> import htslib.hfile: hFILE;
 > import htslib.sam;
-40c43
-< // see cram/cram_structs.h for an internal more complete copy of this enum
----
-> extern (C):
-42,57c45,56
-< // Htslib 1.11 had these listed without any hts prefix, and included
-< // some internal values such as RANS1 and GZIP_RLE (which shouldn't have ever
-< // been public).
-< //
-< // We can't find evidence of these being used and the data type occurs
-< // nowhere in functions or structures meaning using it would be pointless.
-< // However for safety, if you absolute need the API to not change then
-< // define HTS_COMPAT to 101100 (XYYYZZ for X.Y[.Z], meaning 1.11).
-< 
-< // Public methods as defined in the CRAM spec.
-< 
-< // CRAM 2.x and 3.0
-< 
-< // NB: the subsequent numbers may change.  They're simply here for
-< // compatibility with the old API, but may have no bearing on the
-< // internal way htslib works.  DO NOT USE
----
+> import htslib.hts;
+> import core.stdc.stdarg: va_list;
+58a64,80
+> //#include <sys/types.h>
+> alias off_t = size_t;
+> alias ssize_t = size_t;
+> 
 > enum cram_block_method
 > {
 >     BM_ERROR = -1,
@@ -49,227 +22,219 @@
 >     RANS1 = 10, // Not externalised; stored as RANS (generic)
 >     GZIP_RLE = 11 // NB: not externalised in CRAM
 > }
-89c88
-< sam_hdr_t* cram_fd_get_header (cram_fd* fd);
----
-> sam_hdr_t* cram_fd_get_header(cram_fd* fd);
-91c90
-< void cram_fd_set_header (cram_fd* fd, sam_hdr_t* hdr);
----
-> void cram_fd_set_header(cram_fd* fd, sam_hdr_t* hdr);
-93c92
-< int cram_fd_get_version (cram_fd* fd);
----
-> int cram_fd_get_version(cram_fd* fd);
-95c94
-< void cram_fd_set_version (cram_fd* fd, int vers);
----
-> void cram_fd_set_version(cram_fd* fd, int vers);
-97,98c96,97
-< int cram_major_vers (cram_fd* fd);
-< int cram_minor_vers (cram_fd* fd);
----
-> int cram_major_vers(cram_fd* fd);
-> int cram_minor_vers(cram_fd* fd);
-100,101c99,100
-< hFILE* cram_fd_get_fp (cram_fd* fd);
-< void cram_fd_set_fp (cram_fd* fd, hFILE* fp);
----
-> hFILE* cram_fd_get_fp(cram_fd* fd);
-> void cram_fd_set_fp(cram_fd* fd, hFILE* fp);
-107,112c106,111
-< int cram_container_get_length (cram_container* c);
-< void cram_container_set_length (cram_container* c, int length);
-< int cram_container_get_num_blocks (cram_container* c);
-< void cram_container_set_num_blocks (cram_container* c, int num_blocks);
-< int* cram_container_get_landmarks (cram_container* c, int* num_landmarks);
-< void cram_container_set_landmarks (
----
-> int cram_container_get_length(cram_container* c);
-> void cram_container_set_length(cram_container* c, int length);
-> int cram_container_get_num_blocks(cram_container* c);
-> void cram_container_set_num_blocks(cram_container* c, int num_blocks);
-> int* cram_container_get_landmarks(cram_container* c, int* num_landmarks);
-> void cram_container_set_landmarks(
-118c117
-< int cram_container_is_empty (cram_fd* fd);
----
-> int cram_container_is_empty(cram_fd* fd);
-124,136c123,135
-< int cram_block_get_content_id (cram_block* b);
-< int cram_block_get_comp_size (cram_block* b);
-< int cram_block_get_uncomp_size (cram_block* b);
-< int cram_block_get_crc32 (cram_block* b);
-< void* cram_block_get_data (cram_block* b);
-< 
-< cram_content_type cram_block_get_content_type (cram_block* b);
-< 
-< void cram_block_set_content_id (cram_block* b, int id);
-< void cram_block_set_comp_size (cram_block* b, int size);
-< void cram_block_set_uncomp_size (cram_block* b, int size);
-< void cram_block_set_crc32 (cram_block* b, int crc);
-< void cram_block_set_data (cram_block* b, void* data);
----
-> int cram_block_get_content_id(cram_block* b);
-> int cram_block_get_comp_size(cram_block* b);
-> int cram_block_get_uncomp_size(cram_block* b);
-> int cram_block_get_crc32(cram_block* b);
-> void* cram_block_get_data(cram_block* b);
 > 
-> cram_content_type cram_block_get_content_type(cram_block* b);
+81,82d102
+< struct hFILE;
+< 
+89c109
+< sam_hdr_t* cram_fd_get_header(cram_fd* fd);
+---
+> sam_hdr_t* cram_fd_get_header (cram_fd* fd);
+91c111
+< void cram_fd_set_header(cram_fd* fd, sam_hdr_t* hdr);
+---
+> void cram_fd_set_header (cram_fd* fd, sam_hdr_t* hdr);
+93c113
+< int cram_fd_get_version(cram_fd* fd);
+---
+> int cram_fd_get_version (cram_fd* fd);
+95c115
+< void cram_fd_set_version(cram_fd* fd, int vers);
+---
+> void cram_fd_set_version (cram_fd* fd, int vers);
+97,98c117,118
+< int cram_major_vers(cram_fd* fd);
+< int cram_minor_vers(cram_fd* fd);
+---
+> int cram_major_vers (cram_fd* fd);
+> int cram_minor_vers (cram_fd* fd);
+100,101c120,121
+< hFILE* cram_fd_get_fp(cram_fd* fd);
+< void cram_fd_set_fp(cram_fd* fd, hFILE* fp);
+---
+> hFILE* cram_fd_get_fp (cram_fd* fd);
+> void cram_fd_set_fp (cram_fd* fd, hFILE* fp);
+107,112c127,132
+< int cram_container_get_length(cram_container* c);
+< void cram_container_set_length(cram_container* c, int length);
+< int cram_container_get_num_blocks(cram_container* c);
+< void cram_container_set_num_blocks(cram_container* c, int num_blocks);
+< int* cram_container_get_landmarks(cram_container* c, int* num_landmarks);
+< void cram_container_set_landmarks(
+---
+> int cram_container_get_length (cram_container* c);
+> void cram_container_set_length (cram_container* c, int length);
+> int cram_container_get_num_blocks (cram_container* c);
+> void cram_container_set_num_blocks (cram_container* c, int num_blocks);
+> int* cram_container_get_landmarks (cram_container* c, int* num_landmarks);
+> void cram_container_set_landmarks (
+118c138
+< int cram_container_is_empty(cram_fd* fd);
+---
+> int cram_container_is_empty (cram_fd* fd);
+124,136c144,156
+< int cram_block_get_content_id(cram_block* b);
+< int cram_block_get_comp_size(cram_block* b);
+< int cram_block_get_uncomp_size(cram_block* b);
+< int cram_block_get_crc32(cram_block* b);
+< void* cram_block_get_data(cram_block* b);
+< 
+< cram_content_type cram_block_get_content_type(cram_block* b);
+< 
+< void cram_block_set_content_id(cram_block* b, int id);
+< void cram_block_set_comp_size(cram_block* b, int size);
+< void cram_block_set_uncomp_size(cram_block* b, int size);
+< void cram_block_set_crc32(cram_block* b, int crc);
+< void cram_block_set_data(cram_block* b, void* data);
+---
+> int cram_block_get_content_id (cram_block* b);
+> int cram_block_get_comp_size (cram_block* b);
+> int cram_block_get_uncomp_size (cram_block* b);
+> int cram_block_get_crc32 (cram_block* b);
+> void* cram_block_get_data (cram_block* b);
 > 
-> void cram_block_set_content_id(cram_block* b, int id);
-> void cram_block_set_comp_size(cram_block* b, int size);
-> void cram_block_set_uncomp_size(cram_block* b, int size);
-> void cram_block_set_crc32(cram_block* b, int crc);
-> void cram_block_set_data(cram_block* b, void* data);
-138,139c137,138
-< int cram_block_append (cram_block* b, const(void)* data, int size);
-< void cram_block_update_size (cram_block* b);
+> cram_content_type cram_block_get_content_type (cram_block* b);
+> 
+> void cram_block_set_content_id (cram_block* b, int id);
+> void cram_block_set_comp_size (cram_block* b, int size);
+> void cram_block_set_uncomp_size (cram_block* b, int size);
+> void cram_block_set_crc32 (cram_block* b, int crc);
+> void cram_block_set_data (cram_block* b, void* data);
+138,139c158,159
+< int cram_block_append(cram_block* b, const(void)* data, int size);
+< void cram_block_update_size(cram_block* b);
 ---
-> int cram_block_append(cram_block* b, const(void)* data, int size);
-> void cram_block_update_size(cram_block* b);
-142,143c141,142
-< size_t cram_block_get_offset (cram_block* b);
-< void cram_block_set_offset (cram_block* b, size_t offset);
+> int cram_block_append (cram_block* b, const(void)* data, int size);
+> void cram_block_update_size (cram_block* b);
+142,143c162,163
+< size_t cram_block_get_offset(cram_block* b);
+< void cram_block_set_offset(cram_block* b, size_t offset);
 ---
-> size_t cram_block_get_offset(cram_block* b);
-> void cram_block_set_offset(cram_block* b, size_t offset);
-149c148
-< uint cram_block_size (cram_block* b);
+> size_t cram_block_get_offset (cram_block* b);
+> void cram_block_set_offset (cram_block* b, size_t offset);
+149c169
+< uint cram_block_size(cram_block* b);
 ---
-> uint cram_block_size(cram_block* b);
-166c165
-<  * blocks just in case and also emit the adjusted container.
+> uint cram_block_size (cram_block* b);
+181c201
+< int cram_transcode_rg(
 ---
->  * blocks just incase and also emit the adjusted container.
-181c180
-< int cram_transcode_rg (
+> int cram_transcode_rg (
+198c218
+< int cram_copy_slice(cram_fd* in_, cram_fd* out_, int num_slice);
 ---
-> int cram_transcode_rg(
-198c197
-< int cram_copy_slice (cram_fd* in_, cram_fd* out_, int num_slice);
+> int cram_copy_slice (cram_fd* in_, cram_fd* out_, int num_slice);
+223c243
+< cram_block* cram_new_block(cram_content_type content_type, int content_id);
 ---
-> int cram_copy_slice(cram_fd* in_, cram_fd* out_, int num_slice);
-223c222
-< cram_block* cram_new_block (cram_content_type content_type, int content_id);
+> cram_block* cram_new_block (cram_content_type content_type, int content_id);
+234c254
+< cram_block* cram_read_block(cram_fd* fd);
 ---
-> cram_block* cram_new_block(cram_content_type content_type, int content_id);
-234c233
-< cram_block* cram_read_block (cram_fd* fd);
+> cram_block* cram_read_block (cram_fd* fd);
+242c262
+< int cram_write_block(cram_fd* fd, cram_block* b);
 ---
-> cram_block* cram_read_block(cram_fd* fd);
-242c241
-< int cram_write_block (cram_fd* fd, cram_block* b);
+> int cram_write_block (cram_fd* fd, cram_block* b);
+246c266
+< void cram_free_block(cram_block* b);
 ---
-> int cram_write_block(cram_fd* fd, cram_block* b);
-246c245
-< void cram_free_block (cram_block* b);
+> void cram_free_block (cram_block* b);
+254c274
+< int cram_uncompress_block(cram_block* b);
 ---
-> void cram_free_block(cram_block* b);
-254c253
-< int cram_uncompress_block (cram_block* b);
+> int cram_uncompress_block (cram_block* b);
+269c289
+< int cram_compress_block(
 ---
-> int cram_uncompress_block(cram_block* b);
-269,275c268
-< int cram_compress_block (
-<     cram_fd* fd,
-<     cram_block* b,
-<     cram_metrics* metrics,
-<     int method,
-<     int level);
-< int cram_compress_block2 (
+> int cram_compress_block (
+275c295
+< int cram_compress_block2(
 ---
-> int cram_compress_block(
-277d269
-<     cram_slice* s,
-298,299c290,291
-< cram_container* cram_new_container (int nrec, int nslice);
-< void cram_free_container (cram_container* c);
+> int cram_compress_block2 (
+298,299c318,319
+< cram_container* cram_new_container(int nrec, int nslice);
+< void cram_free_container(cram_container* c);
 ---
-> cram_container* cram_new_container(int nrec, int nslice);
-> void cram_free_container(cram_container* c);
-310c302
-< cram_container* cram_read_container (cram_fd* fd);
+> cram_container* cram_new_container (int nrec, int nslice);
+> void cram_free_container (cram_container* c);
+310c330
+< cram_container* cram_read_container(cram_fd* fd);
 ---
-> cram_container* cram_read_container(cram_fd* fd);
-318c310
-< int cram_write_container (cram_fd* fd, cram_container* h);
+> cram_container* cram_read_container (cram_fd* fd);
+318c338
+< int cram_write_container(cram_fd* fd, cram_container* h);
 ---
-> int cram_write_container(cram_fd* fd, cram_container* h);
-328c320
-< int cram_store_container (cram_fd* fd, cram_container* c, char* dat, int* size);
+> int cram_write_container (cram_fd* fd, cram_container* h);
+328c348
+< int cram_store_container(cram_fd* fd, cram_container* c, char* dat, int* size);
 ---
-> int cram_store_container(cram_fd* fd, cram_container* c, char* dat, int* size);
-330c322
-< int cram_container_size (cram_container* c);
+> int cram_store_container (cram_fd* fd, cram_container* c, char* dat, int* size);
+330c350
+< int cram_container_size(cram_container* c);
 ---
-> int cram_container_size(cram_container* c);
-345c337
-< cram_fd* cram_open (const(char)* filename, const(char)* mode);
+> int cram_container_size (cram_container* c);
+345c365
+< cram_fd* cram_open(const(char)* filename, const(char)* mode);
 ---
-> cram_fd* cram_open(const(char)* filename, const(char)* mode);
-353c345
-< cram_fd* cram_dopen (hFILE* fp, const(char)* filename, const(char)* mode);
+> cram_fd* cram_open (const(char)* filename, const(char)* mode);
+353c373
+< cram_fd* cram_dopen(hFILE* fp, const(char)* filename, const(char)* mode);
 ---
-> cram_fd* cram_dopen(hFILE* fp, const(char)* filename, const(char)* mode);
-361c353
-< int cram_close (cram_fd* fd);
+> cram_fd* cram_dopen (hFILE* fp, const(char)* filename, const(char)* mode);
+361c381
+< int cram_close(cram_fd* fd);
 ---
-> int cram_close(cram_fd* fd);
-369c361
-< int cram_seek (cram_fd* fd, off_t offset, int whence);
+> int cram_close (cram_fd* fd);
+369c389
+< int cram_seek(cram_fd* fd, off_t offset, int whence);
 ---
-> int cram_seek(cram_fd* fd, off_t offset, int whence);
-378c370
-< int cram_flush (cram_fd* fd);
+> int cram_seek (cram_fd* fd, off_t offset, int whence);
+378c398
+< int cram_flush(cram_fd* fd);
 ---
-> int cram_flush(cram_fd* fd);
-387c379
-< int cram_eof (cram_fd* fd);
+> int cram_flush (cram_fd* fd);
+387c407
+< int cram_eof(cram_fd* fd);
 ---
-> int cram_eof(cram_fd* fd);
-398c390
-< int cram_set_option (cram_fd* fd, hts_fmt_option opt, ...);
+> int cram_eof (cram_fd* fd);
+398c418
+< int cram_set_option(cram_fd* fd, hts_fmt_option opt, ...);
 ---
-> int cram_set_option(cram_fd* fd, hts_fmt_option opt, ...);
-409c401
-< int cram_set_voption (cram_fd* fd, hts_fmt_option opt, va_list args);
+> int cram_set_option (cram_fd* fd, hts_fmt_option opt, ...);
+409c429
+< int cram_set_voption(cram_fd* fd, hts_fmt_option opt, va_list args);
 ---
-> int cram_set_voption(cram_fd* fd, hts_fmt_option opt, va_list args);
-422c414
-< int cram_set_header (cram_fd* fd, sam_hdr_t* hdr);
+> int cram_set_voption (cram_fd* fd, hts_fmt_option opt, va_list args);
+422c442
+< int cram_set_header(cram_fd* fd, sam_hdr_t* hdr);
 ---
-> int cram_set_header(cram_fd* fd, sam_hdr_t* hdr);
-431c423
-<  *        -1 if an error occurred whilst reading the file or we could not seek back to where we were
+> int cram_set_header (cram_fd* fd, sam_hdr_t* hdr);
+434c454
+< int cram_check_EOF(cram_fd* fd);
 ---
->  *        -1 if an error occured whilst reading the file or we could not seek back to where we were
-434c426
-< int cram_check_EOF (cram_fd* fd);
+> int cram_check_EOF (cram_fd* fd);
+437c457
+< int int32_put_blk(cram_block* b, int val);
 ---
-> int cram_check_EOF(cram_fd* fd);
-437c429
-< int int32_put_blk (cram_block* b, int val);
----
-> int int32_put_blk(cram_block* b, int val);
-445c437
+> int int32_put_blk (cram_block* b, int val);
+445c465
 < alias SAM_hdr = sam_hdr_t_;
 ---
 > alias SAM_hdr = sam_hdr_t;
-455c447
-< SAM_hdr* sam_hdr_parse_ (const(char)* hdr, size_t len);
+455c475
+< SAM_hdr* sam_hdr_parse_(const(char)* hdr, size_t len);
 ---
-> SAM_hdr* sam_hdr_parse_(const(char)* hdr, size_t len);
-463c455
-< void sam_hdr_free (SAM_hdr* hdr);
+> SAM_hdr* sam_hdr_parse_ (const(char)* hdr, size_t len);
+463c483
+< void sam_hdr_free(SAM_hdr* hdr);
 ---
-> void sam_hdr_free(SAM_hdr* hdr);
-483c475
+> void sam_hdr_free (SAM_hdr* hdr);
+483c503
 < enum sam_hdr_add_PG = sam_hdr_add_pg;
 ---
 > alias sam_hdr_add_PG = sam_hdr_add_pg;
-496c488
-< refs_t* cram_get_refs (htsFile* fd);
+496c516
+< refs_t* cram_get_refs(htsFile* fd);
 ---
-> refs_t* cram_get_refs(htsFile* fd);
+> refs_t* cram_get_refs (htsFile* fd);

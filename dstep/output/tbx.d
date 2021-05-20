@@ -78,12 +78,12 @@ extern (D) auto tbx_bgzf_itr_next(T0, T1, T2, T3)(auto ref T0 bgzfp, auto ref T1
     return hts_itr_next(bgzfp, itr, r, tbx);
 }
 
-int tbx_name2id (tbx_t* tbx, const(char)* ss);
+int tbx_name2id(tbx_t* tbx, const(char)* ss);
 
 /* Internal helper function used by tbx_itr_next() */
-BGZF* hts_get_bgzfp (htsFile* fp);
+BGZF* hts_get_bgzfp(htsFile* fp);
 
-int tbx_readrec (
+int tbx_readrec(
     BGZF* fp,
     void* tbxv,
     void* sv,
@@ -95,19 +95,19 @@ int tbx_readrec (
 /** The index struct returned by a successful call should be freed
     via tbx_destroy() when it is no longer needed.
 */
-tbx_t* tbx_index (BGZF* fp, int min_shift, const(tbx_conf_t)* conf);
+tbx_t* tbx_index(BGZF* fp, int min_shift, const(tbx_conf_t)* conf);
 /*
  * All tbx_index_build* methods return: 0 (success), -1 (general failure) or -2 (compression not BGZF)
  */
-int tbx_index_build (const(char)* fn, int min_shift, const(tbx_conf_t)* conf);
+int tbx_index_build(const(char)* fn, int min_shift, const(tbx_conf_t)* conf);
 
-int tbx_index_build2 (
+int tbx_index_build2(
     const(char)* fn,
     const(char)* fnidx,
     int min_shift,
     const(tbx_conf_t)* conf);
 
-int tbx_index_build3 (
+int tbx_index_build3(
     const(char)* fn,
     const(char)* fnidx,
     int min_shift,
@@ -119,7 +119,7 @@ int tbx_index_build3 (
 
     Equivalent to tbx_index_load3(fn, NULL, HTS_IDX_SAVE_REMOTE);
 */
-tbx_t* tbx_index_load (const(char)* fn);
+tbx_t* tbx_index_load(const(char)* fn);
 
 /// Load or stream a .tbi or .csi index
 /** @param fn     Name of the data file corresponding to the index
@@ -130,7 +130,7 @@ tbx_t* tbx_index_load (const(char)* fn);
 
     Equivalent to tbx_index_load3(fn, fnidx, HTS_IDX_SAVE_REMOTE);
 */
-tbx_t* tbx_index_load2 (const(char)* fn, const(char)* fnidx);
+tbx_t* tbx_index_load2(const(char)* fn, const(char)* fnidx);
 
 /// Load or stream a .tbi or .csi index
 /** @param fn     Name of the data file corresponding to the index
@@ -149,9 +149,9 @@ tbx_t* tbx_index_load2 (const(char)* fn, const(char)* fnidx);
     The index struct returned by a successful call should be freed
     via tbx_destroy() when it is no longer needed.
 */
-tbx_t* tbx_index_load3 (const(char)* fn, const(char)* fnidx, int flags);
+tbx_t* tbx_index_load3(const(char)* fn, const(char)* fnidx, int flags);
 
-const(char*)* tbx_seqnames (tbx_t* tbx, int* n); // free the array but not the values
+const(char*)* tbx_seqnames(tbx_t* tbx, int* n); // free the array but not the values
 
-void tbx_destroy (tbx_t* tbx);
+void tbx_destroy(tbx_t* tbx);
 

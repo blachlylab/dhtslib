@@ -53,11 +53,13 @@ DEALINGS IN THE SOFTWARE.  */
         bcf_sr_destroy(sr);
 */
 module htslib.synced_bcf_reader;
+
 import core.stdc.stddef;
+
 import htslib.hts;
-import htslib.kstring: kstring_t;
-import htslib.tbx: tbx_t;
 import htslib.vcf;
+import htslib.kstring : kstring_t;
+import htslib.tbx : tbx_t;
 
 extern (C):
 
@@ -114,7 +116,7 @@ struct bcf_sr_regions_t
     int als_type; // alleles type, currently VCF_SNP or VCF_INDEL
 
     // user handler to deal with skipped regions without a counterpart in VCFs
-    void function (bcf_sr_regions_t*, void*) missed_reg_handler;
+    void function(bcf_sr_regions_t*, void*) missed_reg_handler;
     void* missed_reg_data;
 
     // for in-memory regions (small data)
@@ -201,14 +203,14 @@ struct bcf_srs_t
  *  The bcf_srs_t struct returned by a successful call should be freed
  *  via bcf_sr_destroy() when it is no longer needed.
  */
-bcf_srs_t* bcf_sr_init ();
+bcf_srs_t* bcf_sr_init();
 
 /** Destroy a bcf_srs_t struct */
-void bcf_sr_destroy (bcf_srs_t* readers);
+void bcf_sr_destroy(bcf_srs_t* readers);
 
-char* bcf_sr_strerror (int errnum);
+char* bcf_sr_strerror(int errnum);
 
-int bcf_sr_set_opt (bcf_srs_t* readers, bcf_sr_opt_t opt, ...);
+int bcf_sr_set_opt(bcf_srs_t* readers, bcf_sr_opt_t opt, ...);
 
 /**
  * bcf_sr_set_threads() - allocates a thread-pool for use by the synced reader.
@@ -216,10 +218,10 @@ int bcf_sr_set_opt (bcf_srs_t* readers, bcf_sr_opt_t opt, ...);
  *
  * Returns 0 if the call succeeded, or <0 on error.
  */
-int bcf_sr_set_threads (bcf_srs_t* files, int n_threads);
+int bcf_sr_set_threads(bcf_srs_t* files, int n_threads);
 
 /** Deallocates thread memory, if owned by us. */
-void bcf_sr_destroy_threads (bcf_srs_t* files);
+void bcf_sr_destroy_threads(bcf_srs_t* files);
 
 /**
  *  bcf_sr_add_reader() - open new reader
@@ -231,9 +233,9 @@ void bcf_sr_destroy_threads (bcf_srs_t* files);
  *  See also the bcf_srs_t data structure for parameters controlling
  *  the reader's logic.
  */
-int bcf_sr_add_reader (bcf_srs_t* readers, const(char)* fname);
+int bcf_sr_add_reader(bcf_srs_t* readers, const(char)* fname);
 
-void bcf_sr_remove_reader (bcf_srs_t* files, int i);
+void bcf_sr_remove_reader(bcf_srs_t* files, int i);
 
 /**
  * bcf_sr_next_line() - the iterator
@@ -243,7 +245,7 @@ void bcf_sr_remove_reader (bcf_srs_t* files, int i);
  * (bcf_sr_t.buffer[0]) set at this position. Use the bcf_sr_has_line macro to
  * determine which of the readers are set.
  */
-int bcf_sr_next_line (bcf_srs_t* readers);
+int bcf_sr_next_line(bcf_srs_t* readers);
 
 extern (D) auto bcf_sr_has_line(T0, T1)(auto ref T0 readers, auto ref T1 i)
 {
@@ -275,7 +277,7 @@ extern (D) auto bcf_sr_get_reader(T0, T1)(auto ref T0 _readers, auto ref T1 i)
  *  @seq:  sequence name; NULL to seek to start
  *  @pos:  0-based coordinate
  */
-int bcf_sr_seek (bcf_srs_t* readers, const(char)* seq, hts_pos_t pos);
+int bcf_sr_seek(bcf_srs_t* readers, const(char)* seq, hts_pos_t pos);
 
 /**
  * bcf_sr_set_samples() - sets active samples
@@ -288,7 +290,7 @@ int bcf_sr_seek (bcf_srs_t* readers, const(char)* seq, hts_pos_t pos);
  *
  * Returns 1 if the call succeeded, or 0 on error.
  */
-int bcf_sr_set_samples (bcf_srs_t* readers, const(char)* samples, int is_file);
+int bcf_sr_set_samples(bcf_srs_t* readers, const(char)* samples, int is_file);
 
 /**
  *  bcf_sr_set_targets(), bcf_sr_set_regions() - init targets/regions
@@ -316,13 +318,13 @@ int bcf_sr_set_samples (bcf_srs_t* readers, const(char)* samples, int is_file);
  *  Targets (but not regions) can be prefixed with "^" to request logical complement,
  *  for example "^X,Y,MT" indicates that sequences X, Y and MT should be skipped.
  */
-int bcf_sr_set_targets (
+int bcf_sr_set_targets(
     bcf_srs_t* readers,
     const(char)* targets,
     int is_file,
     int alleles);
 
-int bcf_sr_set_regions (bcf_srs_t* readers, const(char)* regions, int is_file);
+int bcf_sr_set_regions(bcf_srs_t* readers, const(char)* regions, int is_file);
 
 /*
  *  bcf_sr_regions_init()
@@ -347,14 +349,14 @@ int bcf_sr_set_regions (bcf_srs_t* readers, const(char)* regions, int is_file);
  *  The bcf_sr_regions_t struct returned by a successful call should be freed
  *  via bcf_sr_regions_destroy() when it is no longer needed.
  */
-bcf_sr_regions_t* bcf_sr_regions_init (
+bcf_sr_regions_t* bcf_sr_regions_init(
     const(char)* regions,
     int is_file,
     int chr,
     int from,
     int to);
 
-void bcf_sr_regions_destroy (bcf_sr_regions_t* regions);
+void bcf_sr_regions_destroy(bcf_sr_regions_t* regions);
 
 /*
  *  bcf_sr_regions_seek() - seek to the chromosome block
@@ -362,7 +364,7 @@ void bcf_sr_regions_destroy (bcf_sr_regions_t* regions);
  *  Returns 0 on success or -1 on failure. Sets reg->seq appropriately and
  *  reg->start,reg->end to -1.
  */
-int bcf_sr_regions_seek (bcf_sr_regions_t* regions, const(char)* chr);
+int bcf_sr_regions_seek(bcf_sr_regions_t* regions, const(char)* chr);
 
 /*
  *  bcf_sr_regions_next() - retrieves next region. Returns 0 on success and -1
@@ -371,7 +373,7 @@ int bcf_sr_regions_seek (bcf_sr_regions_t* regions, const(char)* chr);
  *  NULL,-1,-1 when no region is available. The coordinates are 0-based,
  *  inclusive.
  */
-int bcf_sr_regions_next (bcf_sr_regions_t* reg);
+int bcf_sr_regions_next(bcf_sr_regions_t* reg);
 
 /*
  *  bcf_sr_regions_overlap() - checks if the interval <start,end> overlaps any of
@@ -382,7 +384,7 @@ int bcf_sr_regions_next (bcf_sr_regions_t* reg);
  *  regions and more regions exist; -2 if not in the regions and there are no more
  *  regions left.
  */
-int bcf_sr_regions_overlap (
+int bcf_sr_regions_overlap(
     bcf_sr_regions_t* reg,
     const(char)* seq,
     hts_pos_t start,
@@ -393,5 +395,5 @@ int bcf_sr_regions_overlap (
  *  all remaining records are processed.
  *  Returns 0 on success, <0 on error.
  */
-int bcf_sr_regions_flush (bcf_sr_regions_t* regs);
+int bcf_sr_regions_flush(bcf_sr_regions_t* regs);
 

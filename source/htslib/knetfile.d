@@ -79,23 +79,23 @@ extern (D) auto knet_fileno(T)(auto ref T fp)
     return fp.fd;
 }
 
-knetFile* knet_open (const(char)* fn, const(char)* mode);
+knetFile* knet_open(const(char)* fn, const(char)* mode);
 
 /*
    This only works with local files.
  */
-knetFile* knet_dopen (int fd, const(char)* mode);
+knetFile* knet_dopen(int fd, const(char)* mode);
 
 /*
   If ->is_ready==0, this routine updates ->fd; otherwise, it simply
   reads from ->fd.
  */
-ssize_t knet_read (knetFile* fp, void* buf, size_t len);
+ssize_t knet_read(knetFile* fp, void* buf, size_t len);
 
 /*
   This routine only sets ->offset and ->is_ready=0. It does not
   communicate with the FTP server.
  */
-off_t knet_seek (knetFile* fp, off_t off, int whence);
-int knet_close (knetFile* fp);
+off_t knet_seek(knetFile* fp, off_t off, int whence);
+int knet_close(knetFile* fp);
 

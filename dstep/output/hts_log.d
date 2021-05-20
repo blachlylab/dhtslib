@@ -40,10 +40,10 @@ enum htsLogLevel
 }
 
 /// Sets the selected log level.
-void hts_set_log_level (htsLogLevel level);
+void hts_set_log_level(htsLogLevel level);
 
 /// Gets the selected log level.
-htsLogLevel hts_get_log_level ();
+htsLogLevel hts_get_log_level();
 
 /// Selected log level.
 /*!
@@ -62,7 +62,7 @@ extern __gshared int hts_verbose;
 * \param context       Context where the event occurred. Typically set to "__func__".
 * \param format        Format string with placeholders, like printf.
 */
-void hts_log (
+void hts_log(
     htsLogLevel severity,
     const(char)* context,
     const(char)* format,

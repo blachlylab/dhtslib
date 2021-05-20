@@ -33,13 +33,13 @@ extern (C):
    Hence calling hts_srand48() will always set up the same POSIX-determined
    sequence of pseudo-random numbers on any platform, while calling srand48()
    may (e.g., on OpenBSD) set up a different non-deterministic sequence. */
-void hts_srand48 (c_long seed);
+void hts_srand48(c_long seed);
 
-double hts_erand48 (ref ushort[3] xseed);
+double hts_erand48(ref ushort[3] xseed);
 
-double hts_drand48 ();
+double hts_drand48();
 
-c_long hts_lrand48 ();
+c_long hts_lrand48();
 
 // Windows usually lacks *rand48(), but cygwin provides them.
 

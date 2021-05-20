@@ -75,44 +75,44 @@ struct kbitset_t
 
 // (For internal use only.) Returns a mask (like 00011111) showing
 // which bits are in use in the last slot (for the given ni) set.
-c_ulong kbs_last_mask (size_t ni);
+c_ulong kbs_last_mask(size_t ni);
 
 // Initialise a bit set capable of holding ni integers, 0 <= i < ni.
 // The set returned is empty if fill == 0, or all of [0,ni) otherwise.
 
 // b[n] is always non-zero (a fact used by kbs_next()).
-kbitset_t* kbs_init2 (size_t ni, int fill);
+kbitset_t* kbs_init2(size_t ni, int fill);
 
 // Initialise an empty bit set capable of holding ni integers, 0 <= i < ni.
-kbitset_t* kbs_init (size_t ni);
+kbitset_t* kbs_init(size_t ni);
 
 // Resize an existing bit set to be capable of holding ni_new integers.
 // Elements in [ni_old,ni_new) are added to the set if fill != 0.
 
 // Need to clear excess bits when fill!=0 or n_new<n; always is simpler.
-int kbs_resize2 (kbitset_t** bsp, size_t ni_new, int fill);
+int kbs_resize2(kbitset_t** bsp, size_t ni_new, int fill);
 
 // Resize an existing bit set to be capable of holding ni_new integers.
 // Returns negative on error.
-int kbs_resize (kbitset_t** bsp, size_t ni_new);
+int kbs_resize(kbitset_t** bsp, size_t ni_new);
 
 // Destroy a bit set.
-void kbs_destroy (kbitset_t* bs);
+void kbs_destroy(kbitset_t* bs);
 
 // Reset the bit set to empty.
-void kbs_clear (kbitset_t* bs);
+void kbs_clear(kbitset_t* bs);
 
 // Reset the bit set to all of [0,ni).
-void kbs_insert_all (kbitset_t* bs);
+void kbs_insert_all(kbitset_t* bs);
 
 // Insert an element into the bit set.
-void kbs_insert (kbitset_t* bs, int i);
+void kbs_insert(kbitset_t* bs, int i);
 
 // Remove an element from the bit set.
-void kbs_delete (kbitset_t* bs, int i);
+void kbs_delete(kbitset_t* bs, int i);
 
 // Test whether the bit set contains the element.
-int kbs_exists (const(kbitset_t)* bs, int i);
+int kbs_exists(const(kbitset_t)* bs, int i);
 
 struct kbitset_iter_t
 {
@@ -122,8 +122,8 @@ struct kbitset_iter_t
 }
 
 // Initialise or reset a bit set iterator.
-void kbs_start (kbitset_iter_t* itr);
+void kbs_start(kbitset_iter_t* itr);
 
 // Return the next element contained in the bit set, or -1 if there are no more.
-int kbs_next (const(kbitset_t)* bs, kbitset_iter_t* itr);
+int kbs_next(const(kbitset_t)* bs, kbitset_iter_t* itr);
 

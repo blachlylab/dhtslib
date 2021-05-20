@@ -251,7 +251,7 @@ extern (D) auto kh_int64_hash_equal(T0, T1)(auto ref T0 a, auto ref T1 b)
   @param  s     Pointer to a null terminated string
   @return       The hash value
  */
-khint_t __ac_X31_hash_string (const(char)* s);
+khint_t __ac_X31_hash_string(const(char)* s);
 /*! @function
   @abstract     Another interface to const char* hash function
   @param  key   Pointer to a nul terminated string [const char*]
@@ -271,7 +271,7 @@ extern (D) auto kh_str_hash_equal(T0, T1)(auto ref T0 a, auto ref T1 b)
   @param  s     Pointer to a kstring
   @return       The hash value
  */
-khint_t __ac_X31_hash_kstring (const kstring_t ks);
+khint_t __ac_X31_hash_kstring(const kstring_t ks);
 /*! @function
   @abstract     Interface to kstring hash function.
   @param  key   Pointer to a khash; permits hashing on non-nul terminated strings.
@@ -286,7 +286,7 @@ extern (D) auto kh_kstr_hash_equal(T0, T1)(auto ref T0 a, auto ref T1 b)
     return a.l == b.l && strncmp(a.s, b.s, a.l) == 0;
 }
 
-khint_t __ac_Wang_hash (khint_t key);
+khint_t __ac_Wang_hash(khint_t key);
 
 extern (D) auto kh_int_hash_func2(T)(auto ref T k)
 {

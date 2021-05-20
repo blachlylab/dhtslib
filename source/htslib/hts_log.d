@@ -1,6 +1,3 @@
-module htslib.hts_log;
-import std.string: toStringz;
-
 /// \file htslib/hts_log.h
 /// Configuration of log levels.
 /* The MIT License
@@ -28,8 +25,11 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+module htslib.hts_log;
 
-extern(C):
+import std.string: toStringz;
+
+extern (C):
 
 /// Log levels.
 enum htsLogLevel // @suppress(dscanner.style.phobos_naming_convention)
@@ -43,10 +43,10 @@ enum htsLogLevel // @suppress(dscanner.style.phobos_naming_convention)
 }
 
 /// Sets the selected log level.
-void hts_set_log_level (htsLogLevel level);
+void hts_set_log_level(htsLogLevel level);
 
 /// Gets the selected log level.
-htsLogLevel hts_get_log_level ();
+htsLogLevel hts_get_log_level();
 
 /// Selected log level.
 /*!
@@ -65,7 +65,7 @@ extern __gshared int hts_verbose;
 * \param context       Context where the event occurred. Typically set to "__func__".
 * \param format        Format string with placeholders, like printf.
 */
-void hts_log (
+void hts_log(
     htsLogLevel severity,
     const(char)* context,
     const(char)* format,

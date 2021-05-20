@@ -22,7 +22,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
 module htslib.hts_expr;
+
 import htslib.kstring: kstring_t;
+
 extern (C):
 
 /// Holds a filter variable.  This is also used to return the results.
@@ -44,7 +46,7 @@ struct hts_expr_val_t
 }
 
 /// Frees a hts_expr_val_t type.
-void hts_expr_val_free (hts_expr_val_t* f);
+void hts_expr_val_free(hts_expr_val_t* f);
 
 /// Opaque hts_filter_t type.  Definition in hts_expr.c
 struct hts_filter_t;
@@ -55,15 +57,15 @@ struct hts_filter_t;
 /** @param str    The filter expression
  *  @return       A pointer on success, NULL on failure
  */
-hts_filter_t* hts_filter_init (const(char)* str);
+hts_filter_t* hts_filter_init(const(char)* str);
 
 /// Frees an hts_filter_t created via hts_filter_init
 /** @param filt    The filter pointer.
  */
-void hts_filter_free (hts_filter_t* filt);
+void hts_filter_free(hts_filter_t* filt);
 
 /// Type for expression symbol lookups; name -> value.
-alias hts_expr_sym_func = int function (
+alias hts_expr_sym_func = int function(
     void* data,
     char* str,
     char** end,
@@ -84,10 +86,10 @@ alias hts_expr_sym_func = int function (
  *  for a null value.  This may be used to check for the existence of
  *  something, irrespective of whether that something evaluates to zero.
  */
-int hts_filter_eval (
+int hts_filter_eval(
     hts_filter_t* filt,
     void* data,
-    int function () sym_func,
+    int function() sym_func,
     hts_expr_val_t* res);
 
 /* HTS_EXPR_H */
