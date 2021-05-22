@@ -1,7 +1,97 @@
-28a29,32
+28a29,30
 > module htslib.faidx;
-> 
-> import htslib.hts;
-> 
-199a204
-> deprecated("Please use faidx_nseq instead")
+> import htslib.hts: hts_pos_t;
+60c62
+< struct faidx_t;
+---
+> struct __faidx_t;
+61a64
+> alias faidx_t = __faidx_t;
+81c84
+< int fai_build3(const(char)* fn, const(char)* fnfai, const(char)* fngzi);
+---
+> int fai_build3 (const(char)* fn, const(char)* fnfai, const(char)* fngzi);
+90c93
+< int fai_build(const(char)* fn);
+---
+> int fai_build (const(char)* fn);
+93c96
+< void fai_destroy(faidx_t* fai);
+---
+> void fai_destroy (faidx_t* fai);
+117c120
+< faidx_t* fai_load3(
+---
+> faidx_t* fai_load3 (
+129c132
+< faidx_t* fai_load(const(char)* fn);
+---
+> faidx_t* fai_load (const(char)* fn);
+149c152
+< faidx_t* fai_load3_format(
+---
+> faidx_t* fai_load3_format (
+163c166
+< faidx_t* fai_load_format(const(char)* fn, fai_format_options format);
+---
+> faidx_t* fai_load_format (const(char)* fn, fai_format_options format);
+178,179c181,182
+< char* fai_fetch(const(faidx_t)* fai, const(char)* reg, int* len);
+< char* fai_fetch64(const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+---
+> char* fai_fetch (const(faidx_t)* fai, const(char)* reg, int* len);
+> char* fai_fetch64 (const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+192,193c195,196
+< char* fai_fetchqual(const(faidx_t)* fai, const(char)* reg, int* len);
+< char* fai_fetchqual64(const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+---
+> char* fai_fetchqual (const(faidx_t)* fai, const(char)* reg, int* len);
+> char* fai_fetchqual64 (const(faidx_t)* fai, const(char)* reg, hts_pos_t* len);
+199c202
+< int faidx_fetch_nseq(const(faidx_t)* fai);
+---
+> int faidx_fetch_nseq (const(faidx_t)* fai);
+212c215
+< char* faidx_fetch_seq(
+---
+> char* faidx_fetch_seq (
+230c233
+< char* faidx_fetch_seq64(
+---
+> char* faidx_fetch_seq64 (
+248c251
+< char* faidx_fetch_qual(
+---
+> char* faidx_fetch_qual (
+266c269
+< char* faidx_fetch_qual64(
+---
+> char* faidx_fetch_qual64 (
+278c281
+< int faidx_has_seq(const(faidx_t)* fai, const(char)* seq);
+---
+> int faidx_has_seq (const(faidx_t)* fai, const(char)* seq);
+281c284
+< int faidx_nseq(const(faidx_t)* fai);
+---
+> int faidx_nseq (const(faidx_t)* fai);
+284c287
+< const(char)* faidx_iseq(const(faidx_t)* fai, int i);
+---
+> const(char)* faidx_iseq (const(faidx_t)* fai, int i);
+287c290
+< int faidx_seq_len(const(faidx_t)* fai, const(char)* seq);
+---
+> int faidx_seq_len (const(faidx_t)* fai, const(char)* seq);
+302c305
+< const(char)* fai_parse_region(
+---
+> const(char)* fai_parse_region (
+314c317
+< void fai_set_cache_size(faidx_t* fai, int cache_size);
+---
+> void fai_set_cache_size (faidx_t* fai, int cache_size);
+329c332
+< char* fai_path(const(char)* fa);
+---
+> char* fai_path (const(char)* fa);

@@ -66,7 +66,7 @@ struct VCFHeader
 
         /** Creates a list of sequence names. It is up to the caller to free the list (but not the sequence names) */
         //const(char) **bcf_hdr_seqnames(const(bcf_hdr_t) *h, int *nseqs);
-        const(char) **ary = bcf_hdr_seqnames(this.hdr, &nseqs);
+        const(char*)*ary = bcf_hdr_seqnames(this.hdr, &nseqs);
         if (!nseqs) return [];
 
         string[] ret;
@@ -76,7 +76,7 @@ struct VCFHeader
             ret ~= fromStringz(ary[i]).idup;
         }
 
-        free(ary);
+        free(cast(void*)ary);
         return ret;        
     }
 

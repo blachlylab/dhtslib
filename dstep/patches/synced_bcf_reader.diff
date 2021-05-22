@@ -1,0 +1,89 @@
+55c55
+< 
+---
+> module htslib.synced_bcf_reader;
+56a57,60
+> import htslib.hts;
+> import htslib.kstring: kstring_t;
+> import htslib.tbx: tbx_t;
+> import htslib.vcf;
+113c117
+<     void function(bcf_sr_regions_t*, void*) missed_reg_handler;
+---
+>     void function (bcf_sr_regions_t*, void*) missed_reg_handler;
+200c204
+< bcf_srs_t* bcf_sr_init();
+---
+> bcf_srs_t* bcf_sr_init ();
+203c207
+< void bcf_sr_destroy(bcf_srs_t* readers);
+---
+> void bcf_sr_destroy (bcf_srs_t* readers);
+205c209
+< char* bcf_sr_strerror(int errnum);
+---
+> char* bcf_sr_strerror (int errnum);
+207c211
+< int bcf_sr_set_opt(bcf_srs_t* readers, bcf_sr_opt_t opt, ...);
+---
+> int bcf_sr_set_opt (bcf_srs_t* readers, bcf_sr_opt_t opt, ...);
+215c219
+< int bcf_sr_set_threads(bcf_srs_t* files, int n_threads);
+---
+> int bcf_sr_set_threads (bcf_srs_t* files, int n_threads);
+218c222
+< void bcf_sr_destroy_threads(bcf_srs_t* files);
+---
+> void bcf_sr_destroy_threads (bcf_srs_t* files);
+230c234
+< int bcf_sr_add_reader(bcf_srs_t* readers, const(char)* fname);
+---
+> int bcf_sr_add_reader (bcf_srs_t* readers, const(char)* fname);
+232c236
+< void bcf_sr_remove_reader(bcf_srs_t* files, int i);
+---
+> void bcf_sr_remove_reader (bcf_srs_t* files, int i);
+242c246
+< int bcf_sr_next_line(bcf_srs_t* readers);
+---
+> int bcf_sr_next_line (bcf_srs_t* readers);
+274c278
+< int bcf_sr_seek(bcf_srs_t* readers, const(char)* seq, hts_pos_t pos);
+---
+> int bcf_sr_seek (bcf_srs_t* readers, const(char)* seq, hts_pos_t pos);
+287c291
+< int bcf_sr_set_samples(bcf_srs_t* readers, const(char)* samples, int is_file);
+---
+> int bcf_sr_set_samples (bcf_srs_t* readers, const(char)* samples, int is_file);
+315c319
+< int bcf_sr_set_targets(
+---
+> int bcf_sr_set_targets (
+321c325
+< int bcf_sr_set_regions(bcf_srs_t* readers, const(char)* regions, int is_file);
+---
+> int bcf_sr_set_regions (bcf_srs_t* readers, const(char)* regions, int is_file);
+346c350
+< bcf_sr_regions_t* bcf_sr_regions_init(
+---
+> bcf_sr_regions_t* bcf_sr_regions_init (
+353c357
+< void bcf_sr_regions_destroy(bcf_sr_regions_t* regions);
+---
+> void bcf_sr_regions_destroy (bcf_sr_regions_t* regions);
+361c365
+< int bcf_sr_regions_seek(bcf_sr_regions_t* regions, const(char)* chr);
+---
+> int bcf_sr_regions_seek (bcf_sr_regions_t* regions, const(char)* chr);
+370c374
+< int bcf_sr_regions_next(bcf_sr_regions_t* reg);
+---
+> int bcf_sr_regions_next (bcf_sr_regions_t* reg);
+381c385
+< int bcf_sr_regions_overlap(
+---
+> int bcf_sr_regions_overlap (
+392c396
+< int bcf_sr_regions_flush(bcf_sr_regions_t* regs);
+---
+> int bcf_sr_regions_flush (bcf_sr_regions_t* regs);
