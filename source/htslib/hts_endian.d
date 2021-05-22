@@ -99,7 +99,7 @@ static if(HTS_ALLOW_UNALIGNED){
 /// This workaround to avoid int promotion issues
 /// implmentation direvied from this post on the dlang forums
 /// https://forum.dlang.org/post/r0imk7$14b7$3@digitalmars.com
-struct int8_t
+private struct int8_t
 {
     byte _val;
     alias _val this;
@@ -140,7 +140,7 @@ unittest
 /// This workaround to avoid int promotion issues
 /// implmentation direvied from this post on the dlang forums
 /// https://forum.dlang.org/post/r0imk7$14b7$3@digitalmars.com
-struct int16_t
+private struct int16_t
 {
     short _val;
     alias _val this;
