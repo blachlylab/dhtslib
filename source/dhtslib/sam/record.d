@@ -15,6 +15,7 @@ import htslib.sam;
 import dhtslib.sam.cigar;
 import dhtslib.sam.tagvalue;
 import dhtslib.sam.header;
+import dhtslib.coordinates;
 
 /**
 Encapsulates a SAM/BAM/CRAM record,
@@ -98,11 +99,19 @@ struct SAMRecord
     /// 0-based leftmost coordinate
     pragma(inline, true)
     @nogc @safe nothrow
-    @property long pos() { return this.b.core.pos; }
+    @property Coordinate!(Basis.zero) pos() { return Coordinate!(Basis.zero)(this.b.core.pos); }
     /// ditto
     pragma(inline, true)
     @nogc @safe nothrow
-    @property void pos(long pos) { this.b.core.pos = pos; }
+    @property void pos(Coordinate!(Basis.zero) pos) { this.b.core.pos = pos.pos; }
+
+    /// 0-based, half-open coordinates that represent
+    /// the mapped length of the alignment 
+    pragma(inline, true)
+    @property Coordinates!(CoordSystem.zbho) coordinates()
+    {
+        return Coordinates!(CoordSystem.zbho)(this.pos, this.pos + this.cigar.alignedLength);
+    }
 
     // TODO: @field  bin     bin calculated by bam_reg2bin()
 
@@ -503,15 +512,15 @@ struct SAMRecord
 
     struct AlignedPair(bool refSeq)
     {
-        long qpos, rpos;
+        Coordinate!(Basis.zero) qpos, rpos;
         Ops cigar_op;
         char queryBase;
         static if(refSeq) char refBase;
 
         string toString(){
             import std.conv : to;
-            static if(refSeq) return rpos.to!string ~ ":" ~ refBase ~ " > " ~ qpos.to!string ~ ":" ~ queryBase;
-            else return rpos.to!string ~ ":" ~ qpos.to!string ~ ":" ~ queryBase;
+            static if(refSeq) return rpos.pos.to!string ~ ":" ~ refBase ~ " > " ~ qpos.pos.to!string ~ ":" ~ queryBase;
+            else return rpos.pos.to!string ~ ":" ~ qpos.pos.to!string ~ ":" ~ queryBase;
         }
     }
 
