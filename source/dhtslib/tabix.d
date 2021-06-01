@@ -105,17 +105,21 @@ struct TabixIndexedFile {
         return sequence_names;
     }
 
-    auto region(CoordSystem cs)(ChromCoordinates!cs region)
-    {
-        return this.region(region.chrom, region.coords);
-    }
-
     /** region(r)
      *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
      */
     auto region(CoordSystem cs)(string chrom, Coordinates!cs coords)
     {
-        auto newCoords = coords.to!(CoordSystem.zbho);
+        auto reg = ChromCoordinates!cs(chrom, coords);
+        return region(reg);
+    }
+
+    /** region(r)
+     *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
+     */
+    auto region(CoordSystem cs)(ChromCoordinates!cs region)
+    {
+        auto newRegion = region.to!(CoordSystem.zbho);
         struct Region
         {
 
@@ -131,11 +135,11 @@ struct TabixIndexedFile {
             // but first row was preloaded in this.next)
             private bool active;
 
-            this(TabixIndexedFile *tbx, string chrom, Coordinates!(CoordSystem.zbho) coords)
+            this(TabixIndexedFile *tbx,  ChromCoordinates!(CoordSystem.zbho) region)
             {
                 this.tbx = tbx;
 
-                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(chrom)), cast(int) coords.start, cast(int) coords.end);
+                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(region.chrom)), cast(int) region.coords.start, cast(int) region.coords.end);
                 debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
                 if (this.itr) {
                     // Load the first record
@@ -188,7 +192,7 @@ struct TabixIndexedFile {
             }
         }
 
-        return Region(&this, chrom, newCoords);
+        return Region(&this, newRegion);
     }
 
 }

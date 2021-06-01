@@ -33,7 +33,7 @@ struct BedRecord
     {
         auto start = (cast(string)this.line.splitter('\t').drop(1).front).to!long;
         auto end = (cast(string)this.line.splitter('\t').drop(2).front).to!long;
-        return Zbho(start, end);
+        return ZBHO(start, end);
     }
     
     /// column 2: The starting position of the feature in the chromosome or scaffold.
@@ -138,7 +138,7 @@ debug(dhtslib_unittest) unittest
     auto bed = BedReader(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","tabix","bed_file.bed"));
     auto rec = bed.front;
     assert(rec.contig == "X");
-    assert(rec.coordinates == Zbho(1000, 1100));
+    assert(rec.coordinates == ZBHO(1000, 1100));
     assert(rec.name == "X1");
     assert(rec.score == 500);
     assert(rec.strand == '+');
@@ -149,7 +149,7 @@ debug(dhtslib_unittest) unittest
 
     rec = bed.front;
     assert(rec.contig == "X");
-    assert(rec.coordinates == Zbho(1200, 1300));
+    assert(rec.coordinates == ZBHO(1200, 1300));
     assert(rec.name == "X2");
     assert(rec.score == 500);
     assert(rec.strand == '+');
@@ -176,7 +176,7 @@ debug(dhtslib_unittest) unittest
     
     auto bed = BedReader(
         buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","tabix","bed_file.bed.gz"),
-        Zbho("X:1000-1400")
+        ZBHO("X:1000-1400")
         );
 
     assert(bed.array.length == 2);

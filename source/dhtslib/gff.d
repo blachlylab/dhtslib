@@ -68,7 +68,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.contig == "X");
     assert(rec.source == "Vega");
     assert(rec.type == "exon");
-    assert(rec.coordinates == Obc(2934816, 2935190));
+    assert(rec.coordinates == OBC(2934816, 2935190));
     assert(rec.score == -1);
     assert(rec.strand == '-');
     assert(rec.phase == -1);
@@ -80,7 +80,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.contig == "X");
     assert(rec.source == "Vega");
     assert(rec.type == "gene");
-    assert(rec.coordinates == Obc(2934816, 2964270));
+    assert(rec.coordinates == OBC(2934816, 2964270));
     assert(rec.score == -1);
     assert(rec.strand == '-');
     assert(rec.phase == -1);
@@ -113,7 +113,7 @@ debug(dhtslib_unittest) unittest
     
     auto gff = GFF3Reader(
         buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","tabix","gff_file.gff.gz"),
-        Obc("X:2934832-2935190")
+        OBC("X:2934832-2935190")
         );
 
     assert(gff.array.length == 4);

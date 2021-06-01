@@ -1,7 +1,7 @@
 /* The MIT License
 
    Copyright (C) 2011 by Attractive Chaos <attractor@live.co.uk>
-   Copyright (C) 2013-2014, 2016, 2018-2019 Genome Research Ltd.
+   Copyright (C) 2013-2014, 2016, 2018-2020 Genome Research Ltd.
 
    Permission is hereby granted, free of charge, to any person obtaining
    a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 */
-
 module htslib.kstring;
 
 import core.stdc.config : c_long;
@@ -32,46 +31,15 @@ import core.stdc.stdio : EOF;
 import core.stdc.stdlib;
 import core.stdc.string : memcpy, strlen;
 
+import htslib.kroundup;
+
 alias ssize_t = ptrdiff_t;	// should be defined in core.stdc somewhere but is not :/
 
 extern (C):
 
-// #define kroundup32(x) (--(x), (x)|=(x)>>1, (x)|=(x)>>2, (x)|=(x)>>4, (x)|=(x)>>8, (x)|=(x)>>16, ++(x))
+// __MINGW_PRINTF_FORMAT
 
-/// round 32 or 64 bit (u)int x to power of 2 that is equal or greater (JSB)
-pragma(inline, true)
-extern (D)
-void kroundup_size_t(ref size_t x) {
-	x -= 1;
-	x |= (x >> 1);
-	x |= (x >> 2);
-	x |= (x >> 4);
-	x |= (x >> 8);
-	x |= (x >> 16);
-
-	static if (size_t.sizeof == 8)
-        x |= (x >> 32);
-
-	++x;
-}
-
-/+
-#if defined __GNUC__ && (__GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4))
-#ifdef __MINGW_PRINTF_FORMAT
-#define KS_ATTR_PRINTF(fmt, arg) __attribute__((__format__ (__MINGW_PRINTF_FORMAT, fmt, arg)))
-#else
-#define KS_ATTR_PRINTF(fmt, arg) __attribute__((__format__ (__printf__, fmt, arg)))
-#endif // __MINGW_PRINTF_FORMAT
-#else
-#define KS_ATTR_PRINTF(fmt, arg)
-#endif
-
-#ifndef HAVE___BUILTIN_CLZ
-#if defined __GNUC__ && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4))
-#define HAVE___BUILTIN_CLZ 1
-#endif
-#endif
-+/
+enum HAVE___BUILTIN_CLZ = 1;
 
 /* kstring_t is a simple non-opaque type whose fields are likely to be
  * used directly by user code (but see also ks_str() and ks_len() below).
@@ -120,18 +88,20 @@ void* kmemmem(const(void)* _str, int n, const(void)* _pat, int m, int** _prep);
 char* kstrtok(const(char)* str, const(char)* sep, ks_tokaux_t* aux);
 
 /* kgetline() uses the supplied fgets()-like function to read a "\n"-
-	 * or "\r\n"-terminated line from fp.  The line read is appended to the
-	 * kstring without its terminator and 0 is returned; EOF is returned at
-	 * EOF or on error (determined by querying fp, as per fgets()). */
+ * or "\r\n"-terminated line from fp.  The line read is appended to the
+ * kstring without its terminator and 0 is returned; EOF is returned at
+ * EOF or on error (determined by querying fp, as per fgets()). */
 alias kgets_func = char* function(char*, int, void*);
-int kgetline(kstring_t* s, char* function(char*, int, void*) fgets, void* fp);
+int kgetline(kstring_t* s, char* function() fgets_fn, void* fp);
 
-// This matches the signature of hgetln(), apart from the last pointer
+/* kgetline2() uses the supplied hgetln()-like function to read a "\n"-
+ * or "\r\n"-terminated line from fp.  The line read is appended to the
+ * ksring without its terminator and 0 is returned; EOF is returned at
+ * EOF or on error (determined by querying fp, as per fgets()). */
 alias kgets_func2 = c_long function(char*, size_t, void*);
-int kgetline2(kstring_t* s, ssize_t function(char*, size_t, void*) fgets, void* fp);
+int kgetline2(kstring_t* s, ssize_t function() fgets_fn, void* fp);
 
 /// kstring initializer for structure assignment
-//#define KS_INITIALIZE { 0, 0, NULL }
 
 /// kstring initializer for pointers
 /**
@@ -391,7 +361,7 @@ int kputl(c_long c, kstring_t* s) {
 
 /*
  * Returns 's' split by delimiter, with *n being the number of components;
- *         NULL on failue.
+ *         NULL on failure.
  */
 int* ksplit(kstring_t* s, int delimiter, int* n)
 {
@@ -400,5 +370,3 @@ int* ksplit(kstring_t* s, int delimiter, int* n)
 	*n = ksplit_core(s.s, delimiter, &max, &offsets);
 	return offsets;
 }
-
-

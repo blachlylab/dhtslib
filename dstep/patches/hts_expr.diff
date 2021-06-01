@@ -1,0 +1,29 @@
+24c24,25
+< 
+---
+> module htslib.hts_expr;
+> import htslib.kstring: kstring_t;
+46c47
+< void hts_expr_val_free(hts_expr_val_t* f);
+---
+> void hts_expr_val_free (hts_expr_val_t* f);
+57c58
+< hts_filter_t* hts_filter_init(const(char)* str);
+---
+> hts_filter_t* hts_filter_init (const(char)* str);
+62c63
+< void hts_filter_free(hts_filter_t* filt);
+---
+> void hts_filter_free (hts_filter_t* filt);
+65c66
+< alias hts_expr_sym_func = int function(
+---
+> alias hts_expr_sym_func = int function (
+86c87
+< int hts_filter_eval(
+---
+> int hts_filter_eval (
+89c90
+<     int function() sym_func,
+---
+>     int function () sym_func,

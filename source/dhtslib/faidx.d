@@ -214,25 +214,25 @@ debug(dhtslib_unittest) unittest
 
     fai.setCacheSize(4000000);
 
-    assert(fai.fetchSequence("CHROMOSOME_I",Zbho(0, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",Obho(1, 30)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",Zbc(0, 28)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",Obc(1, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",ZBHO(0, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",OBHO(1, 30)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",ZBC(0, 28)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",OBC(1, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
 
-    assert(fai.fetchSequence("CHROMOSOME_I",Zbho(1, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",Obho(2, 30)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",Zbc(1, 28)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",Obc(2, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",ZBHO(1, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",OBHO(2, 30)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",ZBC(1, 28)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",OBC(2, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
 
-    assert(fai["CHROMOSOME_I",Zb(0) .. Zb(29)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai["CHROMOSOME_I",ZB(0) .. ZB(29)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
     import std.stdio;
-    writeln(fai["CHROMOSOME_I",Ob(1) .. Ob(30)]);
-    assert(fai["CHROMOSOME_I",Ob(1) .. Ob(30)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    writeln(fai["CHROMOSOME_I",OB(1) .. OB(30)]);
+    assert(fai["CHROMOSOME_I",OB(1) .. OB(30)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
     
-    assert(fai.fetchSequence(Zbho("CHROMOSOME_I:0-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(Obho("CHROMOSOME_I:1-30")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(Zbc("CHROMOSOME_I:0-28")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(Obc("CHROMOSOME_I:1-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ZBHO("CHROMOSOME_I:0-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(OBHO("CHROMOSOME_I:1-30")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ZBC("CHROMOSOME_I:0-28")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(OBC("CHROMOSOME_I:1-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
 
     assert(fai.seqLen("CHROMOSOME_I") == 1009800);
     assert(fai.nSeq == 7);

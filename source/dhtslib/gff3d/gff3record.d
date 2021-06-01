@@ -22,7 +22,7 @@ import dhtslib.coordinates;
 Format Documentation:
  *  http://gmod.org/wiki/GFF3
  *  https://useast.ensembl.org/info/website/upload/gff3.html
- *  https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
+ *  https://github.com/The-Sequence-Ontology/Specifications/blOB/master/gff3.md
  *  http://www.sequenceontology.org/gff3.shtml
  *
  *  TODO: make sortable
@@ -59,12 +59,12 @@ struct GFF3_Record
     /// Column 3: feature type; sequence ontology (SO) defined type, or SO accession number
     @property type() const { return cast(string)this.raw.splitter('\t').drop(2).front; }
 
-    /// Columns 4 & 5: returns Coordinate set: Obc format
+    /// Columns 4 & 5: returns Coordinate set: OBC format
     @property coordinates() const
     {
         auto start = (cast(string)this.raw.splitter('\t').drop(3).front).to!long;
         auto end = (cast(string)this.raw.splitter('\t').drop(4).front).to!long;
-        return Obc(start, end);
+        return OBC(start, end);
     }
     /// Columns 4: start; 1-based integer start position of the feature
     @property start() const { return this.coordinates.start; }
@@ -142,9 +142,9 @@ struct GFF3_Record
     /// Computed feature length
     @property length() const { return this.end - (this.start-1); }
     /// Relative start === 1
-    @property relativeStart() const { return Ob(1); }
+    @property relativeStart() const { return OB(1); }
     /// Relative start === the feature length
-    @property relativeEnd() const  { return Ob(this.length); }
+    @property relativeEnd() const  { return OB(this.length); }
 
     /// Genomic coordinate at offset into feature, taking strandedness into account
     @property coordinateAtOffset(long offset) const
@@ -159,7 +159,7 @@ struct GFF3_Record
         // for - strand count backward; for +, ., and ? strand count forward
         immutable auto direction = (this.strand == '-' ? -1 : 1);
 
-        return Ob(begin + (direction * offset));
+        return OB(begin + (direction * offset));
     }
     /// Genomic coordinate at beginning of feature, taking strandedness into account
     @property coordinateAtBegin() const

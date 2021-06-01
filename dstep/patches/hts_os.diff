@@ -1,0 +1,18 @@
+24a25
+> module htslib.hts_os;
+35c36
+< void hts_srand48(c_long seed);
+---
+> void hts_srand48 (c_long seed);
+37c38
+< double hts_erand48(ref ushort[3] xseed);
+---
+> double hts_erand48 (ref ushort[3] xseed);
+39c40
+< double hts_drand48();
+---
+> double hts_drand48 ();
+41c42
+< c_long hts_lrand48();
+---
+> c_long hts_lrand48 ();

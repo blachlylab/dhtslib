@@ -393,7 +393,7 @@ struct SAMReader
     {
         auto tid = this.header.targetId(ctg);
         auto end = this.header.targetLength(tid) + coords[1];
-        auto endCoord = Zb(end);
+        auto endCoord = ZB(end);
         auto newEndCoord = endCoord.to!bs;
         auto c = Coordinates!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
         return query(tid, c);
@@ -402,7 +402,7 @@ struct SAMReader
     auto opIndex(Basis bs)(int tid, Tuple!(Coordinate!bs, OffsetType) coords)
     {
         auto end = this.header.targetLength(tid) + coords[1];
-        auto endCoord = Zb(end);
+        auto endCoord = ZB(end);
         auto newEndCoord = endCoord.to!bs;
         auto c = Coordinates!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
         return query(tid, c);
@@ -819,17 +819,32 @@ debug(dhtslib_unittest) unittest
     // assert(bam["CHROMOSOME_III"].array.length == 41);
     // assert(bam["CHROMOSOME_IV"].array.length == 19);
     // assert(bam["CHROMOSOME_V"].array.length == 0);
-    assert(bam.query(Obc("CHROMOSOME_I:900-2000")).array.length == 14);
-    assert(bam.query("CHROMOSOME_I", Zbho(900, 2000)) .array.length == 14);
-    assert(bam["CHROMOSOME_I",Zb(900) .. Zb(2000)].array.length == 14);
-    assert(bam[0, Zb(900) .. Zb(2000)].array.length == 14);
+    assert(bam.query(OBC("CHROMOSOME_I:900-2000")).array.length == 14);
+    assert(bam.query("CHROMOSOME_I", ZBHO(900, 2000)) .array.length == 14);
+    assert(bam["CHROMOSOME_I",ZB(900) .. ZB(2000)].array.length == 14);
+    assert(bam[0, ZB(900) .. ZB(2000)].array.length == 14);
 
-    assert(bam["CHROMOSOME_I",Zb(940)].array.length == 2);
-    assert(bam[0, Zb(940)].array.length == 2);
+    assert(bam["CHROMOSOME_I",ZB(940)].array.length == 2);
+    assert(bam[0, ZB(940)].array.length == 2);
 
 
-    assert(bam["CHROMOSOME_I",Zb(900) .. $].array.length == 18);
-    assert(bam[0, Zb(900) .. $].array.length == 18);
+    assert(bam["CHROMOSOME_I",ZB(900) .. $].array.length == 18);
+    assert(bam[0, ZB(900) .. $].array.length == 18);
+    assert(bam["CHROMOSOME_I",$].array.length == 0);
+    assert(bam[0, $].array.length == 0);
+    assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
+
+    assert(bam.query(OBC("CHROMOSOME_I:900-2000")).array.length == 14);
+    assert(bam.query("CHROMOSOME_I", OBHO(901, 2000)) .array.length == 14);
+    assert(bam["CHROMOSOME_I",OB(901) .. OB(2001)].array.length == 14);
+    assert(bam[0, OB(901) .. OB(2001)].array.length == 14);
+
+    assert(bam["CHROMOSOME_I",OB(941)].array.length == 2);
+    assert(bam[0, OB(941)].array.length == 2);
+
+
+    assert(bam["CHROMOSOME_I",OB(901) .. $].array.length == 18);
+    assert(bam[0, OB(901) .. $].array.length == 18);
     assert(bam["CHROMOSOME_I",$].array.length == 0);
     assert(bam[0, $].array.length == 0);
     assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);

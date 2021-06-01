@@ -1,6 +1,3 @@
-module htslib.hts_log;
-import std.string: toStringz;
-
 /// \file htslib/hts_log.h
 /// Configuration of log levels.
 /* The MIT License
@@ -28,17 +25,21 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+module htslib.hts_log;
 
-extern(C):
+import std.string: toStringz;
+
+extern (C):
 
 /// Log levels.
-enum htsLogLevel {          // @suppress(dscanner.style.phobos_naming_convention)
-    HTS_LOG_OFF,            ///< All logging disabled.
-    HTS_LOG_ERROR,          ///< Logging of errors only.
-    HTS_LOG_WARNING = 3,    ///< Logging of errors and warnings.
-    HTS_LOG_INFO,           ///< Logging of errors, warnings, and normal but significant events.
-    HTS_LOG_DEBUG,          ///< Logging of all except the most detailed debug events.
-    HTS_LOG_TRACE           ///< All logging enabled.
+enum htsLogLevel // @suppress(dscanner.style.phobos_naming_convention)
+{
+    HTS_LOG_OFF = 0, ///< All logging disabled.
+    HTS_LOG_ERROR = 1, ///< Logging of errors only.
+    HTS_LOG_WARNING = 3, ///< Logging of errors and warnings.
+    HTS_LOG_INFO = 4, ///< Logging of errors, warnings, and normal but significant events.
+    HTS_LOG_DEBUG = 5, ///< Logging of all except the most detailed debug events.
+    HTS_LOG_TRACE = 6 ///< All logging enabled.
 }
 
 /// Sets the selected log level.
@@ -54,7 +55,7 @@ htsLogLevel hts_get_log_level();
  */
 extern __gshared int hts_verbose;
 
-/**! Logs an event.
+/*! Logs an event.
 * \param severity      Severity of the event:
 *                      - HTS_LOG_ERROR means that something went wrong so that a task could not be completed.
 *                      - HTS_LOG_WARNING means that something unexpected happened, but that execution can continue, perhaps in a degraded mode.
@@ -64,7 +65,11 @@ extern __gshared int hts_verbose;
 * \param context       Context where the event occurred. Typically set to "__func__".
 * \param format        Format string with placeholders, like printf.
 */
-void hts_log(htsLogLevel severity, const(char) *context, const(char) *format, ...);
+void hts_log(
+    htsLogLevel severity,
+    const(char)* context,
+    const(char)* format,
+    ...);
 
 pragma(inline, true):
 /**! Logs an event with severity HTS_LOG_ERROR and default context. Parameters: format, ... */

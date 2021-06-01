@@ -1,7 +1,7 @@
 /// @file htslib/sam.h
 /// High-level SAM/BAM/CRAM sequence file operations.
 /*
-    Copyright (C) 2008, 2009, 2013-2019 Genome Research Ltd.
+    Copyright (C) 2008, 2009, 2013-2020 Genome Research Ltd.
     Copyright (C) 2010, 2012, 2013 Broad Institute.
 
     Author: Heng Li <lh3@sanger.ac.uk>
@@ -26,12 +26,14 @@ DEALINGS IN THE SOFTWARE.  */
 
 module htslib.sam;
 
-import core.stdc.stdint;
+import core.stdc.stddef;
+import core.stdc.stdlib;
+import std.format: format;
+
 import htslib.hts;
 import htslib.hts_log;
-import htslib.bgzf: BGZF;
-import htslib.kstring: kstring_t;
-import std.format: format;
+import htslib.bgzf : BGZF;
+import htslib.kstring : kstring_t, ssize_t;
 
 extern (C):
 
@@ -372,6 +374,13 @@ extern (D) auto bam_seqi(T0, T1)(auto ref T0 s, auto ref T1 i)
 {
     return s[i >> 1] >> ((~i & 1) << 2) & 0xf;
 }
+
+/*!
+ @abstract  Modifies a single base in the bam structure.
+ @param s   Query sequence returned by bam_get_seq()
+ @param i   The i-th position, 0-based
+ @param b   Base in nt16 nomenclature (see seq_nt16_table)
+*/
 
 /**************************
  *** Exported functions ***
@@ -1021,6 +1030,7 @@ enum BAM_USER_OWNS_DATA = 2;
 
    \endcode
 */
+pragma(inline,true)
 void bam_set_mempolicy(bam1_t* b, uint policy) {
     b.mempolicy = policy;
 }
@@ -1030,6 +1040,7 @@ void bam_set_mempolicy(bam1_t* b, uint policy) {
 
     See bam_set_mempolicy()
  */
+pragma(inline,true)
 uint bam_get_mempolicy(bam1_t* b) {
     return b.mempolicy;
 }
@@ -1076,6 +1087,46 @@ bam1_t* bam_copy1(bam1_t* bdst, const(bam1_t)* bsrc);
    via bam_destroy1() when it is no longer needed.
  */
 bam1_t* bam_dup1(const(bam1_t)* bsrc);
+
+/// Sets all components of an alignment structure
+/**
+   @param bam      Target alignment structure. Must be initialized by a call to bam_init1().
+                   The data field will be reallocated automatically as needed.
+   @param l_qname  Length of the query name. If set to 0, the placeholder query name "*" will be used.
+   @param qname    Query name, may be NULL if l_qname = 0
+   @param flag     Bitwise flag, a combination of the BAM_F* constants.
+   @param tid      Chromosome ID, defined by sam_hdr_t (a.k.a. RNAME).
+   @param pos      0-based leftmost coordinate.
+   @param mapq     Mapping quality.
+   @param n_cigar  Number of CIGAR operations.
+   @param cigar    CIGAR data, may be NULL if n_cigar = 0.
+   @param mtid     Chromosome ID of next read in template, defined by sam_hdr_t (a.k.a. RNEXT).
+   @param mpos     0-based leftmost coordinate of next read in template (a.k.a. PNEXT).
+   @param isize    Observed template length ("insert size") (a.k.a. TLEN).
+   @param l_seq    Length of the query sequence (read) and sequence quality string.
+   @param seq      Sequence, may be NULL if l_seq = 0.
+   @param qual     Sequence quality, may be NULL.
+   @param l_aux    Length to be reserved for auxiliary field data, may be 0.
+
+   @return >= 0 on success (number of bytes written to bam->data), negative (with errno set) on failure.
+*/
+int bam_set1(
+    bam1_t* bam,
+    size_t l_qname,
+    const(char)* qname,
+    ushort flag,
+    int tid,
+    hts_pos_t pos,
+    ubyte mapq,
+    size_t n_cigar,
+    const(uint)* cigar,
+    int mtid,
+    hts_pos_t mpos,
+    hts_pos_t isize,
+    size_t l_seq,
+    const(char)* seq,
+    const(char)* qual,
+    size_t l_aux);
 
 /// Calculate query length from CIGAR data
 /**
@@ -1124,7 +1175,8 @@ hts_pos_t bam_cigar2rlen(int n_cigar, const(uint)* cigar);
 
       @discussion For a mapped read, this is just b->core.pos + bam_cigar2rlen.
       For an unmapped read (either according to its flags or if it has no cigar
-      string), we return b->core.pos + 1 by convention.
+      string) or a read whose cigar string consumes no reference bases at all,
+      we return b->core.pos + 1 by convention.
  */
 hts_pos_t bam_endpos(const(bam1_t)* b);
 
@@ -1138,6 +1190,31 @@ char* bam_flag2str(int flag); /** The string must be freed by the user */
  @return    0 on success, -1 on failure
  */
 int bam_set_qname(bam1_t* b, const(char)* qname);
+
+/*! @function
+ @abstract  Parse a CIGAR string into a uint32_t array
+ @param  in      [in]  pointer to the source string
+ @param  end     [out] address of the pointer to the new end of the input string
+                       can be NULL
+ @param  a_cigar [in/out]  address of the destination uint32_t buffer
+ @param  a_mem   [in/out]  address of the allocated number of buffer elements
+ @return         number of processed CIGAR operators; -1 on error
+ */
+ssize_t sam_parse_cigar(
+    const(char)* in_,
+    char** end,
+    uint** a_cigar,
+    size_t* a_mem);
+
+/*! @function
+ @abstract  Parse a CIGAR string into a bam1_t struct
+ @param  in      [in]  pointer to the source string
+ @param  end     [out] address of the pointer to the new end of the input string
+                       can be NULL
+ @param  b       [in/out]  address of the destination bam1_t struct
+ @return         number of processed CIGAR operators; -1 on error
+ */
+ssize_t bam_parse_cigar(const(char)* in_, char** end, bam1_t* b);
 
 /*************************
  *** BAM/CRAM indexing ***
@@ -1157,13 +1234,11 @@ extern (D) auto bam_itr_next(T0, T1, T2)(auto ref T0 htsfp, auto ref T1 itr, aut
 
 // Load/build .csi or .bai BAM index file.  Does not work with CRAM.
 // It is recommended to use the sam_index_* functions below instead.
-pragma(inline, true)
 extern (D) auto bam_index_load(T)(auto ref T fn)
 {
     return hts_idx_load(fn, HTS_FMT_BAI);
 }
 
-pragma(inline, true)
 extern (D) auto bam_index_build(T0, T1)(auto ref T0 fn, auto ref T1 min_shift)
 {
     return sam_index_build(fn, min_shift);
@@ -1373,6 +1448,7 @@ hts_itr_t* sam_itr_regarray(
     @param r           Pointer to a bam1_t struct
     @return >= 0 on success; -1 when there is no more data; < -1 on error
  */
+pragma(inline,true)
 int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r) {
     if (!htsfp.is_bgzf && !htsfp.is_cram) {
         hts_log_error(__FUNCTION__, format("%s not BGZF compressed", htsfp.fn ? htsfp.fn : "File"));
@@ -1411,6 +1487,7 @@ const(char)* sam_parse_region(
 
 alias sam_open = hts_open;
 alias sam_open_format = hts_open_format;
+
 alias sam_close = hts_close;
 
 int sam_open_mode(char* mode, const(char)* fn, const(char)* format);
@@ -1443,9 +1520,64 @@ int sam_read1(samFile* fp, sam_hdr_t* h, bam1_t* b);
  */
 int sam_write1(samFile* fp, const(sam_hdr_t)* h, const(bam1_t)* b);
 
+// Forward declaration, see hts_expr.h for full.
+struct hts_filter_t;
+
+/// sam_passes_filter - Checks whether a record passes an hts_filter.
+/** @param h      Pointer to the header structure previously read
+ *  @param b      Pointer to the BAM record to be checked
+ *  @param filt   Pointer to the filter, created from hts_filter_init.
+ *  @return       1 if passes, 0 if not, and <0 on error.
+ */
+int sam_passes_filter(
+    const(sam_hdr_t)* h,
+    const(bam1_t)* b,
+    hts_filter_t* filt);
+
 /*************************************
  *** Manipulating auxiliary fields ***
  *************************************/
+
+/// Converts a BAM aux tag to SAM format
+/*
+ * @param b    Pointer to the bam record
+ * @param key  Two letter tag key
+ * @param type Single letter type code: ACcSsIifHZB.
+ * @param tag  Tag data pointer, in BAM format
+ * @param end  Pointer to end of bam record (largest extent of tag)
+ * @param ks   Kstring to write the formatted tag to
+ *
+ * @return pointer to end of tag on success,
+ *         NULL on failure.
+ *
+ * @discussion The three separate parameters key, type, tag may be
+ * derived from a s=bam_aux_get() query as s-2, *s and s+1.  However
+ * it is recommended to use bam_aux_get_str in this situation.
+ * The desire to split these parameters up is for potential processing
+ * of non-BAM formats that encode using a BAM type mechanism
+ * (such as the internal CRAM representation).
+ */
+
+// brevity and consistency with other code.
+
+// NB: "d" is not an official type in the SAM spec.
+// However for unknown reasons samtools has always supported this.
+// We believe, HOPE, it is not in general usage and we do not
+// encourage it.
+
+// or externalise sam.c's aux_type2size function?
+
+// now points to the start of the array
+
+// write the type
+
+// Unknown type
+const(ubyte)* sam_format_aux1(
+    const(ubyte)* key,
+    const ubyte type,
+    const(ubyte)* tag,
+    const(ubyte)* end,
+    kstring_t* ks);
 
 /// Return a pointer to an aux record
 /** @param b   Pointer to the bam record
@@ -1457,6 +1589,17 @@ int sam_write1(samFile* fp, const(sam_hdr_t)* h, const(bam1_t)* b);
     EINVAL and NULL is returned.
  */
 ubyte* bam_aux_get(const(bam1_t)* b, ref const(char)[2] tag);
+
+/// Return a SAM formatting string containing a BAM tag
+/** @param b   Pointer to the bam record
+    @param tag Desired aux tag
+    @param s   The kstring to write to.
+
+    @return 1 on success,
+            0 on no tag found with errno = ENOENT,
+           -1 on error (errno will be either EINVAL or ENOMEM).
+ */
+int bam_aux_get_str(const(bam1_t)* b, ref const(char)[2] tag, kstring_t* s);
 
 /// Get an integer aux value
 /** @param s Pointer to the tag data, as returned by bam_aux_get()
@@ -1552,6 +1695,15 @@ int bam_aux_del(bam1_t* b, ubyte* s);
    This function will not change the ordering of tags in the bam record.
    New tags will be appended to any existing aux records.
 
+   If @p len is less than zero, the length of the input string will be
+   calculated using strlen().  Otherwise exactly @p len bytes will be
+   copied from @p data to make the new tag.  If these bytes do not
+   include a terminating NUL character, one will be added.  (Note that
+   versions of HTSlib up to 1.10.2 had different behaviour here and
+   simply copied @p len bytes from data.  To generate a valid tag it
+   was necessary to ensure the last character was a NUL, and include
+   it in @p len.)
+
    On failure, errno may be set to one of the following values:
 
    EINVAL: The bam record's aux data is corrupt or an existing tag with the
@@ -1630,7 +1782,7 @@ int bam_aux_update_float(bam1_t* b, ref const(char)[2] tag, float val);
 
    This function will not change the ordering of tags in the bam record.
    New tags will be appended to any existing aux records.  The bam record
-   will grow or shrink in order to accomodate the new data.
+   will grow or shrink in order to accommodate the new data.
 
    The data parameter must not point to any data in the bam record itself or
    undefined behaviour may result.
@@ -1715,11 +1867,11 @@ struct bam_pileup1_t
 
 alias bam_plp_auto_f = int function(void* data, bam1_t* b);
 
-struct __bam_plp_t;
-alias bam_plp_t = __bam_plp_t*;
+struct bam_plp_s;
+alias bam_plp_t = bam_plp_s*;
 
-struct __bam_mplp_t;
-alias bam_mplp_t = __bam_mplp_t*;
+struct bam_mplp_s;
+alias bam_mplp_t = bam_mplp_s*;
 
 /**
  *  bam_plp_init() - sets an iterator over multiple
