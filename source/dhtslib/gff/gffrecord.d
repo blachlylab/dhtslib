@@ -100,7 +100,7 @@ struct GFFRecord(GFFVersion ver)
 
     /// Column 1: seqid (aka contig); basis for the coordinate system
     /// getter
-    @property seqid()
+    @property seqid() const
     {
         if(unpacked) return this.fields[0];
         return cast(string)this.raw.splitter('\t').front; 
@@ -115,7 +115,7 @@ struct GFFRecord(GFFVersion ver)
     }
 
     /// ditto
-    @property contig()
+    @property contig() const
     {
         return seqid;
     }
@@ -128,7 +128,7 @@ struct GFFRecord(GFFVersion ver)
 
     /// Column 2: source; software, procedure, or database originating the record
     /// getter
-    @property source()
+    @property source() const
     {
         if(unpacked) return this.fields[1];
         return cast(string)this.raw.splitter('\t').drop(1).front;
@@ -144,7 +144,7 @@ struct GFFRecord(GFFVersion ver)
 
     /// Column 3: feature type; sequence ontology (SO) defined type, or SO accession number
     /// getter
-    @property type()
+    @property type() const
     {
         if(unpacked) return this.fields[2];
         return cast(string)this.raw.splitter('\t').drop(2).front;
@@ -160,7 +160,7 @@ struct GFFRecord(GFFVersion ver)
 
     /// Columns 4 & 5: returns Coordinate set: OBC format
     /// getter
-    @property coordinates()
+    @property coordinates() const
     {
         long start, end;
         if(unpacked){
@@ -184,15 +184,15 @@ struct GFFRecord(GFFVersion ver)
     }
 
     /// Columns 4: start; 1-based integer start position of the feature
-    @property start(){ return this.coordinates.start; }
+    @property start() const { return this.coordinates.start; }
     /// Column 5: end; closed coordinate integer ending nucleotide position of the feature
-    @property end(){ return this.coordinates.end; }
+    @property end() const { return this.coordinates.end; }
 
     /// Column 6: score; float. From the standard: "the semantics of the score are ill-defined."
     /// Tragically, score can be either a float, or not present (".")
     /// Totally arbitrarily, we will represent absent as -1
     /// getter
-    @property score()
+    @property score() const
     {
         string val;
         if(unpacked) val = this.fields[5];
@@ -216,7 +216,7 @@ struct GFFRecord(GFFVersion ver)
 
     /// Column 7: strand; '+', '-', or '.' (or '?' for relevant but unknown)
     // getter
-    @property strand()
+    @property strand() const
     {
         if(unpacked) return cast(char)this.fields[6][0];
         return cast(char)this.raw.splitter('\t').drop(6).front[0];
@@ -251,7 +251,7 @@ struct GFFRecord(GFFVersion ver)
     Tragically, phase can be either an integer (0, 1, 2), or not present (".")
     Totally arbitrarily, we will represent absent as -1
     **/
-    @property phase()
+    @property phase() const
     {
         string val;
         if(unpacked) val = this.fields[7];
@@ -271,7 +271,7 @@ struct GFFRecord(GFFVersion ver)
     }
 
     /// Column 9: backwards compatible GFF2 group field
-    @property group()
+    @property group() const
     {
         if(unpacked) return this.fields[8];
         return cast(string)this.raw.splitter('\t').drop(8).front;
@@ -290,7 +290,7 @@ struct GFFRecord(GFFVersion ver)
     string attributes(const string field){ return this.opIndex(field); }
 
     /// Provides map key lookup semantics for column 9 attributes
-    string opIndex(string field)
+    string opIndex(string field) const
     {
         if(unpacked) return this.kvmap[field];
         static if(ver != GFFVersion.GFF3){
@@ -335,14 +335,14 @@ struct GFFRecord(GFFVersion ver)
     }
 
     /// Computed feature length
-    @property length(){ return this.end - (this.start-1); }
+    @property length() const { return this.end - (this.start-1); }
     /// Relative start === 1
-    @property relativeStart(){ return OB(1); }
+    @property relativeStart() const { return OB(1); }
     /// Relative start === the feature length
-    @property relativeEnd() { return OB(this.length); }
+    @property relativeEnd() const { return OB(this.length); }
 
     /// Genomic coordinate at offset into feature, taking strandedness into account
-    @property coordinateAtOffset(long offset)
+    @property coordinateAtOffset(long offset) const
     {
         // GFF3 features are 1-based coordinates
         assert(offset > 0);
@@ -357,17 +357,17 @@ struct GFFRecord(GFFVersion ver)
         return OB(begin + (direction * offset));
     }
     /// Genomic coordinate at beginning of feature, taking strandedness into account
-    @property coordinateAtBegin()
+    @property coordinateAtBegin() const
     {
         return this.coordinateAtOffset(1);
     }
     /// Genomic coordinate at end of feature, taking strandedness into account
-    @property coordinateAtEnd()
+    @property coordinateAtEnd() const
     {
         return this.coordinateAtOffset(this.length);
     }
 
-    string toString()
+    string toString() const
     {
         if(!unpacked) 
             return cast(string) this.raw;
@@ -380,12 +380,12 @@ struct GFFRecord(GFFVersion ver)
     }
 
     /// Returns a string with the canonical "chr:start-end" representation
-    @property string canonicalRepresentation()
+    @property string canonicalRepresentation() const
     {
         return this.seqid~":"~this.start.pos.to!string~"-"~this.end.pos.to!string;
     }
     /// Return the seqURI representation
-    @property string seqURI(){
+    @property string seqURI() const {
         return format("seq:unk/%s", this.canonicalRepresentation);
     }
 
