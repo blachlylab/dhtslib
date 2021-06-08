@@ -139,7 +139,7 @@ struct TabixIndexedFile {
             {
                 this.tbx = tbx;
 
-                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(region.chrom)), cast(int) region.coords.start, cast(int) region.coords.end);
+                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(region.chrom)), region.coords.start, region.coords.end);
                 debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
                 if (this.itr) {
                     // Load the first record
