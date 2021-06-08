@@ -124,7 +124,7 @@ struct TabixIndexedFile {
         {
 
             /** TODO: determine how thread-(un)safe this is (i.e., using a potentially shared *fp and *tbx) */
-            private TabixIndexedFile *tbx;
+            private TabixIndexedFile tbx;
 
             private hts_itr_t *itr;
             private string next;
@@ -135,7 +135,7 @@ struct TabixIndexedFile {
             // but first row was preloaded in this.next)
             private bool active;
 
-            this(TabixIndexedFile *tbx,  ChromCoordinates!(CoordSystem.zbho) region)
+            this(TabixIndexedFile tbx,  ChromCoordinates!(CoordSystem.zbho) region)
             {
                 this.tbx = tbx;
 
@@ -192,7 +192,7 @@ struct TabixIndexedFile {
             }
         }
 
-        return Region(&this, newRegion);
+        return Region(this, newRegion);
     }
 
 }
