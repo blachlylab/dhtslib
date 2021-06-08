@@ -24,13 +24,14 @@ struct BedRecord
 {
     private string line;
 
-    private bool unpacked;
+    private bool unpacked = true;
     private string[] fields;
 
     /// string ctor
     this(string line)
     {
         this.line = line;
+        this.unpacked = false;
     }
 
     /// unpack fields of bed line for mutability
@@ -54,6 +55,7 @@ struct BedRecord
     @property contig(string val)
     {
         unpack;
+        if(this.fields.length == 0) this.fields.length = 3;  
         this.fields[0] = val;
     }
 
@@ -77,6 +79,7 @@ struct BedRecord
     @property coordinates(CoordSystem cs)(Coordinates!cs coords)
     {
         unpack;
+        if(this.fields.length < 3) this.fields.length = 3;
         auto newCoords = coords.to!(CoordSystem.zbho);
         this.fields[1] = newCoords.start.pos.to!string;
         this.fields[2] = newCoords.end.pos.to!string; 
@@ -101,6 +104,7 @@ struct BedRecord
     @property name(string val)
     {
         unpack;
+        if(this.fields.length < 4) this.fields.length = 4;
         this.fields[3] = val;
     }
 
@@ -117,6 +121,7 @@ struct BedRecord
     @property score(int val)
     {
         unpack;
+        if(this.fields.length < 5) this.fields.length = 5;
         this.fields[4] = val.to!string;
     }    
     
@@ -134,6 +139,7 @@ struct BedRecord
     {
         assert(val == '.' || val == '+'|| val == '-');
         unpack;
+        if(this.fields.length < 6) this.fields.length = 6;
         this.fields[5] = [val].idup;
     }
 
@@ -150,6 +156,7 @@ struct BedRecord
     @property thickStart(int val)
     {
         unpack;
+        if(this.fields.length < 7) this.fields.length = 7;
         this.fields[6] = val.to!string;
     }
 
@@ -166,6 +173,7 @@ struct BedRecord
     @property thickEnd(int val)
     {
         unpack;
+        if(this.fields.length < 8) this.fields.length = 8;
         this.fields[7] = val.to!string;
     }
     
@@ -191,6 +199,7 @@ struct BedRecord
     @property itemRGB(RGB rgb)
     {
         unpack;
+        if(this.fields.length < 9) this.fields.length = 9;
         this.fields[8] = [rgb.red, rgb.green, rgb.blue].map!(x => x.to!string).join(",");
     }
 
@@ -207,6 +216,7 @@ struct BedRecord
     @property blockCount(int count)
     {
         unpack;
+        if(this.fields.length < 10) this.fields.length = 10;
         this.fields[9] = count.to!string;
     }
     
@@ -234,6 +244,7 @@ struct BedRecord
     @property blockSizes(int[] vals)
     {
         unpack;
+        if(this.fields.length < 11) this.fields.length = 11;
         this.fields[10] = vals.map!(x => x.to!string).join(",");
     }
 
@@ -264,6 +275,7 @@ struct BedRecord
     @property blockStarts(int[] vals)
     {
         unpack;
+        if(this.fields.length < 12) this.fields.length = 12;
         this.fields[11] = vals.map!(x => x.to!string).join(",");
     }
 
@@ -280,6 +292,7 @@ struct BedRecord
     auto opIndexAssign(string val, ulong idx)
     {
         unpack;
+        if(this.fields.length < idx) this.fields.length = idx;
         return this.fields[idx] = val;
     }
 
