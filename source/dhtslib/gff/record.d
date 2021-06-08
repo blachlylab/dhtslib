@@ -1,4 +1,4 @@
-module dhtslib.gff.gffrecord;
+module dhtslib.gff.record;
 
 import std.stdio;
 import std.algorithm.iteration: splitter;

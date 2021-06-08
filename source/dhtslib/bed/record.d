@@ -1,4 +1,4 @@
-module dhtslib.bed.bedrecord;
+module dhtslib.bed.record;
 
 import std.range : inputRangeObject, InputRangeObject;
 import std.algorithm: splitter, map;

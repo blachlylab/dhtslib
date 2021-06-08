@@ -1,7 +1,7 @@
 module dhtslib.bed;
 
-public import dhtslib.bed.bedreader;
-public import dhtslib.bed.bedrecord;
+public import dhtslib.bed.reader;
+public import dhtslib.bed.record;
 
 debug(dhtslib_unittest) unittest
 {

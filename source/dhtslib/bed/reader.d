@@ -1,7 +1,7 @@
-module dhtslib.bed.bedreader;
+module dhtslib.bed.reader;
 
 import dhtslib.coordinates;
-import dhtslib.bed.bedrecord;
+import dhtslib.bed.record;
 import dhtslib.bgzf;
 import dhtslib.tabix;
 

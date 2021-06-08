@@ -17,8 +17,8 @@ Standards: http://gmod.org/wiki/GFF3
 */
 module dhtslib.gff;
 
-public import dhtslib.gff.gffrecord;
-public import dhtslib.gff.gffreader;
+public import dhtslib.gff.record;
+public import dhtslib.gff.reader;
 
 unittest{
     import dhtslib.coordinates;

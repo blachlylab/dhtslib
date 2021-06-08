@@ -1,4 +1,4 @@
-module dhtslib.gff.gffreader;
+module dhtslib.gff.reader;
 
 import std.range : inputRangeObject, InputRangeObject;
 
