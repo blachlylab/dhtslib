@@ -15,9 +15,9 @@ Standards: http://gmod.org/wiki/GFF3
     https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
     http://www.sequenceontology.org/gff3.shtml
 */
-module dhtslib.gff3d;
+module dhtslib.gff;
 
-public import dhtslib.gff3d.gffrecord;
+public import dhtslib.gff.gffrecord;
 
 unittest{
     import dhtslib.coordinates;
