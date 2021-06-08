@@ -13,6 +13,7 @@ import core.stdc.string;
 import core.vararg;
 
 import std.conv: to, ConvException;
+import std.format: format;
 import std.range: ElementType;
 import std.string: fromStringz, toStringz;
 import std.traits: Unqual;
