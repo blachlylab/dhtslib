@@ -17,18 +17,6 @@ import std.math : isNaN;
 
 import dhtslib.coordinates;
 
-//import dhtslib.htslib.hts_log;
-
-/** GFF Generic Record
-
-Format Documentation:
- *  http://gmod.org/wiki/GFF2#The_GFF2_File_Format
- *  https://useast.ensembl.org/info/website/upload/gff.html
- *  
- *  TODO: make sortable
- *  TODO: Make record builder (i.e. start with blank record and add attrs) to prep for writing
- */
-
 enum GFFVersion
 {
     GFF2 = 0,
@@ -40,22 +28,35 @@ alias GTFRecord = GFFRecord!(GFFVersion.GTF);
 alias GFF2Record = GFFRecord!(GFFVersion.GFF2);
 alias GFF3Record = GFFRecord!(GFFVersion.GFF3);
 
+/** GFF Generic Record
 
+Format Documentation:
+ *  http://gmod.org/wiki/GFF2#The_GFF2_File_Format
+ *  https://useast.ensembl.org/info/website/upload/gff.html
+ *   
+ *  Represents a GFF record. Version selected only changes formatting of 
+ *  String representations and how the record is parsed. Implementation  
+ *  is mostly the same. This record has getters and setters and 
+ *  should be able to be built from scratch.
+ */
 struct GFFRecord(GFFVersion ver)
 {
     private ubyte[] raw;
 
-    private bool unpacked;
-    private string[] fields;
+    private bool unpacked = true;
+    private string[9] fields;
     private string[string] kvmap;
 
     /// constructor (raw ubytes)
     this(ubyte[]data){
         this.raw = data;
+        this.unpacked = false;
     }
+
     /// constructor (string)
     this(string data){
         this.raw = cast(ubyte[])data;
+        this.unpacked = false;
     }
 
     /// unpack fields of gff line for mutability
@@ -373,7 +374,7 @@ struct GFFRecord(GFFVersion ver)
     {
         if(!unpacked) 
             return cast(string) this.raw;
-        string ret = this.fields.join("\t");
+        string ret = this.fields[].join("\t");
         static if(ver == GFFVersion.GFF3) 
             ret ~= ("\t" ~ this.kvmap.byKeyValue.map!(a => a.key ~ "=" ~ a.value).join(";"));
         else
