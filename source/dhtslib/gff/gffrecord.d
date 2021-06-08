@@ -58,6 +58,7 @@ struct GFFRecord(GFFVersion ver)
         this.raw = cast(ubyte[])data;
     }
 
+    /// unpack fields of gff line for mutability
     private void unpack()
     {
         if(this.unpacked) return;
@@ -71,6 +72,7 @@ struct GFFRecord(GFFVersion ver)
         this.unpacked = true;
     }
 
+    /// unpack attributes of gff3 line for mutability
     private void unpackGFF3Attributes(){
         auto kvpairs = this.fields[8].split(';');
         foreach (string kv; kvpairs)
@@ -81,6 +83,7 @@ struct GFFRecord(GFFVersion ver)
         }
     }
 
+    /// unpack attributes of gff2 line for mutability
     private void unpackGFF2Attributes(){
         auto kvpairs = this.fields[8].split(';');
         foreach (string kv; kvpairs)
@@ -224,12 +227,11 @@ struct GFFRecord(GFFVersion ver)
 
     /// Column 7: strand; '+', '-', or '.' (or '?' for relevant but unknown)
     //setter
-    @property strand(string s)
+    @property strand(char s)
     {
         unpack;
-        assert(s.length == 1);
-        assert(s[0] == '+' || s[0] == '-' || s[0] == '.');
-        this.fields[6] = s;
+        assert(s == '+' || s == '-' || s == '.');
+        this.fields[6] = [s].idup;
     }
 
     /** Column 8: phase;

@@ -59,7 +59,7 @@ unittest{
     rec.type = "gene1";
     rec.coordinates = OBC(11_870, 14_410);
     rec.score = 1.0;
-    rec.strand = "-";
+    rec.strand = '-';
     rec.phase = 1;
     rec["ID"] = "ENSG00000223972.51";
     rec["gene_id"] = "ENSG00000223972.51";
@@ -136,7 +136,7 @@ unittest{
     rec.type = "gene1";
     rec.coordinates = OBC(11_870, 14_410);
     rec.score = 1.0;
-    rec.strand = "-";
+    rec.strand = '-';
     rec.phase = 1;
     rec["ID"] = "ENSG00000223972.51";
     rec["gene_id"] = "ENSG00000223972.51";
