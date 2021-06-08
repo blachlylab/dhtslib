@@ -175,12 +175,22 @@ debug(dhtslib_unittest) unittest
     // assert(bg.array == ["122333444455555"]);
 }
 
+/**
+    Range that allows reading a record based format via BGZFile.
+    Needs a record type that encompasses only one line of text.
+    Rectype could be GFF3Record, BedRecord ...
+    This is a sister struct to dhtslib.tabix.RecordReaderRegion.
+*/
 struct RecordReader(RecType)
 {
+    /// file reader
     BGZFile file;
+    /// file reader range
     ReturnType!(this.initializeRange) range;
+    /// keep the header
     string header;
 
+    /// string filename ctor
     this(string fn)
     {
         this.file = BGZFile(fn);
@@ -193,21 +203,25 @@ struct RecordReader(RecType)
         this.header = this.header[0 .. $-1];
     }
 
+    /// copy the BGZFile.byLineCopy range
     auto initializeRange()
     {
         return this.file.byLineCopy.inputRangeObject;
     }
 
+    /// returns RecType
     RecType front()
     {
         return RecType(this.range.front);
     }
 
+    /// move the range
     void popFront()
     {
         this.range.popFront;
     }
 
+    /// is range done
     auto empty()
     {
         return this.range.empty;

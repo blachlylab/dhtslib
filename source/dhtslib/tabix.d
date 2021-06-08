@@ -213,19 +213,33 @@ struct TabixIndexedFile {
 
 // }
 
+/**
+    Range that allows reading a record based format via tabix.
+    Needs a record type that encompasses only one line of text
+    and a ChromCoordinates region to use for tabix filtering.
+    Rectype could be GFF3Record, BedRecord ...
+    This is a sister struct to dhtslib.bgzf.RecordReader.
+*/
 struct RecordReaderRegion(RecType, CoordSystem cs)
 {
+    /// file reader
     TabixIndexedFile file;
+    /// file reader range
     ReturnType!(this.initializeRange) range;
+    /// chrom of region
     string chrom;
+    /// coordinates of region
     Coordinates!cs coords;
+    /// keep the header
     string header;
 
+    /// ChromCoordinates ctor
     this(string fn, ChromCoordinates!cs region, string fnIdx = "")
     {
         this(fn, region.chrom, region.coords, fnIdx);
     }
     
+    /// string chrom and Coordinates ctor
     this(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
     {
         this.file = TabixIndexedFile(fn, fnIdx);
@@ -236,21 +250,25 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
         this.range.empty;
     }
 
+    /// copy the TabixIndexedFile.region range
     auto initializeRange()
     {
         return this.file.region(this.chrom, this.coords);
     }
 
+    /// returns RecType
     RecType front()
     {
         return RecType(this.range.front);
     }
 
+    /// move the range
     void popFront()
     {
         this.range.popFront;
     }
 
+    /// is the range done
     auto empty()
     {
         return this.range.empty;

@@ -7,46 +7,55 @@ import dhtslib.tabix;
 import dhtslib.gff;
 import dhtslib.coordinates;
 
+/// Returns a RecordReader range for a GFF3 file
 auto GFF3Reader(string fn)
 {
     return RecordReader!GFF3Record(fn);
 }
 
+/// Returns a RecordReaderRegion range for a GFF3 file
 auto GFF3Reader(CoordSystem cs)(string fn, ChromCoordinates!cs region, string fnIdx = "")
 {
     return RecordReaderRegion!(GFF3Record, cs)(fn, region, fnIdx);
 }
 
+/// ditto
 auto GFF3Reader(CoordSystem cs)(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
 {
     return RecordReaderRegion!(GFF3Record, cs)(fn, chrom, coords, fnIdx);
 }
 
+/// Returns a RecordReader range for a GTF file
 auto GTFReader(string fn)
 {
     return RecordReader!GTFRecord(fn);
 }
 
+/// Returns a RecordReaderRegion range for a GTF file
 auto GTFReader(CoordSystem cs)(string fn, ChromCoordinates!cs region, string fnIdx = "")
 {
     return RecordReaderRegion!(GTFRecord, cs)(fn, region, fnIdx);
 }
 
+/// ditto
 auto GTFReader(CoordSystem cs)(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
 {
     return RecordReaderRegion!(GTFRecord, cs)(fn, chrom, coords, fnIdx);
 }
 
+/// Returns a RecordReader range for a GFF2 file
 auto GFF2Reader(string fn)
 {
     return RecordReader!GTFRecord(fn);
 }
 
+/// Returns a RecordReaderRegion range for a GFF2 file
 auto GFF2Reader(CoordSystem cs)(string fn, ChromCoordinates!cs region, string fnIdx = "")
 {
     return RecordReaderRegion!(GTFRecord, cs)(fn, region, fnIdx);
 }
 
+/// ditto
 auto GFF2Reader(CoordSystem cs)(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
 {
     return RecordReaderRegion!(GTFRecord, cs)(fn, chrom, coords, fnIdx);
