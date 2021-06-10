@@ -1,11 +1,8 @@
 /**
 
-GFF3 Record abstraction
+GFF file reading and writing
 
-This module provides a readable, writeable abstraction of GFF3 records.
-
-For reading and writing from and to bgzip-compressed/tabix-indexed files,
-use dhtslib -- https://github.com/blachlylab/dhtslib
+This module provides a readable, writeable abstraction of GFF records and files.
 
 Authors: James S Blachly, MD <james.blachly@gmail.com>; Thomas Gregory <charles.gregory@osumc.edu>
 License: MIT
@@ -19,6 +16,7 @@ module dhtslib.gff;
 
 public import dhtslib.gff.record;
 public import dhtslib.gff.reader;
+public import dhtslib.gff.writer;
 
 unittest{
     import dhtslib.coordinates;
