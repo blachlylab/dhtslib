@@ -43,38 +43,36 @@ struct GFFRecord(GFFVersion ver)
 {
     private ubyte[] raw;
 
-    private bool unpacked = true;
+    private bool unpackedFields = true;
+    private bool unpackedAttributes = true;
     private string[9] fields;
     private string[string] kvmap;
 
     /// constructor (raw ubytes)
     this(ubyte[]data){
         this.raw = data;
-        this.unpacked = false;
+        this.unpackedFields = false;
+        this.unpackedAttributes = false;
     }
 
     /// constructor (string)
     this(string data){
-        this.raw = cast(ubyte[])data;
-        this.unpacked = false;
+        this(cast(ubyte[])data);
     }
 
     /// unpack fields of gff line for mutability
     private void unpack()
     {
-        if(this.unpacked) return;
+        if(this.unpackedFields) return;
         this.fields = (cast(string) this.raw).split('\t');
         assert(this.fields.length == 9);
-        static if(ver == GFFVersion.GFF3){
-            unpackGFF3Attributes;
-        }else{
-            unpackGFF2Attributes;
-        }
-        this.unpacked = true;
+        this.unpackedFields = true;
     }
 
     /// unpack attributes of gff3 line for mutability
     private void unpackGFF3Attributes(){
+        if(this.unpackedAttributes) return;
+        unpack;
         auto kvpairs = this.fields[8].split(';');
         foreach (string kv; kvpairs)
         {
@@ -82,10 +80,13 @@ struct GFFRecord(GFFVersion ver)
             assert(kvfields.length == 2);
             this.kvmap[kvfields[0]] = kvfields[0];
         }
+        this.unpackedAttributes = true;
     }
 
     /// unpack attributes of gff2 line for mutability
     private void unpackGFF2Attributes(){
+        if(this.unpackedAttributes) return;
+        unpack;
         auto kvpairs = this.fields[8].split(';');
         foreach (string kv; kvpairs)
         {
@@ -93,6 +94,7 @@ struct GFFRecord(GFFVersion ver)
             assert(kvfields.length == 2);
             this.kvmap[kvfields[0].strip] = kvfields[0].strip;
         }
+        this.unpackedAttributes = true;
     }
 
     /// TODO: Not implemented; (almost) always true
@@ -106,7 +108,7 @@ struct GFFRecord(GFFVersion ver)
     /// getter
     @property seqid() const
     {
-        if(unpacked) return this.fields[0];
+        if(unpackedFields) return this.fields[0];
         return cast(string)this.raw.splitter('\t').front; 
     }
 
@@ -134,7 +136,7 @@ struct GFFRecord(GFFVersion ver)
     /// getter
     @property source() const
     {
-        if(unpacked) return this.fields[1];
+        if(unpackedFields) return this.fields[1];
         return cast(string)this.raw.splitter('\t').drop(1).front;
     }
 
@@ -150,7 +152,7 @@ struct GFFRecord(GFFVersion ver)
     /// getter
     @property type() const
     {
-        if(unpacked) return this.fields[2];
+        if(unpackedFields) return this.fields[2];
         return cast(string)this.raw.splitter('\t').drop(2).front;
     }
     
@@ -167,7 +169,7 @@ struct GFFRecord(GFFVersion ver)
     @property coordinates() const
     {
         long start, end;
-        if(unpacked){
+        if(unpackedFields){
             start = this.fields[3].to!long;
             end = this.fields[4].to!long;
         }else{
@@ -199,7 +201,7 @@ struct GFFRecord(GFFVersion ver)
     @property score() const
     {
         string val;
-        if(unpacked) val = this.fields[5];
+        if(unpackedFields) val = this.fields[5];
         else val = cast(string)this.raw.splitter('\t').drop(5).front;
         if(val=="."){
             return -1.0;
@@ -222,7 +224,7 @@ struct GFFRecord(GFFVersion ver)
     // getter
     @property strand() const
     {
-        if(unpacked) return cast(char)this.fields[6][0];
+        if(unpackedFields) return cast(char)this.fields[6][0];
         return cast(char)this.raw.splitter('\t').drop(6).front[0];
     }
 
@@ -257,7 +259,7 @@ struct GFFRecord(GFFVersion ver)
     @property phase() const
     {
         string val;
-        if(unpacked) val = this.fields[7];
+        if(unpackedFields) val = this.fields[7];
         else val = cast(string)this.raw.splitter('\t').drop(7).front;
         if(val=="."){
             return -1;
@@ -276,7 +278,13 @@ struct GFFRecord(GFFVersion ver)
     /// Column 9: backwards compatible GFF2 group field
     @property group() const
     {
-        if(unpacked) return this.fields[8];
+        if(unpackedAttributes){
+            static if(ver == GFFVersion.GFF3) 
+                return ("\t" ~ this.kvmap.byKeyValue.map!(a => a.key ~ "=" ~ a.value).join(";"));
+            else
+                return ("\t" ~ (this.kvmap.byKeyValue.map!(a => " " ~ a.key ~ " " ~ a.value ~ " ").join(";"))[1 .. $]);
+        }
+        if(unpackedFields) return this.fields[8];
         return cast(string)this.raw.splitter('\t').drop(8).front;
     }
 
@@ -285,8 +293,10 @@ struct GFFRecord(GFFVersion ver)
     {
         unpack;
         this.fields[8] = g;
-        static if(ver == GFFVersion.GFF3) unpackGFF3Attributes;
-        else unpackGFF2Attributes;
+
+        /// clear hashmap as values have been overwritten
+        if(this.unpackedAttributes) this.kvmap.clear;
+        this.unpackedAttributes = false;
     }
 
     /// Column 9: attributes; A list of ;-separated feature attributes in key=value form
@@ -295,7 +305,7 @@ struct GFFRecord(GFFVersion ver)
     /// Provides map key lookup semantics for column 9 attributes
     string opIndex(string field) const
     {
-        if(unpacked) return this.kvmap[field];
+        if(unpackedAttributes) return this.kvmap[field];
         static if(ver != GFFVersion.GFF3){
             auto attrs=this.raw.splitter('\t').drop(8).front.splitter(";");
             auto val = attrs    // actualy a Range of key=val
@@ -326,7 +336,8 @@ struct GFFRecord(GFFVersion ver)
     /// Provides map key assignment semantics for column 9 attributes
     void opIndexAssign(string val, string field)
     {
-        unpack;
+        static if(ver == GFFVersion.GFF3) unpackGFF3Attributes;
+        else unpackGFF2Attributes;
         static if(ver != GFFVersion.GFF3) val = "\"" ~ val ~ "\"";
         this.kvmap[field] = val;
     }
@@ -372,13 +383,18 @@ struct GFFRecord(GFFVersion ver)
 
     string toString() const
     {
-        if(!unpacked) 
+        if(!unpackedFields) 
             return cast(string) this.raw;
-        string ret = this.fields[].join("\t");
-        static if(ver == GFFVersion.GFF3) 
-            ret ~= ("\t" ~ this.kvmap.byKeyValue.map!(a => a.key ~ "=" ~ a.value).join(";"));
-        else
-            ret ~= ("\t" ~ (this.kvmap.byKeyValue.map!(a => " " ~ a.key ~ " " ~ a.value ~ " ").join(";"))[1 .. $]);
+        string ret;
+        if(unpackedAttributes){
+            ret = this.fields[0..8].join("\t");
+            static if(ver == GFFVersion.GFF3) 
+                ret ~= ("\t" ~ this.kvmap.byKeyValue.map!(a => a.key ~ "=" ~ a.value).join(";"));
+            else
+                ret ~= ("\t" ~ (this.kvmap.byKeyValue.map!(a => " " ~ a.key ~ " " ~ a.value ~ " ").join(";"))[1 .. $]);
+        }else{
+            ret = this.fields[].join("\t");
+        }
         return ret;
     }
 
