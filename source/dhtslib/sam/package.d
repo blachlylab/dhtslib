@@ -31,6 +31,8 @@ module dhtslib.sam;
 public import dhtslib.sam.header;
 public import dhtslib.sam.record;
 public import dhtslib.sam.cigar;
+public import dhtslib.sam.md;
+public import dhtslib.sam.tagvalue;
 public import dhtslib.sam.reader;
 public import dhtslib.sam.writer;
 
