@@ -273,6 +273,11 @@ struct ChromCoordinates(CoordSystem cs)
     Coordinates!cs coords;
 
     /// string constructor
+    this(string chrom, Coordinates!cs coords){
+        this.chrom = chrom;
+        this.coords = coords;
+    }
+    /// string constructor
     this(string region){
         import std.array : split;
 

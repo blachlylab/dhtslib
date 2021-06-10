@@ -10,6 +10,8 @@ module dhtslib.tabix;
 
 import std.stdio;
 import std.string;
+import std.traits : ReturnType;
+import std.range : inputRangeObject, InputRangeObject;
 import core.stdc.stdlib : malloc, free;
 
 import htslib.hts;
@@ -27,6 +29,8 @@ struct TabixIndexedFile {
 
     htsFile *fp;    /// pointer to htsFile struct
     tbx_t   *tbx;   /// pointer to tabix handle
+
+    private int refct = 1;
 
     string header;  /// NGS flat file's header (if any; e.g. BED may not have one)
 
@@ -50,12 +54,24 @@ struct TabixIndexedFile {
 
         loadHeader();
     }
+    
+    this(this)
+    {
+        refct++;
+    }
+    
     ~this()
     {
-        debug(dhtslib_debug) { writeln("TabixIndexedFile dtor"); }
-        tbx_destroy(this.tbx);
+        if(--refct == 0){
+            debug(dhtslib_debug) { writeln("TabixIndexedFile dtor"); }
+            tbx_destroy(this.tbx);
 
-        if ( hts_close(this.fp) ) writefln("hts_close returned non-zero status: %s\n", fromStringz(this.fp.fn));
+            if ( hts_close(this.fp) ) writefln("hts_close returned non-zero status: %s\n", fromStringz(this.fp.fn));
+        }
+    }
+
+    invariant(){
+        assert(refct >= 0);
     }
 
     private void loadHeader()
@@ -94,8 +110,8 @@ struct TabixIndexedFile {
      */
     auto region(CoordSystem cs)(string chrom, Coordinates!cs coords)
     {
-        auto region = ChromCoordinates!cs(chrom, coords);
-        return region(region);
+        auto reg = ChromCoordinates!cs(chrom, coords);
+        return region(reg);
     }
 
     /** region(r)
@@ -108,8 +124,7 @@ struct TabixIndexedFile {
         {
 
             /** TODO: determine how thread-(un)safe this is (i.e., using a potentially shared *fp and *tbx) */
-            private htsFile *fp;
-            private tbx_t   *tbx;
+            private TabixIndexedFile tbx;
 
             private hts_itr_t *itr;
             private string next;
@@ -120,12 +135,11 @@ struct TabixIndexedFile {
             // but first row was preloaded in this.next)
             private bool active;
 
-            this(htsFile *fp, tbx_t *tbx, ChromCoordinates!(CoordSystem.zbho) region)
+            this(TabixIndexedFile tbx,  ChromCoordinates!(CoordSystem.zbho) region)
             {
-                this.fp = fp;
-                this.tbx= tbx;
+                this.tbx = tbx;
 
-                this.itr = tbx_itr_queryi(tbx, tbx_name2id(tbx, toStringz(region.chrom)), cast(int) region.start, cast(int) region.end);
+                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(region.chrom)), region.coords.start, region.coords.end);
                 debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
                 if (this.itr) {
                     // Load the first record
@@ -166,7 +180,7 @@ struct TabixIndexedFile {
 
                 // Get next entry
                 kstring_t kstr;
-                immutable res = tbx_itr_next(this.fp, this.tbx, this.itr, &kstr);
+                immutable res = tbx_itr_next(this.tbx.fp, this.tbx.tbx, this.itr, &kstr);
                 if (res < 0) {
                     // we are done
                     this.next = null;
@@ -178,7 +192,7 @@ struct TabixIndexedFile {
             }
         }
 
-        return Region(this.fp, this.tbx, newRegion);
+        return Region(this, newRegion);
     }
 
 }
@@ -198,3 +212,65 @@ struct TabixIndexedFile {
 //     auto vcfw = VCFWriter()
 
 // }
+
+/**
+    Range that allows reading a record based format via tabix.
+    Needs a record type that encompasses only one line of text
+    and a ChromCoordinates region to use for tabix filtering.
+    Rectype could be GFF3Record, BedRecord ...
+    This is a sister struct to dhtslib.bgzf.RecordReader.
+*/
+struct RecordReaderRegion(RecType, CoordSystem cs)
+{
+    /// file reader
+    TabixIndexedFile file;
+    /// file reader range
+    ReturnType!(this.initializeRange) range;
+    /// chrom of region
+    string chrom;
+    /// coordinates of region
+    Coordinates!cs coords;
+    /// keep the header
+    string header;
+
+    /// ChromCoordinates ctor
+    this(string fn, ChromCoordinates!cs region, string fnIdx = "")
+    {
+        this(fn, region.chrom, region.coords, fnIdx);
+    }
+    
+    /// string chrom and Coordinates ctor
+    this(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
+    {
+        this.file = TabixIndexedFile(fn, fnIdx);
+        this.chrom = chrom;
+        this.coords = coords;
+        this.header = this.file.header;
+        this.range = this.initializeRange;
+        this.range.empty;
+    }
+
+    /// copy the TabixIndexedFile.region range
+    auto initializeRange()
+    {
+        return this.file.region(this.chrom, this.coords);
+    }
+
+    /// returns RecType
+    RecType front()
+    {
+        return RecType(this.range.front);
+    }
+
+    /// move the range
+    void popFront()
+    {
+        this.range.popFront;
+    }
+
+    /// is the range done
+    auto empty()
+    {
+        return this.range.empty;
+    }
+}

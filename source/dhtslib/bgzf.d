@@ -12,6 +12,8 @@ import core.stdc.stdio : SEEK_SET;
 import std.parallelism : totalCPUs;
 import std.stdio : writeln, writefln;
 import std.string : fromStringz, toStringz;
+import std.range : inputRangeObject, InputRangeObject;
+import std.traits : ReturnType;
 
 import htslib.bgzf;
 import htslib.hfile: hseek, off_t;
@@ -171,4 +173,57 @@ debug(dhtslib_unittest) unittest
     assert(bg.byLineCopy.array.length == 500);
     assert(bg.byLine.array.length == 500);
     // assert(bg.array == ["122333444455555"]);
+}
+
+/**
+    Range that allows reading a record based format via BGZFile.
+    Needs a record type that encompasses only one line of text.
+    Rectype could be GFF3Record, BedRecord ...
+    This is a sister struct to dhtslib.tabix.RecordReaderRegion.
+*/
+struct RecordReader(RecType)
+{
+    /// file reader
+    BGZFile file;
+    /// file reader range
+    ReturnType!(this.initializeRange) range;
+    /// keep the header
+    string header;
+
+    /// string filename ctor
+    this(string fn)
+    {
+        this.file = BGZFile(fn);
+        this.range = this.initializeRange;
+        while(!this.range.empty && this.range.front.length > 0 && this.range.front[0] == '#')
+        {
+            header ~= this.range.front ~ "\n";
+            this.range.popFront;
+        }
+        this.header = this.header[0 .. $-1];
+    }
+
+    /// copy the BGZFile.byLineCopy range
+    auto initializeRange()
+    {
+        return this.file.byLineCopy.inputRangeObject;
+    }
+
+    /// returns RecType
+    RecType front()
+    {
+        return RecType(this.range.front);
+    }
+
+    /// move the range
+    void popFront()
+    {
+        this.range.popFront;
+    }
+
+    /// is range done
+    auto empty()
+    {
+        return this.range.empty;
+    }
 }
