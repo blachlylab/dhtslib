@@ -1,6 +1,6 @@
 module dhtslib.recordwriter;
 
-import std.stdio : File;
+import std.stdio : File, stdout;
 import std.range : ElementType;
 
 /**
@@ -17,7 +17,11 @@ if(__traits(hasMember, RecType, "toString"))
     this(string fn, string header="")
     {
         /// open file and write header if any
-        this.f = File(fn, "w");
+        if(fn == "-"){
+            this.f = stdout;
+        }else{
+            this.f = File(fn, "w");
+        }
         if(header != "") this.f.writeln(header);
     }
 
