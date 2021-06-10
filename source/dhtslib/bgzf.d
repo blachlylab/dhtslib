@@ -190,6 +190,8 @@ struct RecordReader(RecType)
     /// keep the header
     string header;
 
+    bool emptyLine = false;
+
     /// string filename ctor
     this(string fn)
     {
@@ -219,11 +221,12 @@ struct RecordReader(RecType)
     void popFront()
     {
         this.range.popFront;
+        if(this.range.front == "") this.emptyLine = true;
     }
 
     /// is range done
     auto empty()
     {
-        return this.range.empty;
+        return this.emptyLine || this.range.empty;
     }
 }

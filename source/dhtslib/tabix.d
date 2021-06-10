@@ -232,6 +232,8 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     Coordinates!cs coords;
     /// keep the header
     string header;
+    
+    bool emptyLine = false;
 
     /// ChromCoordinates ctor
     this(string fn, ChromCoordinates!cs region, string fnIdx = "")
@@ -266,11 +268,12 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     void popFront()
     {
         this.range.popFront;
+        if(this.range.front == "") this.emptyLine = true;
     }
 
     /// is the range done
     auto empty()
     {
-        return this.range.empty;
+        return this.emptyLine || this.range.empty;
     }
 }
