@@ -1,6 +1,7 @@
 # htslib
 ### Install
-`dhtslib` relies on `htslib`. `htslib` relies on a handful of compression and web-access libraries: `zlib, bzip2, lzma, curl, and ssl`. Technically `htslib` can be built without some of these libraries, though to get all the benefits of `dhtslib` we recommend installing all of them. For more information you can visit the [htslib](https://github.com/samtools/htslib) repository.
+#### Prequisites
+`dhtslib` relies on `htslib`. `htslib` relies on a handful of compression and web-access libraries: `zlib, bzip2, lzma, curl, and ssl`. Technically `htslib` can be built without some of these libraries, though to get all the benefits of `dhtslib` we recommend installing all of them. For more information you can visit the [htslib](https://github.com/samtools/htslib) repository. 
 
 To intall `htslib` dependencies:
 ```
@@ -33,7 +34,9 @@ MacOS
 
 brew install xz autoconf automake
 ````
+`libdeflate` can also be installed for faster (de)compression but is optional.
 
+#### htslib build and install
 You will then need to download htslib (latest release [here](https://github.com/samtools/htslib/releases/latest)). As of now we support versions >=1.10. To install htslib:
 
 ```
@@ -52,8 +55,10 @@ autoreconf -i
 make 
 sudo make install
 ```
-### dub linking issues
-Sometimes it is neccessary to specify the `LIBRARY_PATH` or `LD_LIBRARY_PATH` environment variables in order for `dub` and the D compilers to find your `htslib` installation. This could also apply if your `htslib` isn't a standard install under `/usr/local/lib`.
+
+### Troubleshooting
+#### dub linking issues
+By default `htslib` is dynamically linked to `dhtslib` via `dub`.Sometimes it is neccessary to specify the `LIBRARY_PATH` or `LD_LIBRARY_PATH` environment variables in order for `dub` and the D compilers to find your `htslib` installation. This could also apply if your `htslib` isn't a standard install under `/usr/local/lib`.
 
 ```
 LIBRARY_PATH=/usr/local/lib dub build
@@ -61,7 +66,7 @@ LD_LIBRARY_PATH=/usr/local/lib LIBRARY_PATH=/usr/local/lib dub build
 ```
 
 
-### Statically linking to htslib
+#### Statically linking to htslib
 `libhts.a` needs to be added to your project's source files.
 Remember to link to all dynamic libraries configured when htslib was built. This may
 include bz2, lzma, zlib, defalate, crypto, pthreads, curl.
