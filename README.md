@@ -6,8 +6,7 @@ dhtslib
 
 # Overview
 
-D bindings and convenience wrappers for [htslib](https://github.com/samtools/htslib),
-the most widely-used library for manipulation of high-throughput sequencing data.
+`dhtslib` provides D bindings, high-level abstractions, and some additional functionality for [htslib](https://github.com/samtools/htslib), the most widely-used library for manipulation of high-throughput sequencing data.
 
 # Installation
 
@@ -15,52 +14,41 @@ Add `dhtslib` as a dependency to `dub.json`:
 
 ```
     "dependencies": {
-        "dhtslib": "~>0.10.0",
+        "dhtslib": "~>0.12.3+htslib-1.10",
+    }
 ```
-(version number 0.10.0 is example; see https://dub.pm/package-format-json)
+(version number 0.12.3 is example, `+htslib-1.10` represents the compatible htslib version; see https://dub.pm/package-format-json)
 
 # Requirements
 
 ## Dynamically linking to htslib (default)
-A system installation of htslib v1.10 or 1.11 is required.
-
-# Statically linking to htslib
-`libhts.a` needs to be added to your project's source files.
-Remember to link to all dynamic libraries configured when htslib was built. This may
-include bz2, lzma, zlib, defalate, crypto, pthreads, curl.
-Finally, if statically linking, the `-lhts` flag needs to be removed from compilation
-by selecting the dub configuration `source-static` as the dub configuration type for dhtslib
-within your own project's dub configuration file:
-
-```
-"subConfigurations": {
-                "dhtslib": "source-static"
-        },
-```
+A system installation of htslib >= v1.10 is required. You can find detailed install instructions [here](htslib.md).
 
 # Usage
 
-## D API (OOP Wrappers)
+## Dhtslib API (OOP Wrappers)
 
 Object-oriented, idomatic D wrappers are available for:
 
+* SAM/BAM/CRAM files and streams (`dhtslib.sam`)
+* VCF/BCF files (`dhtslib.vcf`)
 * BGZF compressed files (`dhtslib.bgzf`)
 * FASTA indexes (`dhtslib.faidx`)
-* SAM/BAM/CRAM files and streams (`dhtslib.sam`)
 * Tabix-indexed files (`dhtslib.tabix`)
-* VCF/BCF files (`dhtslib.vcf`)
 
-For example, this provides access to BGZF files by line as a consumable InputRange.
-Or, for BAM files, the ability to query for a range (e.g. "chr1:1000000-2000000") and obtain an InputRange over the BAM records.
-For most file type readers, indexing (`["coordinates"]`) queries return ranges of records. There are multiple options, including
-`["chr1", 10_000_000 .. 20_000_000]` and `["chr1:10000000-20000000]`.
-See the documentation for more details.
+Additional functionality is provided for:
+
+* GFF(2|3) files and streams (`dhtslib.gff`)
+* BED files and streams (`dhtslib.bed`)
+* FASTQ files and streams (`dhtslib.fastq`)
+* Compile-time coordinate system (`dhtslib.coordinates`)
+
+All htslib bindings can be found under the `htslib` namespace (in prior versions they were under `dhtlsib.htslib`). These can be used directly as they could with htslib.
+
 
 ## htslib API
 
-Direct bindings to htslib C API are available as submodules under `dhtslib.htslib`. 
-Naming remains the same as the original `.h` include files.
-For example, `import dhtslib.htslib.faidx` for direct access to the C function calls.
+Direct bindings to htslib C API are available as submodules under `htslib`. Naming remains the same as the original `.h` include files. For example, `import htslib.faidx` for direct access to the C function calls.
 The current compatible versions are 1.10+
 
 Currently implemented:
