@@ -202,7 +202,7 @@ struct RecordReader(RecType)
             header ~= this.range.front ~ "\n";
             this.range.popFront;
         }
-        this.header = this.header[0 .. $-1];
+        if(this.header.length > 0) this.header = this.header[0 .. $-1];
     }
 
     /// copy the BGZFile.byLineCopy range
