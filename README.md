@@ -6,7 +6,7 @@ dhtslib
 
 # Overview
 
-`dhtslib` provides D bindings, high-level abstractions, and additional functionality for [htslib](https://github.com/samtools/htslib), the most widely-used library for manipulation of high-throughput sequencing data. We currently support linux and OSX. Windows support is still in progress (see #38).
+`dhtslib` provides D bindings, high-level abstractions, and additional functionality for [htslib](https://github.com/samtools/htslib), the most widely-used library for manipulation of high-throughput sequencing data. We currently support linux and OSX. Windows support is still in progress (see #38). More extensive documentation can be found at our [gitbook](https://blachlylab.gitbook.io/dhtslib/).
 
 # Installation
 
