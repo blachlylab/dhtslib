@@ -245,9 +245,9 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
     auto tbx = TabixIndexedFile(fn);
-    auto vcf = VCFReader(tbx, OBHO("1:3000151-3062916"));
+    auto vcf = VCFReader(tbx, ChromOBHO("1:3000151-3062916"));
     assert(vcf.count == 3);
-    vcf = VCFReader(tbx, OBHO("1:3000151-3062916"));
+    vcf = VCFReader(tbx, ChromOBHO("1:3000151-3062916"));
     vcf.empty;
     VCFRecord rec = vcf.front;
     assert(rec.chrom == "1");

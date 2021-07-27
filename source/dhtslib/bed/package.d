@@ -88,7 +88,7 @@ debug(dhtslib_unittest) unittest
     
     auto bed = BedReader(
         buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","bed_file.bed.gz"),
-        ZBHO("X:1000-1400")
+        ChromZBHO("X:1000-1400")
         );
 
     assert(bed.array.length == 2);

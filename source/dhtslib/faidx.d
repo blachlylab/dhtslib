@@ -229,10 +229,10 @@ debug(dhtslib_unittest) unittest
     writeln(fai["CHROMOSOME_I",OB(1) .. OB(30)]);
     assert(fai["CHROMOSOME_I",OB(1) .. OB(30)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
     
-    assert(fai.fetchSequence(ZBHO("CHROMOSOME_I:0-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(OBHO("CHROMOSOME_I:1-30")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(ZBC("CHROMOSOME_I:0-28")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(OBC("CHROMOSOME_I:1-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ChromZBHO("CHROMOSOME_I:0-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ChromOBHO("CHROMOSOME_I:1-30")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ChromZBC("CHROMOSOME_I:0-28")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ChromOBC("CHROMOSOME_I:1-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
 
     assert(fai.seqLen("CHROMOSOME_I") == 1009800);
     assert(fai.nSeq == 7);

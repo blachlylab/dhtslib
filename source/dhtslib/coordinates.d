@@ -312,101 +312,26 @@ struct ChromCoordinates(CoordSystem cs)
     } 
 }
 
-/// Shortcut string ZBHO
-auto ZeroBasedHalfOpen(T: string)(T region)
-{
-    return ChromCoordinates!(CoordSystem.zbho)(region);
-}
+alias ZBHO = Coordinates!(CoordSystem.zbho);
+alias OBHO = Coordinates!(CoordSystem.obho);
+alias ZBC = Coordinates!(CoordSystem.zbc);
+alias OBC = Coordinates!(CoordSystem.obc);
 
-/// Shortcut long ZBHO
-auto ZeroBasedHalfOpen(T: long)(T start, T end)
-{
-    return Coordinates!(CoordSystem.zbho)(start, end);
-}
+alias ZeroBasedHalfOpen = Coordinates!(CoordSystem.zbho);
+alias OneBasedHalfOpen = Coordinates!(CoordSystem.obho);
+alias ZeroBasedClosed = Coordinates!(CoordSystem.zbc);
+alias OneBasedClosed = Coordinates!(CoordSystem.obc);
 
-/// Shortcut string ZBHO
-auto ZBHO(T: string)(T region)
-{
-    return ChromCoordinates!(CoordSystem.zbho)(region);
-}
+alias ChromZBHO = ChromCoordinates!(CoordSystem.zbho);
+alias ChromOBHO = ChromCoordinates!(CoordSystem.obho);
+alias ChromZBC = ChromCoordinates!(CoordSystem.zbc);
+alias ChromOBC = ChromCoordinates!(CoordSystem.obc);
 
-/// Shortcut long ZBHO
-auto ZBHO(T: long)(T start, T end)
-{
-    return Coordinates!(CoordSystem.zbho)(start, end);
-}
+alias ChromZeroBasedHalfOpen = ChromCoordinates!(CoordSystem.zbho);
+alias ChromOneBasedHalfOpen = ChromCoordinates!(CoordSystem.obho);
+alias ChromZeroBasedClosed = ChromCoordinates!(CoordSystem.zbc);
+alias ChromOneBasedClosed = ChromCoordinates!(CoordSystem.obc);
 
-/// Shortcut string ZBC
-auto ZeroBasedClosed(T: string)(T region)
-{
-    return ChromCoordinates!(CoordSystem.zbc)(region);
-}
-
-/// Shortcut long ZBC
-auto ZeroBasedClosed(T: long)(T start, T end)
-{
-    return Coordinates!(CoordSystem.zbc)(start, end);
-}
-
-/// Shortcut string ZBC
-auto ZBC(T: string)(T region)
-{
-    return ChromCoordinates!(CoordSystem.zbc)(region);
-}
-
-/// Shortcut long ZBC
-auto ZBC(T: long)(T start, T end)
-{
-    return Coordinates!(CoordSystem.zbc)(start, end);
-}
-
-/// Shortcut string OBHO
-auto OneBasedHalfOpen(T: string)(T region)
-{
-    return ChromCoordinates!(CoordSystem.obho)(region);
-}
-
-/// Shortcut long OBHO
-auto OneBasedHalfOpen(T: long)(T start, T end)
-{
-    return Coordinates!(CoordSystem.obho)(start, end);
-}
-
-/// Shortcut string OBHO
-auto OBHO(T: string)(T region)
-{
-    return ChromCoordinates!(CoordSystem.obho)(region);
-}
-
-/// Shortcut long OBHO
-auto OBHO(T: long)(T start, T end)
-{
-    return Coordinates!(CoordSystem.obho)(start, end);
-}
-
-/// Shortcut string OBC
-auto OneBasedClosed(T: string)(T region)
-{
-    return ChromCoordinates!(CoordSystem.obc)(region);
-}
-
-/// Shortcut long OBC
-auto OneBasedClosed(T: long)(T start, T end)
-{
-    return Coordinates!(CoordSystem.obc)(start, end);
-}
-
-/// Shortcut string OBC
-auto OBC(T: string)(T region)
-{
-    return ChromCoordinates!(CoordSystem.obc)(region);
-}
-
-/// Shortcut long OBC
-auto OBC(T: long)(T start, T end)
-{
-    return Coordinates!(CoordSystem.obc)(start, end);
-}
 
 debug(dhtslib_unittest) unittest
 {
@@ -442,10 +367,10 @@ debug(dhtslib_unittest) unittest
     auto c3 = c0.to!(CoordSystem.obho);
     auto c4 = c0.to!(CoordSystem.zbho);
     
-    assert(c1 == ZBC("chrom1:0-99"));
-    assert(c2 == OBC("chrom1:1-100"));
-    assert(c3 == OBHO("chrom1:1-101"));
-    assert(c4 == ZBHO("chrom1:0-100"));
+    assert(c1 == ChromZBC("chrom1:0-99"));
+    assert(c2 == ChromOBC("chrom1:1-100"));
+    assert(c3 == ChromOBHO("chrom1:1-101"));
+    assert(c4 == ChromZBHO("chrom1:0-100"));
     
     writeln(c0);
     writeln(c1);

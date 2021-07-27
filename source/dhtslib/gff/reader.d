@@ -122,7 +122,7 @@ debug(dhtslib_unittest) unittest
     
     auto gff = GFF3Reader(
         buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","gff_file.gff.gz"),
-        OBC("X:2934832-2935190")
+        ChromOBC("X:2934832-2935190")
         );
 
     assert(gff.array.length == 4);
