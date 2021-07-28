@@ -39,6 +39,7 @@ obc  -1,0   -1,-1    0,+1    -
 */
 
 module dhtslib.coordinates;
+import std.traits : isIntegral;
 import std.conv : to;
 
 /// Represents 0-based vs 1-based coordinate types
@@ -67,6 +68,7 @@ struct Coordinate(Basis bs)
 
     invariant
     {
+        assert(pos >= 0);
         // in one based systems, pos cannot be zero
         static if(bs == Basis.one)
         {
@@ -84,6 +86,14 @@ struct Coordinate(Basis bs)
         // zero to one base, increment
         else static if (tobs == Basis.one) return Coordinate!bs(pos + 1);
         else static assert(0, "Coordinate Type error");
+    }
+
+    /// make a new coordinate with a value of this.pos + off
+    /// this.pos + off
+    auto offset(T)(T off)
+    if(isIntegral!T)
+    {
+        return Coordinatse!(bs)(cast(long)(this.pos + off));
     }
 }
 
@@ -250,6 +260,75 @@ struct Coordinates(CoordSystem cs)
         }
     }
 
+    /// make a new coordinate pair with a value of 
+    /// this.start + off and this.end + off
+    auto offset(T)(T off)
+    if(isIntegral!T)
+    {
+        return Coordinates!(cs)(cast(long)(this.start + off), cast(long)(this.end + off));
+    }
+
+    /// intersection of two regions
+    auto intersectImpl(Coordinates!cs other)
+    {
+        if(!this.isOverlap(other)){
+            return Coordinates!(cs).init;
+        }
+        return Coordinates!(cs)(
+            this.getMaxStart(other),
+            this.getMinEnd(other)
+            );
+    }
+
+    /// union of two regions
+    auto unionImpl(Coordinates!cs other)
+    {
+        if(!this.isOverlap(other)){
+            return Coordinates!(cs).init;
+        }
+        return Coordinates!(cs)(
+            this.getMinStart(other),
+            this.getMaxEnd(other)
+            );
+    }
+
+    auto isOverlap(Coordinates!cs other)
+    {
+        static if(endtype == End.closed){
+            return this.getMaxStart(other) <= this.getMinEnd(other);
+        }else{
+            return this.getMaxStart(other) < this.getMinEnd(other);
+        }
+    }
+
+    auto getMinStart(Coordinates!cs other)
+    {
+        return this.start < other.start ? this.start : other.start;
+    }
+
+    auto getMaxStart(Coordinates!cs other)
+    {
+        return this.start > other.start ? this.start : other.start;
+    }
+
+    auto getMinEnd(Coordinates!cs other)
+    {
+        return this.end < other.end ? this.end : other.end;
+    }
+    
+    auto getMaxEnd(Coordinates!cs other)
+    {
+        return this.end > other.end ? this.end : other.end;
+    }
+
+    /// set operators for intersect, union, and difference
+    auto opBinary(string op)(Coordinates!cs other)
+    {
+        static if(op == "|") return unionImpl(other);
+        else static if(op == "&") return intersectImpl(other);
+        else static assert(0,"Operator "~op~" not implemented");
+    }
+
     /// Get string representation for printing
     string toString() const{
         return "[" ~ CoordSystemLabels[cs] ~ "] " ~ this.start.pos.to!string ~ "-" ~ this.end.pos.to!string;
@@ -405,4 +484,40 @@ debug(dhtslib_unittest) unittest
     assert(c3 == OBHO(1, 101));
     assert(c4 == ZBHO(0, 100));
     // ...
+}
+
+debug(dhtslib_unittest) unittest
+{
+    ZBHO c0 = ZBHO(0, 100);
+    assert(c0.size == 100);
+
+    auto c1 = c0.offset(50);
+    assert(c1 == ZBHO(50, 150));
+    assert((c0 & c1) == ZBHO(50, 100));
+    assert((c0 | c1) == ZBHO(0, 150));
+
+    c1 = c0.offset(99);
+    assert(c1 == ZBHO(99, 199));
+
+    assert((c0 & c1) == ZBHO(99, 100));
+    assert((c0 | c1) == ZBHO(0, 199));
+}
+
+debug(dhtslib_unittest) unittest
+{
+    OBC c0 = OBC(1, 100);
+    assert(c0.size == 100);
+
+    auto c1 = c0.offset(50);
+    assert(c1 == OBC(51, 150));
+
+    assert((c0 & c1) == OBC(51, 100));
+    assert((c0 | c1) == OBC(1, 150));
+
+    c1 = c0.offset(99);
+    assert(c1 == OBC(100, 199));
+    import std.stdio;
+    writeln((c0 & c1));
+    assert((c0 & c1) == OBC(100, 100));
+    assert((c0 | c1) == OBC(1, 199));
 }
