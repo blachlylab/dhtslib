@@ -76,39 +76,59 @@ pragma(inline, true):
 //#define hts_log_error(...) hts_log(HTS_LOG_ERROR, __func__, __VA_ARGS__)
 void hts_log_error(const(char)[] ctx, string msg)
 {
-    string colormsg = "\x1b[0;31m" ~ msg ~ "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_ERROR, toStringz(ctx), toStringz(colormsg));
+    string open_error_color = "\x1b[0;31m";
+    string close_color      = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_ERROR, toStringz(ctx), "%*.s%*.s%*.s",
+            cast(int)open_error_color.length, open_error_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
 }
 /**! Logs an event with severity HTS_LOG_WARNING and default context. Parameters: format, ... */
 //#define hts_log_warning(...) hts_log(HTS_LOG_WARNING, __func__, __VA_ARGS__)
 void hts_log_warning(const(char)[] ctx, string msg)
 {
-    string colormsg = "\x1b[0;33m" ~ msg ~ "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_WARNING, toStringz(ctx), toStringz(colormsg));
+    string open_warning_color = "\x1b[0;33m";
+    string close_color        = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_WARNING, toStringz(ctx), "%*.s%*.s%*.s",
+            cast(int)open_warning_color.length, open_warning_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
 }
 
 /**! Logs an event with severity HTS_LOG_INFO and default context. Parameters: format, ... */
 //#define hts_log_info(...) hts_log(HTS_LOG_INFO, __func__, __VA_ARGS__)
 void hts_log_info(const(char)[] ctx, string msg)
 {
-    string colormsg = "\x1b[0;32m" ~ msg ~ "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_INFO, toStringz(ctx), toStringz(colormsg));
+    string open_info_color = "\x1b[0;32m";
+    string close_color     = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_INFO, toStringz(ctx), "%*.s%*.s%*.s",
+            cast(int)open_info_color.length, open_info_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
 }
 
 /**! Logs an event with severity HTS_LOG_DEBUG and default context. Parameters: format, ... */
 //#define hts_log_debug(...) hts_log(HTS_LOG_DEBUG, __func__, __VA_ARGS__)
 void hts_log_debug(const(char)[] ctx, string msg)
 {
-    string colormsg = "\x1b[0;36m" ~ msg ~ "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_DEBUG, toStringz(ctx), toStringz(colormsg));
+    string open_debug_color = "\x1b[0;36m";
+    string close_color     = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_DEBUG, toStringz(ctx), "%*.s%*.s%*.s",
+            cast(int)open_debug_color.length, open_debug_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
 }
 
 /**! Logs an event with severity HTS_LOG_TRACE and default context. Parameters: format, ... */
 //#define hts_log_trace(...) hts_log(HTS_LOG_TRACE, __func__, __VA_ARGS__)
 void hts_log_trace(const(char)[] ctx, string msg)
 {
-    string colormsg = "\x1b[1;36m" ~ msg ~ "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), toStringz(colormsg));
+    string open_trace_color = "\x1b[1;36m";
+    string close_color     = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), "%*.s%*.s%*.s",
+            cast(int)open_trace_color.length, open_trace_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
 }
 
 ///
