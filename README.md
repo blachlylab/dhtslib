@@ -108,7 +108,7 @@ It's easy to get a segfault by using the direct C API incorrectly. Or possibly c
 
 # Bugs and Warnings
 
-Do not call `hts_log_*` from a destructor, as it is potentialy allocating via `toStringz`
+Do not call `hts_log_*` with `ctx` as anything other than a string literal from a destructor, as it is potentialy allocating via `toStringz`
 
 
 # Programs made with dhtslib
