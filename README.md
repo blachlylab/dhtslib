@@ -94,7 +94,7 @@ Yes
 **A**:
 bioD, as a more general bioinformatics framework, is more comparable to bio-python, bio-ruby, bio-rust, etc.
 bioD does have some excellent hts file format (BGZF and SAM) handling, and at one time sambamba, which relied on it, was faster than samtools.
-However, the development resources poured into `htslib` overall are tremendous, and we with to leverage that rather than writing VCF, tabix, etc. code from scratch.
+However, the development resources poured into `htslib` overall are tremendous, and we wish to leverage that rather than writing VCF, tabix, etc. code from scratch.
 
 **Q**: How does this compare to bio-Rust's htslib bindings?
 
