@@ -195,12 +195,6 @@ struct Coordinates(CoordSystem cs)
         this.end.pos = end;
     }
 
-    /// Coordinate constructor
-    this(Coordinate!basetype start, Coordinate!basetype end){
-        this.start = start;
-        this.end = end;
-    }
-
     invariant
     {
         // In half-open systems, ensure start strictly less than end,
@@ -398,7 +392,7 @@ debug(dhtslib_unittest) unittest
 
 debug(dhtslib_unittest) unittest
 {
-    auto c0 = Coordinates!(CoordSystem.obho)(OB(1), OB(101));
+    auto c0 = Coordinates!(CoordSystem.obho)(1, 101);
     assert(c0.size == 100);
 
     auto c1 = c0.to!(CoordSystem.zbc);
