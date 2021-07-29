@@ -78,7 +78,7 @@ void hts_log_error(const(char)[] ctx, string msg)
 {
     string open_error_color = "\x1b[0;31m";
     string close_color      = "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_ERROR, toStringz(ctx), "%*s%*s%*s",
+    hts_log(htsLogLevel.HTS_LOG_ERROR, toStringz(ctx), "%.*s%.*s%.*s",
             cast(int)open_error_color.length, open_error_color.ptr,
             cast(int)msg.length, msg.ptr,
             cast(int)close_color.length, close_color.ptr);
@@ -89,7 +89,7 @@ void hts_log_warning(const(char)[] ctx, string msg)
 {
     string open_warning_color = "\x1b[0;33m";
     string close_color        = "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_WARNING, toStringz(ctx), "%*s%*s%*s",
+    hts_log(htsLogLevel.HTS_LOG_WARNING, toStringz(ctx), "%.*s%.*s%.*s",
             cast(int)open_warning_color.length, open_warning_color.ptr,
             cast(int)msg.length, msg.ptr,
             cast(int)close_color.length, close_color.ptr);
@@ -101,7 +101,7 @@ void hts_log_info(const(char)[] ctx, string msg)
 {
     string open_info_color = "\x1b[0;32m";
     string close_color     = "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_INFO, toStringz(ctx), "%*s%*s%*s",
+    hts_log(htsLogLevel.HTS_LOG_INFO, toStringz(ctx), "%.*s%.*s%.*s",
             cast(int)open_info_color.length, open_info_color.ptr,
             cast(int)msg.length, msg.ptr,
             cast(int)close_color.length, close_color.ptr);
@@ -113,7 +113,7 @@ void hts_log_debug(const(char)[] ctx, string msg)
 {
     string open_debug_color = "\x1b[0;36m";
     string close_color     = "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_DEBUG, toStringz(ctx), "%*s%*s%*s",
+    hts_log(htsLogLevel.HTS_LOG_DEBUG, toStringz(ctx), "%.*s%.*s%.*s",
             cast(int)open_debug_color.length, open_debug_color.ptr,
             cast(int)msg.length, msg.ptr,
             cast(int)close_color.length, close_color.ptr);
@@ -125,7 +125,7 @@ void hts_log_trace(const(char)[] ctx, string msg)
 {
     string open_trace_color = "\x1b[1;36m";
     string close_color     = "\x1b[0m";
-    hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), "%*s%*s%*s",
+    hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), "%.*s%.*s%.*s",
             cast(int)open_trace_color.length, open_trace_color.ptr,
             cast(int)msg.length, msg.ptr,
             cast(int)close_color.length, close_color.ptr);
