@@ -88,6 +88,17 @@ struct Coordinate(Basis bs)
         else static assert(0, "Coordinate Type error");
     }
 
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: ZB)()
+    {
+        return this.to!(Basis.zero);
+    }
+
+    auto to(T: OB)()
+    {
+        return this.to!(Basis.one);
+    }
+
     /// make a new coordinate with a value of this.pos + off
     /// this.pos + off
     auto offset(T)(T off)
@@ -260,6 +271,30 @@ struct Coordinates(CoordSystem cs)
         }
     }
 
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: ZBHO)()
+    {
+        return this.to!(CoordSystem.zbho);
+    }
+
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: OBHO)()
+    {
+        return this.to!(CoordSystem.obho);
+    }
+
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: ZBC)()
+    {
+        return this.to!(CoordSystem.zbc);
+    }
+    
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: OBC)()
+    {
+        return this.to!(CoordSystem.obc);
+    }
+
     /// make a new coordinate pair with a value of 
     /// this.start + off and this.end + off
     auto offset(T)(T off)
@@ -377,6 +412,30 @@ struct ChromCoordinates(CoordSystem cs)
         return c;
     }
 
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: ZBHO)()
+    {
+        return this.to!(CoordSystem.zbho);
+    }
+
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: OBHO)()
+    {
+        return this.to!(CoordSystem.obho);
+    }
+
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: ZBC)()
+    {
+        return this.to!(CoordSystem.zbc);
+    }
+    
+    /// Convert coordinate to another based system using shortcuts
+    auto to(T: OBC)()
+    {
+        return this.to!(CoordSystem.obc);
+    }
+
     /// Get string representation for printing
     string toString() const{
         return "[" ~ CoordSystemLabels[cs] ~ "] " ~ 
@@ -455,13 +514,30 @@ debug(dhtslib_unittest) unittest
 debug(dhtslib_unittest) unittest
 {
     import std.stdio;
-    auto c0 = Coordinates!(CoordSystem.zbho)(ZB(0), ZB(100));
+    auto c0 = Coordinates!(CoordSystem.zbho)(0, 100);
     assert(c0.size == 100);
 
     auto c1 = c0.to!(CoordSystem.zbc);
     auto c2 = c0.to!(CoordSystem.obc);
     auto c3 = c0.to!(CoordSystem.obho);
     auto c4 = c0.to!(CoordSystem.zbho);
+    
+    assert(c1 == ZBC(0, 99));
+    assert(c2 == OBC(1, 100));
+    assert(c3 == OBHO(1, 101));
+    assert(c4 == ZBHO(0, 100));
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    auto c0 = ZBHO(0, 100);
+    assert(c0.size == 100);
+
+    auto c1 = c0.to!ZBC;
+    auto c2 = c0.to!OBC;
+    auto c3 = c0.to!OBHO;
+    auto c4 = c0.to!ZBHO;
     
     assert(c1 == ZBC(0, 99));
     assert(c2 == OBC(1, 100));

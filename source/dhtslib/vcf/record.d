@@ -180,16 +180,16 @@ struct VCFRecord
      * NB: internally BCF is uzing 0 based coordinates; we only show +1 when printing a VCF line with toString (which calls vcf_format)
     */
     @property
-    Coordinate!(Basis.zero) pos()
+    ZB pos()
     out(coord) { assert(coord >= 0); }
     do
     {
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
-        return Coordinate!(Basis.zero)(this.line.pos);
+        return ZB(this.line.pos);
     }
     /// Set position (POS, column 2)
     @property
-    void pos(Coordinate!(Basis.zero) p)
+    void pos(ZB p)
     in { assert(p >= 0); }
     do
     {
@@ -246,9 +246,9 @@ struct VCFRecord
     }
 
     /// Coordinate range of the reference allele
-    @property Coordinates!(CoordSystem.zbho) coordinates()
+    @property ZBHO coordinates()
     {
-        return Coordinates!(CoordSystem.zbho)(this.pos, this.pos + this.refLen);
+        return ZBHO(this.pos, this.pos + this.refLen);
     }
     
     /// All alleles getter (array)
