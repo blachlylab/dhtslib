@@ -342,7 +342,37 @@ enum hts_fmt_option
     HTS_OPT_CACHE_SIZE = 103,
     HTS_OPT_BLOCK_SIZE = 104,
     HTS_OPT_FILTER = 105,
-    HTS_OPT_PROFILE = 106
+    HTS_OPT_PROFILE = 106,
+
+    // Fastq
+
+    // Boolean.
+    // Read / Write CASAVA 1.8 format.
+    // See https://emea.support.illumina.com/content/dam/illumina-support/documents/documentation/software_documentation/bcl2fastq/bcl2fastq_letterbooklet_15038058brpmi.pdf
+    //
+    // The CASAVA tag matches \d:[YN]:\d+:[ACGTN]+
+    // The first \d is read 1/2 (1 or 2), [YN] is QC-PASS/FAIL flag,
+    // \d+ is a control number, and the sequence at the end is
+    // for barcode sequence.  Barcodes are read into the aux tag defined
+    // by FASTQ_OPT_BARCODE ("BC" by default).
+    FASTQ_OPT_CASAVA = 1000,
+
+    // String.
+    // Whether to read / write extra SAM format aux tags from the fastq
+    // identifier line.  For reading this can simply be "1" to request
+    // decoding aux tags.  For writing it is a comma separated list of aux
+    // tag types to be written out.
+    FASTQ_OPT_AUX = 1001,
+
+    // Boolean.
+    // Whether to add /1 and /2 to read identifiers when writing FASTQ.
+    // These come from the BAM_FREAD1 or BAM_FREAD2 flags.
+    // (Detecting the /1 and /2 is automatic when reading fastq.)
+    FASTQ_OPT_RNUM = 1002,
+
+    // Two character string.
+    // Barcode aux tag for CASAVA; defaults to "BC".
+    FASTQ_OPT_BARCODE = 1003,
 }
 
 /// Profile options for encoding; primarily used at present in CRAM
@@ -483,7 +513,7 @@ const(char)* hts_version();
 // Immediately after release, bump ZZ to 90 to distinguish in-development
 // Git repository builds from the release; you may wish to increment this
 // further when significant features are merged.
-enum HTS_VERSION = 101200;
+enum HTS_VERSION = 101300;
 
 /**! @abstract Introspection on the features enabled in htslib
  *
@@ -543,7 +573,7 @@ char* hts_format_description(const(htsFormat)* format);
   @param fn       The file name or "-" for stdin/stdout. For indexed files
                   with a non-standard naming, the file name can include the
                   name of the index file delimited with HTS_IDX_DELIM
-  @param mode     Mode matching / [rwa][bceguxz0-9]* /
+  @param mode     Mode matching / [rwa][bcefFguxz0-9]* /
   @discussion
       With 'r' opens for reading; any further format mode letters are ignored
       as the format is detected by checking the first few bytes or BGZF blocks
@@ -873,9 +903,9 @@ extern (D) auto hts_bin_first(T)(auto ref T l)
 }
 
 pragma(inline, true)
-extern (D) auto hts_bin_parent(T)(auto ref T l)
+extern (D) auto hts_bin_parent(T)(auto ref T b)
 {
-    return (l - 1) >> 3;
+    return (b - 1) >> 3;
 }
 
 ///////////////////////////////////////////////////////////
@@ -1048,6 +1078,8 @@ enum HTS_IDX_FLAG : int
 ///////////////////////////////////////////////////////////
 // Functions for accessing meta-data stored in indexes
 
+alias hts_id2name_f = const(char)* function(void*, int);
+
 /// Get extra index meta-data
 /** @param idx    The index
     @param l_meta Pointer to where the length of the extra data is stored
@@ -1104,6 +1136,24 @@ int hts_idx_get_stat(
 */
 ulong hts_idx_get_n_no_coor(const(hts_idx_t)* idx);
 
+/// Return a list of target names from an index
+/** @param      idx    Index
+    @param[out] n      Location to store the number of targets
+    @param      getid  Callback function to get the name for a target ID
+    @param      hdr    Header from indexed file
+    @return An array of pointers to the names on success; NULL on failure
+
+    @note The names are pointers into the header data structure.  When cleaning
+    up, only the array should be freed, not the names.
+ */
+const(char *)* hts_idx_seqnames(const(hts_idx_t)* idx, int* n, hts_id2name_f getid, void* hdr); // free only the array, not the values
+
+/// Return the number of targets from an index
+/** @param      idx    Index
+    @return The number of targets
+ */
+int hts_idx_nseq(const(hts_idx_t) *idx);
+
 ///////////////////////////////////////////////////////////
 // Region parsing
 
@@ -1129,7 +1179,6 @@ enum HTS_PARSE_FLAGS : int
 long hts_parse_decimal(const(char)* str, char** strend, HTS_PARSE_FLAGS flags);
 
 alias hts_name2id_f = int function(void*, const(char)*);
-alias hts_id2name_f = const(char)* function(void*, int);
 
 /// Parse a "CHR:START-END"-style region string
 /** @param str  String to be parsed
@@ -1287,21 +1336,6 @@ hts_itr_t* hts_itr_querys(
  */
 int hts_itr_next(BGZF* fp, hts_itr_t* iter, void* r, void* data);
 
-/// Return a list of target names from an index
-/** @param      idx    Index
-    @param[out] n      Location to store the number of targets
-    @param      getid  Callback function to get the name for a target ID
-    @param      hdr    Header from indexed file
-    @return An array of pointers to the names on success; NULL on failure
-
-    @note The names are pointers into the header data structure.  When cleaning
-    up, only the array should be freed, not the names.
- */
-const(char*)* hts_idx_seqnames(
-    const(hts_idx_t)* idx,
-    int* n,
-    hts_id2name_f getid,
-    void* hdr); // free only the array, not the values
 
 /**********************************
  * Iterator with multiple regions *
@@ -1501,12 +1535,31 @@ long hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls)
     return 0;
 }
 
+/// Compute the level of a bin in a binning index
+pragma(inline, true)
+int hts_bin_level(int bin) {
+    int l, b;
+    for (l = 0, b = bin; b; ++l){ b = hts_bin_parent(b);}
+    return l;
+}
+
+//! Compute the corresponding entry into the linear index of a given bin from
+//! a binning index
+/*!
+ *  @param bin    The bin number
+ *  @param n_lvls The index depth (number of levels - 0 based)
+ *  @return       The integer offset into the linear index
+ *
+ *  Explanation of the return value formula:
+ *  Each bin on level l covers exp(2, (n_lvls - l)*3 + min_shift) base pairs.
+ *  A linear index entry covers exp(2, min_shift) base pairs.
+ */
+
 // compute the level of bin
 pragma(inline, true)
 int hts_bin_bot(int bin, int n_lvls)
 {
-    int l, b;
-    for (l = 0, b = bin; b; ++l){ b = hts_bin_parent(b); } // compute the level of bin
+    int l = hts_bin_level(bin);
     return (bin - hts_bin_first(l)) << (n_lvls - l) * 3;
 }
 
