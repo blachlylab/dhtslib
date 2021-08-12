@@ -13,14 +13,8 @@ auto GFF3Reader(string fn)
     return RecordReader!GFF3Record(fn);
 }
 
-/// Returns a RecordReaderRegion range for a GFF3 file
-auto GFF3Reader(CoordSystem cs)(string fn, ChromCoordinates!cs region, string fnIdx = "")
-{
-    return RecordReaderRegion!(GFF3Record, cs)(fn, region, fnIdx);
-}
-
 /// ditto
-auto GFF3Reader(CoordSystem cs)(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
+auto GFF3Reader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
 {
     return RecordReaderRegion!(GFF3Record, cs)(fn, chrom, coords, fnIdx);
 }
@@ -31,14 +25,8 @@ auto GTFReader(string fn)
     return RecordReader!GTFRecord(fn);
 }
 
-/// Returns a RecordReaderRegion range for a GTF file
-auto GTFReader(CoordSystem cs)(string fn, ChromCoordinates!cs region, string fnIdx = "")
-{
-    return RecordReaderRegion!(GTFRecord, cs)(fn, region, fnIdx);
-}
-
 /// ditto
-auto GTFReader(CoordSystem cs)(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
+auto GTFReader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
 {
     return RecordReaderRegion!(GTFRecord, cs)(fn, chrom, coords, fnIdx);
 }
@@ -49,14 +37,8 @@ auto GFF2Reader(string fn)
     return RecordReader!GTFRecord(fn);
 }
 
-/// Returns a RecordReaderRegion range for a GFF2 file
-auto GFF2Reader(CoordSystem cs)(string fn, ChromCoordinates!cs region, string fnIdx = "")
-{
-    return RecordReaderRegion!(GTFRecord, cs)(fn, region, fnIdx);
-}
-
 /// ditto
-auto GFF2Reader(CoordSystem cs)(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
+auto GFF2Reader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
 {
     return RecordReaderRegion!(GTFRecord, cs)(fn, chrom, coords, fnIdx);
 }
@@ -120,9 +102,10 @@ debug(dhtslib_unittest) unittest
     // writeln(err);
     hts_log_info(__FUNCTION__, "Loading test file");
     
+    auto reg = getIntervalFromString("X:2934832-2935190");
     auto gff = GFF3Reader(
         buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","gff_file.gff.gz"),
-        ChromOBC("X:2934832-2935190")
+        reg.contig, reg.interval
         );
 
     assert(gff.array.length == 4);

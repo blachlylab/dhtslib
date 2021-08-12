@@ -2,7 +2,7 @@
 
     STATUS: Experimental
 
-    Coordinates include `start` and `end`, but no reference sequence id (chr, contig, etc.)
+    Interval include `start` and `end`, but no reference sequence id (chr, contig, etc.)
 
     The `Coordinate` type is templated on `CoordSystem` enum, so that the actual coordinate
     system in use -- and by this, we mean zero- or one-based, and half-open vs. closed --
@@ -41,6 +41,13 @@ obc  -1,0   -1,-1    0,+1    -
 module dhtslib.coordinates;
 import std.traits : isIntegral;
 import std.conv : to;
+import std.string : toStringz;
+import std.typecons : tuple;
+
+import dhtslib : VCFHeader, SAMHeader;
+import htslib.sam : bam_name2id;
+import htslib.vcf : bcf_hdr_id2name;
+import htslib.hts : hts_parse_region, hts_parse_reg64, hts_parse_decimal, hts_name2id_f, HTS_PARSE_FLAGS;
 
 /// Represents 0-based vs 1-based coordinate types
 enum Basis
@@ -198,7 +205,7 @@ static immutable CoordSystemLabels = ["zbho", "zbc", "obho", "obc"];
 /// The (start, end) coordinates within a coordinate system,
 /// where the type itself encodes the coordinate system details
 /// (zero or one-based; half-open vs. closed)
-struct Coordinates(CoordSystem cs)
+struct Interval(CoordSystem cs)
 {
     /// alias Basis and End enums for this Coordsystem type
     alias basetype = coordinateSystemToBasis!cs;
@@ -251,7 +258,7 @@ struct Coordinates(CoordSystem cs)
 
         // return same CoordinateSystem type
         static if (cs == tocs)
-            return Coordinates!(tocs)(newStart, newEnd);
+            return Interval!(tocs)(newStart, newEnd);
         else{
             // convert coordinates to new base type
             newStart = newStart.to!tobasetype;
@@ -267,7 +274,7 @@ struct Coordinates(CoordSystem cs)
                     newEnd++;
                 }
             }
-            return Coordinates!(tocs)(newStart, newEnd);
+            return Interval!(tocs)(newStart, newEnd);
         }
     }
 
@@ -300,34 +307,34 @@ struct Coordinates(CoordSystem cs)
     auto offset(T)(T off)
     if(isIntegral!T)
     {
-        return Coordinates!(cs)(cast(long)(this.start + off), cast(long)(this.end + off));
+        return Interval!(cs)(cast(long)(this.start + off), cast(long)(this.end + off));
     }
 
     /// intersection of two regions
-    auto intersectImpl(Coordinates!cs other)
+    auto intersectImpl(Interval!cs other)
     {
         if(!this.isOverlap(other)){
-            return Coordinates!(cs).init;
+            return Interval!(cs).init;
         }
-        return Coordinates!(cs)(
+        return Interval!(cs)(
             this.getMaxStart(other),
             this.getMinEnd(other)
             );
     }
 
     /// union of two regions
-    auto unionImpl(Coordinates!cs other)
+    auto unionImpl(Interval!cs other)
     {
         if(!this.isOverlap(other)){
-            return Coordinates!(cs).init;
+            return Interval!(cs).init;
         }
-        return Coordinates!(cs)(
+        return Interval!(cs)(
             this.getMinStart(other),
             this.getMaxEnd(other)
             );
     }
 
-    auto isOverlap(Coordinates!cs other)
+    auto isOverlap(Interval!cs other)
     {
         static if(endtype == End.closed){
             return this.getMaxStart(other) <= this.getMinEnd(other);
@@ -336,28 +343,28 @@ struct Coordinates(CoordSystem cs)
         }
     }
 
-    auto getMinStart(Coordinates!cs other)
+    auto getMinStart(Interval!cs other)
     {
         return this.start < other.start ? this.start : other.start;
     }
 
-    auto getMaxStart(Coordinates!cs other)
+    auto getMaxStart(Interval!cs other)
     {
         return this.start > other.start ? this.start : other.start;
     }
 
-    auto getMinEnd(Coordinates!cs other)
+    auto getMinEnd(Interval!cs other)
     {
         return this.end < other.end ? this.end : other.end;
     }
     
-    auto getMaxEnd(Coordinates!cs other)
+    auto getMaxEnd(Interval!cs other)
     {
         return this.end > other.end ? this.end : other.end;
     }
 
     /// set operators for intersect, union, and difference
-    auto opBinary(string op)(Coordinates!cs other)
+    auto opBinary(string op)(Interval!cs other)
     {
         static if(op == "|") return unionImpl(other);
         else static if(op == "&") return intersectImpl(other);
@@ -370,105 +377,32 @@ struct Coordinates(CoordSystem cs)
     }
 }
 
-/// Represents a string version of coordinates
-/// takes a string of form: chrom:start-end
-struct ChromCoordinates(CoordSystem cs)
-{
-    /// chromosome or contig
-    string chrom;
-
-    /// Coordinates
-    Coordinates!cs coords;
-
-    /// string constructor
-    this(string chrom, Coordinates!cs coords){
-        this.chrom = chrom;
-        this.coords = coords;
+auto getIntervalFromString(string region){
+    ZBHO coords;
+    auto regStr = toStringz(region);
+    auto ptr = hts_parse_reg64(regStr,&coords.start.pos,&coords.end.pos);
+    if(!ptr){
+        throw new Exception("Region string could not be parsed");
     }
-    /// string constructor
-    this(string region){
-        import std.array : split;
-
-        auto first = region.split(":");
-        assert(first.length == 2);
-
-        this.chrom = first[0];
-
-        auto strcoords = first[1].split("-");
-        assert(strcoords.length == 2);
-
-        auto start = strcoords[0].to!long;
-        auto end = strcoords[1].to!long;
-
-        this.coords = Coordinates!cs(start,end);
-    }
-
-    /// Convert coordinates to another coordinate system 
-    auto to(CoordSystem tocs)()
-    {
-        ChromCoordinates!tocs c;
-        c.chrom = this.chrom;
-        c.coords = this.coords.to!tocs;
-        return c;
-    }
-
-    /// Convert coordinate to another based system using shortcuts
-    auto to(T: ZBHO)()
-    {
-        return this.to!(CoordSystem.zbho);
-    }
-
-    /// Convert coordinate to another based system using shortcuts
-    auto to(T: OBHO)()
-    {
-        return this.to!(CoordSystem.obho);
-    }
-
-    /// Convert coordinate to another based system using shortcuts
-    auto to(T: ZBC)()
-    {
-        return this.to!(CoordSystem.zbc);
-    }
-    
-    /// Convert coordinate to another based system using shortcuts
-    auto to(T: OBC)()
-    {
-        return this.to!(CoordSystem.obc);
-    }
-
-    /// Get string representation for printing
-    string toString() const{
-        return "[" ~ CoordSystemLabels[cs] ~ "] " ~ 
-            chrom ~ ":" ~ this.coords.start.pos.to!string ~ 
-            "-" ~ this.coords.end.pos.to!string;
-    } 
+    auto contig = region[0..ptr - regStr];
+    return tuple!("contig","interval")(contig,coords);
 }
 
-alias ZBHO = Coordinates!(CoordSystem.zbho);
-alias OBHO = Coordinates!(CoordSystem.obho);
-alias ZBC = Coordinates!(CoordSystem.zbc);
-alias OBC = Coordinates!(CoordSystem.obc);
 
-alias ZeroBasedHalfOpen = Coordinates!(CoordSystem.zbho);
-alias OneBasedHalfOpen = Coordinates!(CoordSystem.obho);
-alias ZeroBasedClosed = Coordinates!(CoordSystem.zbc);
-alias OneBasedClosed = Coordinates!(CoordSystem.obc);
+alias ZBHO = Interval!(CoordSystem.zbho);
+alias OBHO = Interval!(CoordSystem.obho);
+alias ZBC = Interval!(CoordSystem.zbc);
+alias OBC = Interval!(CoordSystem.obc);
 
-alias ChromZBHO = ChromCoordinates!(CoordSystem.zbho);
-alias ChromOBHO = ChromCoordinates!(CoordSystem.obho);
-alias ChromZBC = ChromCoordinates!(CoordSystem.zbc);
-alias ChromOBC = ChromCoordinates!(CoordSystem.obc);
-
-alias ChromZeroBasedHalfOpen = ChromCoordinates!(CoordSystem.zbho);
-alias ChromOneBasedHalfOpen = ChromCoordinates!(CoordSystem.obho);
-alias ChromZeroBasedClosed = ChromCoordinates!(CoordSystem.zbc);
-alias ChromOneBasedClosed = ChromCoordinates!(CoordSystem.obc);
+alias ZeroBasedHalfOpen = Interval!(CoordSystem.zbho);
+alias OneBasedHalfOpen = Interval!(CoordSystem.obho);
+alias ZeroBasedClosed = Interval!(CoordSystem.zbc);
+alias OneBasedClosed = Interval!(CoordSystem.obc);
 
 
 debug(dhtslib_unittest) unittest
 {
-    import std.stdio;
-    auto c0 = Coordinates!(CoordSystem.zbho)(0, 100);
+    auto c0 = Interval!(CoordSystem.zbho)(0, 100);
     assert(c0.size == 100);
 
     auto c1 = c0.to!(CoordSystem.zbc);
@@ -480,41 +414,20 @@ debug(dhtslib_unittest) unittest
     assert(c2 == OBC(1, 100));
     assert(c3 == OBHO(1, 101));
     assert(c4 == ZBHO(0, 100));
-    
-    writeln(c0);
-    writeln(c1);
-    writeln(c2);
-    writeln(c3);
     // ...
 }
 
 debug(dhtslib_unittest) unittest
 {
-    import std.stdio;
-    auto c0 = ChromCoordinates!(CoordSystem.zbho)("chrom1:0-100");
-    assert(c0.coords.size == 100);
-
-    auto c1 = c0.to!(CoordSystem.zbc);
-    auto c2 = c0.to!(CoordSystem.obc);
-    auto c3 = c0.to!(CoordSystem.obho);
-    auto c4 = c0.to!(CoordSystem.zbho);
-    
-    assert(c1 == ChromZBC("chrom1:0-99"));
-    assert(c2 == ChromOBC("chrom1:1-100"));
-    assert(c3 == ChromOBHO("chrom1:1-101"));
-    assert(c4 == ChromZBHO("chrom1:0-100"));
-    
-    writeln(c0);
-    writeln(c1);
-    writeln(c2);
-    writeln(c3);
-    // ...
+    auto reg = getIntervalFromString("chrom1:0-100");
+    assert(reg.contig == "chrom1");
+    auto c0 = reg.interval;
+    assert(c0 == Interval!(CoordSystem.zbho)(0, 100));
 }
 
 debug(dhtslib_unittest) unittest
 {
-    import std.stdio;
-    auto c0 = Coordinates!(CoordSystem.zbho)(0, 100);
+    auto c0 = Interval!(CoordSystem.zbho)(0, 100);
     assert(c0.size == 100);
 
     auto c1 = c0.to!(CoordSystem.zbc);
@@ -530,7 +443,6 @@ debug(dhtslib_unittest) unittest
 
 debug(dhtslib_unittest) unittest
 {
-    import std.stdio;
     auto c0 = ZBHO(0, 100);
     assert(c0.size == 100);
 
@@ -547,7 +459,7 @@ debug(dhtslib_unittest) unittest
 
 debug(dhtslib_unittest) unittest
 {
-    auto c0 = Coordinates!(CoordSystem.obho)(1, 101);
+    auto c0 = Interval!(CoordSystem.obho)(1, 101);
     assert(c0.size == 100);
 
     auto c1 = c0.to!(CoordSystem.zbc);

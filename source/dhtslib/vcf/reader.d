@@ -19,9 +19,9 @@ auto VCFReader(string fn, int MAX_UNPACK = BCF_UN_ALL)
     return VCFReaderImpl!(CoordSystem.zbc, false)(fn, MAX_UNPACK);
 }
 
-auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, ChromCoordinates!cs region, int MAX_UNPACK = BCF_UN_ALL)
+auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, int MAX_UNPACK = BCF_UN_ALL)
 {
-    return VCFReaderImpl!(cs,true)(tbxFile, region, MAX_UNPACK);
+    return VCFReaderImpl!(cs,true)(tbxFile, chrom, coords, MAX_UNPACK);
 }
 
 /** Basic support for reading VCF, BCF files */
@@ -47,10 +47,10 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         ReturnType!(this.initializeTabixRange) tbxRange; /// For tabix use
 
         /// TabixIndexedFile and coordinates ctor
-        this(TabixIndexedFile tbxFile, ChromCoordinates!cs region, int MAX_UNPACK = BCF_UN_ALL)
+        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, int MAX_UNPACK = BCF_UN_ALL)
         {
             this.tbx = tbxFile;
-            this.tbxRange = initializeTabixRange(region);
+            this.tbxRange = initializeTabixRange(chrom, coords);
             this.tbxRange.empty;
             /// read the header from TabixIndexedFile
             bcf_hdr_t * hdrPtr = bcf_hdr_init(toUTFz!(char *)("r"));
@@ -63,9 +63,9 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         }
 
         /// copy the TabixIndexedFile.region range
-        auto initializeTabixRange(ChromCoordinates!cs region)
+        auto initializeTabixRange(string chrom, Interval!cs coords)
         {
-            return this.tbx.region(region);
+            return this.tbx.region(chrom, coords);
         }
     }else{
         /// read existing VCF file
@@ -245,9 +245,10 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
     auto tbx = TabixIndexedFile(fn);
-    auto vcf = VCFReader(tbx, ChromOBHO("1:3000151-3062916"));
+    auto reg = getIntervalFromString("1:3000151-3062916");
+    auto vcf = VCFReader(tbx, reg.contig, reg.interval);
     assert(vcf.count == 3);
-    vcf = VCFReader(tbx, ChromOBHO("1:3000151-3062916"));
+    vcf = VCFReader(tbx, reg.contig, reg.interval);
     vcf.empty;
     VCFRecord rec = vcf.front;
     assert(rec.chrom == "1");

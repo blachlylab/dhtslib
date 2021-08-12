@@ -108,18 +108,9 @@ struct TabixIndexedFile {
     /** region(r)
      *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
      */
-    auto region(CoordSystem cs)(string chrom, Coordinates!cs coords)
+    auto region(CoordSystem cs)(string chrom, Interval!cs coords)
     {
-        auto reg = ChromCoordinates!cs(chrom, coords);
-        return region(reg);
-    }
-
-    /** region(r)
-     *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
-     */
-    auto region(CoordSystem cs)(ChromCoordinates!cs region)
-    {
-        auto newRegion = region.to!(CoordSystem.zbho);
+        auto newCoords = coords.to!(CoordSystem.zbho);
         struct Region
         {
 
@@ -134,12 +125,13 @@ struct TabixIndexedFile {
             // re-iterating always returns first row only (since *itr is expended 
             // but first row was preloaded in this.next)
             private bool active;
+            private string chrom;
 
-            this(TabixIndexedFile tbx,  ChromCoordinates!(CoordSystem.zbho) region)
+            this(TabixIndexedFile tbx,  string chrom, Interval!(CoordSystem.zbho) coords)
             {
                 this.tbx = tbx;
-
-                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(region.chrom)), region.coords.start, region.coords.end);
+                this.chrom = chrom;
+                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(this.chrom)), coords.start, coords.end);
                 debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
                 if (this.itr) {
                     // Load the first record
@@ -192,7 +184,7 @@ struct TabixIndexedFile {
             }
         }
 
-        return Region(this, newRegion);
+        return Region(this, chrom, newCoords);
     }
 
 }
@@ -216,7 +208,7 @@ struct TabixIndexedFile {
 /**
     Range that allows reading a record based format via tabix.
     Needs a record type that encompasses only one line of text
-    and a ChromCoordinates region to use for tabix filtering.
+    and a ChromInterval region to use for tabix filtering.
     Rectype could be GFF3Record, BedRecord ...
     This is a sister struct to dhtslib.bgzf.RecordReader.
 */
@@ -229,20 +221,14 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     /// chrom of region
     string chrom;
     /// coordinates of region
-    Coordinates!cs coords;
+    Interval!cs coords;
     /// keep the header
     string header;
     
     bool emptyLine = false;
-
-    /// ChromCoordinates ctor
-    this(string fn, ChromCoordinates!cs region, string fnIdx = "")
-    {
-        this(fn, region.chrom, region.coords, fnIdx);
-    }
     
-    /// string chrom and Coordinates ctor
-    this(string fn, string chrom, Coordinates!cs coords, string fnIdx = "")
+    /// string chrom and Interval ctor
+    this(string fn, string chrom, Interval!cs coords, string fnIdx = "")
     {
         this.file = TabixIndexedFile(fn, fnIdx);
         this.chrom = chrom;
