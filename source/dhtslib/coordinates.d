@@ -377,6 +377,10 @@ struct Interval(CoordSystem cs)
     }
 }
 
+
+/// Returns tuple of String and ZBHO coordinates
+/// representing input string. Supports htslib coordinate strings.
+/// i.e chr1:1-10
 auto getIntervalFromString(string region){
     ZBHO coords;
     auto regStr = toStringz(region);
@@ -388,6 +392,25 @@ auto getIntervalFromString(string region){
     return tuple!("contig","interval")(contig,coords);
 }
 
+/// TODO: complete getIntervalFromString with the ability to check headers
+
+// auto getIntervalFromString(Header)(string region, Header h)
+//     if(is(Header == SAMHeader) || is(Header == VCFHeader))
+// {
+//     ZBHO coords;
+//     int tid;
+//     auto regStr = toStringz(region);
+//     auto flag =  HTS_PARSE_FLAGS.HTS_PARSE_THOUSANDS_SEP;
+//     static if(is(Header == SAMHeader)){
+//         auto ptr = hts_parse_region(regStr,&tid, &coords.start.pos, &coords.end.pos, cast(hts_name2id_f * )&bam_name2id, h.h, flag);
+//     } else static if(is(Header == VCFHeader)){
+//         auto ptr = hts_parse_region(regStr,&tid, &coords.start.pos, &coords.end.pos, &bcf_hdr_id2name, h.hdr, flag);
+//     }
+//     if(!ptr){
+//         throw new Exception("Region string could not be parsed");
+//     }
+//     return tuple!("tid","interval")(tid, coords);
+// }
 
 alias ZBHO = Interval!(CoordSystem.zbho);
 alias OBHO = Interval!(CoordSystem.obho);
@@ -508,4 +531,23 @@ debug(dhtslib_unittest) unittest
     writeln((c0 & c1));
     assert((c0 & c1) == OBC(100, 100));
     assert((c0 | c1) == OBC(1, 199));
+}
+
+///
+debug(dhtslib_unittest) unittest
+{
+    import dhtslib.sam;
+    import htslib.hts_log;
+    import std.path : buildPath, dirName;
+    import std.string : fromStringz;
+    import std.array : array; 
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
+    hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
+    
+    auto reg = getIntervalFromString("sheila:1-10",sam.header);
+    assert(reg.tid == 0);
+    assert(reg.interval == ZBHO(0,11));
 }
