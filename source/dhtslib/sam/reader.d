@@ -264,12 +264,6 @@ struct SAMReader
         return RecordRange(this.fp, this.header, itr);
     }
 
-    /// ditto
-    auto query(CoordSystem cs)(ChromInterval!cs region)
-    in (!this.header.isNull)
-    {
-        return query(region.chrom, region.coords);
-    }
 
     /// ditto
     auto query(string[] regions)
