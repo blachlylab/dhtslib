@@ -8,6 +8,11 @@
     },
     "configurations": [
         {
+            "name": "source",
+            "targetType": "library",
+            "libs": ["hts"]
+        },
+        {
             "name": "unittest",
             "debugVersions": ["dhtslib_unittest"],
             "libs": ["hts"]
@@ -51,14 +56,9 @@
             "libs": ["hts"]
         },
         {
-            "name": "source",
-            "targetType": "library",
-            "libs": ["hts"]
-        },
-        {
             "name": "source-static",
             "targetType": "library",
-            "sourceFiles": ["../htslib/libhts.a"],
+            "sourceFiles": ["htslib/libhts.a"],
             "libs": [ ]
         }
     ]
