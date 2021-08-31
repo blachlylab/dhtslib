@@ -76,7 +76,7 @@ struct BedRecord
     /// column 2: The starting position of the feature in the chromosome or scaffold.
     /// column 3: The ending position of the feature in the chromosome or scaffold. 
     /// setter
-    @property coordinates(CoordSystem cs)(Coordinates!cs coords)
+    @property coordinates(CoordSystem cs)(Interval!cs coords)
     {
         unpack;
         if(this.fields.length < 3) this.fields.length = 3;

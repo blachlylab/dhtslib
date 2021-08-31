@@ -86,9 +86,10 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing BedReader (Tabix)");
     hts_log_info(__FUNCTION__, "Loading test file");
     
+    auto reg = getIntervalFromString("X:1000-1400");
     auto bed = BedReader(
         buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","bed_file.bed.gz"),
-        ZBHO("X:1000-1400")
+        reg.contig, reg.interval
         );
 
     assert(bed.array.length == 2);

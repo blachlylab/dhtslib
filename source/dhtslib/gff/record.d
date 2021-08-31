@@ -181,7 +181,7 @@ struct GFFRecord(GFFVersion ver)
 
     /// Columns 4 & 5: returns Coordinate set: OBC format
     /// setter
-    @property coordinates(CoordSystem cs)(Coordinates!cs coords)
+    @property coordinates(CoordSystem cs)(Interval!cs coords)
     {
         unpack;
         auto newCoords = coords.to!(CoordSystem.obc);

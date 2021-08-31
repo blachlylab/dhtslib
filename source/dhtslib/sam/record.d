@@ -99,18 +99,18 @@ struct SAMRecord
     /// 0-based leftmost coordinate
     pragma(inline, true)
     @nogc @safe nothrow
-    @property Coordinate!(Basis.zero) pos() { return Coordinate!(Basis.zero)(this.b.core.pos); }
+    @property ZB pos() { return ZB(this.b.core.pos); }
     /// ditto
     pragma(inline, true)
     @nogc @safe nothrow
-    @property void pos(Coordinate!(Basis.zero) pos) { this.b.core.pos = pos.pos; }
+    @property void pos(ZB pos) { this.b.core.pos = pos.pos; }
 
     /// 0-based, half-open coordinates that represent
     /// the mapped length of the alignment 
     pragma(inline, true)
-    @property Coordinates!(CoordSystem.zbho) coordinates()
+    @property ZBHO coordinates()
     {
-        return Coordinates!(CoordSystem.zbho)(this.pos, this.pos + this.cigar.alignedLength);
+        return ZBHO(this.pos, this.pos + this.cigar.alignedLength);
     }
 
     // TODO: @field  bin     bin calculated by bam_reg2bin()

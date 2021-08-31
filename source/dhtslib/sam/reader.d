@@ -247,7 +247,7 @@ struct SAMReader
     *   auto reads6 = bamfile.query("{HLA-DRB1*12:17}:1-100");
     *   ```
     */ 
-    auto query(CoordSystem cs)(string chrom, Coordinates!cs coords)
+    auto query(CoordSystem cs)(string chrom, Interval!cs coords)
     in (!this.header.isNull)
     {
         auto tid = this.header.targetId(chrom);
@@ -255,7 +255,7 @@ struct SAMReader
     }
 
     /// ditto
-    auto query(CoordSystem cs)(int tid, Coordinates!cs coords)
+    auto query(CoordSystem cs)(int tid, Interval!cs coords)
     in (!this.header.isNull)
     {
         /// convert to zero-based half-open
@@ -264,12 +264,6 @@ struct SAMReader
         return RecordRange(this.fp, this.header, itr);
     }
 
-    /// ditto
-    auto query(CoordSystem cs)(ChromCoordinates!cs region)
-    in (!this.header.isNull)
-    {
-        return query(region.chrom, region.coords);
-    }
 
     /// ditto
     auto query(string[] regions)
@@ -279,25 +273,19 @@ struct SAMReader
     }
 
     /// ditto
-    auto opIndex(CoordSystem cs)(ChromCoordinates!cs region)
-    {
-        return query!cs(region);
-    }
-
-    /// ditto
     auto opIndex(string[] regions)
     {
         return query(regions);
     }
 
     /// ditto
-    auto opIndex(CoordSystem cs)(string tid, Coordinates!cs coords)
+    auto opIndex(CoordSystem cs)(string tid, Interval!cs coords)
     {
         return query(tid, coords);
     }
 
     /// ditto
-    auto opIndex(CoordSystem cs)(int tid, Coordinates!cs coords)
+    auto opIndex(CoordSystem cs)(int tid, Interval!cs coords)
     {
         return query(tid, coords);
     }
@@ -305,14 +293,14 @@ struct SAMReader
     /// ditto
     auto opIndex(Basis bs)(string tid, Coordinate!bs pos)
     {
-        auto coords = Coordinates!(getCoordinateSystem!(bs,End.open))(pos, pos + 1);
+        auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos, pos + 1);
         return query(tid, coords);
     }
 
     /// ditto
     auto opIndex(Basis bs)(int tid, Coordinate!bs pos)
     {
-        auto coords = Coordinates!(getCoordinateSystem!(bs,End.open))(pos, pos + 1);
+        auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos, pos + 1);
         return query(tid, coords);
     }
 
@@ -320,7 +308,7 @@ struct SAMReader
     deprecated("use multidimensional slicing with second parameter as range ([\"chr1\", 1 .. 2])")
     auto opIndex(Basis bs)(string tid, Coordinate!bs pos1, Coordinate!bs pos2)
     {
-        auto coords = Coordinates!(getCoordinateSystem!(bs,End.open))(pos1, pos2);
+        auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos1, pos2);
         return query(tid, coords);
     }
 
@@ -328,7 +316,7 @@ struct SAMReader
     deprecated("use multidimensional slicing with second parameter as range ([20, 1 .. 2])")
     auto opIndex(Basis bs)(int tid, Coordinate!bs pos1, Coordinate!bs pos2)
     {
-        auto coords = Coordinates!(getCoordinateSystem!(bs,End.open))(pos1, pos2);
+        auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos1, pos2);
         return query(tid, coords);
     }
 
@@ -336,7 +324,7 @@ struct SAMReader
     auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, Coordinate!bs end) if(dim == 1)
     {
         assert(end > start);
-        return Coordinates!(getCoordinateSystem!(bs, End.open))(start, end);
+        return Interval!(getCoordinateSystem!(bs, End.open))(start, end);
     }
 
 
@@ -372,7 +360,7 @@ struct SAMReader
         auto tid = this.header.targetId(ctg);
         auto end = this.header.targetLength(tid) + endoff.offset;
         // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
-        auto coords = Coordinates!(CoordSystem.zbho)(end, end + 1);
+        auto coords = Interval!(CoordSystem.zbho)(end, end + 1);
         return query(tid, coords);
     }
     /// ditto
@@ -380,7 +368,7 @@ struct SAMReader
     {
         auto end = this.header.targetLength(tid) + endoff.offset;
         // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
-        auto coords = Coordinates!(CoordSystem.zbho)(end, end + 1);
+        auto coords = Interval!(CoordSystem.zbho)(end, end + 1);
         return query(tid, coords);
     }
     /// ditto
@@ -395,7 +383,7 @@ struct SAMReader
         auto end = this.header.targetLength(tid) + coords[1];
         auto endCoord = ZB(end);
         auto newEndCoord = endCoord.to!bs;
-        auto c = Coordinates!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
+        auto c = Interval!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
         return query(tid, c);
     }
     /// ditto
@@ -404,7 +392,7 @@ struct SAMReader
         auto end = this.header.targetLength(tid) + coords[1];
         auto endCoord = ZB(end);
         auto newEndCoord = endCoord.to!bs;
-        auto c = Coordinates!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
+        auto c = Interval!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
         return query(tid, c);
     }
 
@@ -819,7 +807,6 @@ debug(dhtslib_unittest) unittest
     // assert(bam["CHROMOSOME_III"].array.length == 41);
     // assert(bam["CHROMOSOME_IV"].array.length == 19);
     // assert(bam["CHROMOSOME_V"].array.length == 0);
-    assert(bam.query(OBC("CHROMOSOME_I:900-2000")).array.length == 14);
     assert(bam.query("CHROMOSOME_I", ZBHO(900, 2000)) .array.length == 14);
     assert(bam["CHROMOSOME_I",ZB(900) .. ZB(2000)].array.length == 14);
     assert(bam[0, ZB(900) .. ZB(2000)].array.length == 14);
@@ -834,7 +821,6 @@ debug(dhtslib_unittest) unittest
     assert(bam[0, $].array.length == 0);
     assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
 
-    assert(bam.query(OBC("CHROMOSOME_I:900-2000")).array.length == 14);
     assert(bam.query("CHROMOSOME_I", OBHO(901, 2000)) .array.length == 14);
     assert(bam["CHROMOSOME_I",OB(901) .. OB(2001)].array.length == 14);
     assert(bam[0, OB(901) .. OB(2001)].array.length == 14);

@@ -101,7 +101,7 @@ struct IndexedFastaFile {
 
     /// Fetch sequence in region by assoc array-style lookup:
     /// `string sequence = fafile["chr2:20123-30456"]`
-    auto opIndex(CoordSystem cs)(ChromCoordinates!cs region)
+    auto opIndex(CoordSystem cs)(ChromInterval!cs region)
     {
         return fetchSequence(region);
     }
@@ -110,7 +110,7 @@ struct IndexedFastaFile {
     /// `string sequence = fafile["chr2", 20123 .. 30456]`
     ///
     /// Sadly, $ to represent max length is not supported
-    auto opIndex(CoordSystem cs)(string contig, Coordinates!cs coords)
+    auto opIndex(CoordSystem cs)(string contig, Interval!cs coords)
     {
         return fetchSequence(contig, coords);
     }
@@ -120,21 +120,13 @@ struct IndexedFastaFile {
     in { assert(start >= 0); assert(start <= end); }
     do
     {
-        auto coords = Coordinates!(getCoordinateSystem!(bs, End.open))(start, end);
+        auto coords = Interval!(getCoordinateSystem!(bs, End.open))(start, end);
         return coords;
-    }
-
-    /// Fetch sequence in region by assoc array-style lookup:
-    /// `string sequence = fafile.fetchSequence("chr2:20123-30456")`
-
-    string fetchSequence(CoordSystem cs)(ChromCoordinates!cs region)
-    {
-        return fetchSequence(region.chrom, region.coords);
     }
 
     /// Fetch sequencing in a region by function call with contig, start, end
     /// `string sequence = fafile.fetchSequence("chr2", 20123, 30456)`
-    string fetchSequence(CoordSystem cs)(string contig, Coordinates!cs coords)
+    string fetchSequence(CoordSystem cs)(string contig, Interval!cs coords)
     {
         char *fetchedSeq;
         long fetchedLen;
@@ -228,11 +220,6 @@ debug(dhtslib_unittest) unittest
     import std.stdio;
     writeln(fai["CHROMOSOME_I",OB(1) .. OB(30)]);
     assert(fai["CHROMOSOME_I",OB(1) .. OB(30)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    
-    assert(fai.fetchSequence(ZBHO("CHROMOSOME_I:0-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(OBHO("CHROMOSOME_I:1-30")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(ZBC("CHROMOSOME_I:0-28")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence(OBC("CHROMOSOME_I:1-29")) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
 
     assert(fai.seqLen("CHROMOSOME_I") == 1009800);
     assert(fai.nSeq == 7);
