@@ -534,20 +534,20 @@ debug(dhtslib_unittest) unittest
 }
 
 ///
-debug(dhtslib_unittest) unittest
-{
-    import dhtslib.sam;
-    import htslib.hts_log;
-    import std.path : buildPath, dirName;
-    import std.string : fromStringz;
-    import std.array : array; 
+// debug(dhtslib_unittest) unittest
+// {
+//     import dhtslib.sam;
+//     import htslib.hts_log;
+//     import std.path : buildPath, dirName;
+//     import std.string : fromStringz;
+//     import std.array : array; 
 
-    hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
-    hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
-    hts_log_info(__FUNCTION__, "Loading test file");
-    auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
+//     hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
+//     hts_log_info(__FUNCTION__, "Testing SAMFile & SAMRecord");
+//     hts_log_info(__FUNCTION__, "Loading test file");
+//     auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","auxf#values.sam"), 0);
     
-    auto reg = getIntervalFromString("sheila:1-10",sam.header);
-    assert(reg.tid == 0);
-    assert(reg.interval == ZBHO(0,11));
-}
+//     auto reg = getIntervalFromString("sheila:1-10",sam.header);
+//     assert(reg.tid == 0);
+//     assert(reg.interval == ZBHO(0,11));
+// }
