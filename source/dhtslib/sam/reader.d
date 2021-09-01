@@ -8,8 +8,7 @@ import std.typecons : Tuple;
 import std.range.interfaces : InputRange, inputRangeObject;
 import std.range.primitives : isInputRange, ElementType;
 
-import htslib.hts : htsFile, hts_open, hts_close, hts_hopen, hts_set_threads, htsExactFormat;
-import htslib.hts : hts_idx_t, hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
+import htslib.hts;
 import htslib.hfile : hdopen, hclose, hFILE, off_t, htell, hseek;
 import htslib.bgzf : bgzf_tell, bgzf_seek;
 
@@ -113,14 +112,6 @@ struct SAMReader
 
         // read header
         this.header = SAMHeader(sam_hdr_read(this.fp));
-        this.idx = sam_index_load(this.fp, this.fn);
-        if (this.idx == null)
-        {
-            hts_log_info(__FUNCTION__, "SAM index not found");
-            // TODO: attempt to build
-            // TODO: edit range to return empty immediately if no idx
-        }
-        hts_log_debug(__FUNCTION__, format("SAM index: %s", this.idx));
 
         // collect header offset just in case it is a sam file
         // we would like to iterate
@@ -140,6 +131,8 @@ struct SAMReader
 
         if((this.fp !is null) && (this.f is null))
         {
+            if(this.idx !is null)
+                hts_idx_destroy(this.idx);
             const auto ret = hts_close(fp);
             if (ret < 0)
                 writefln("There was an error closing %s", fromStringz(this.fn));
@@ -260,6 +253,15 @@ struct SAMReader
     {
         /// convert to zero-based half-open
         auto newcoords = coords.to!(CoordSystem.zbho);
+
+        /// load index
+        if(this.idx == null)
+            this.idx = sam_index_load(this.fp, this.fn);
+        if (this.idx == null)
+        {
+            hts_log_error(__FUNCTION__, "SAM index not found");
+            throw new Exception("SAM index not found");
+        }
         auto itr = sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end);
         return RecordRange(this.fp, this.header, itr);
     }
