@@ -554,7 +554,7 @@ struct SAMRecord
                 current.rpos = coords.front.rpos;
                 current.cigar_op = coords.front.cigar_op;
                 if(!CigarOp(0, current.cigar_op).is_query_consuming) current.queryBase = '-';
-                else current.queryBase = qseq[current.qpos];
+                else current.queryBase = qseq[current.qpos.pos];
                 
                 static if(refSeq){
                     if(!CigarOp(0, current.cigar_op).is_reference_consuming) current.refBase = '-';
@@ -574,7 +574,7 @@ struct SAMRecord
                 current.rpos = coords.front.rpos;
                 current.cigar_op = coords.front.cigar_op;
                 if(!CigarOp(0, current.cigar_op).is_query_consuming) current.queryBase = '-';
-                else current.queryBase = qseq[current.qpos];
+                else current.queryBase = qseq[current.qpos.pos];
                 
                 static if(refSeq){
                     if(CigarOp(0, current.cigar_op).is_reference_consuming) mdItr.popFront;

@@ -12,8 +12,8 @@ auto BedReader(string fn)
 }
 
 /// ditto
-auto BedReader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+auto BedReader(CoordSystem cs)(string fn, Interval!cs coords, string fnIdx = "")
 {
-    return RecordReaderRegion!(BedRecord, cs)(fn, chrom, coords, fnIdx);
+    return RecordReaderRegion!(BedRecord, cs)(fn, coords, fnIdx);
 }
 

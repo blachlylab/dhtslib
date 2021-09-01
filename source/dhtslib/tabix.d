@@ -20,6 +20,8 @@ import htslib.tbx;
 import dhtslib.coordinates;
 //import htslib.regidx;
 
+import optional : match;
+
 /** Encapsulates a position-sorted record-oriented NGS flat file,
  *  indexed with Tabix, including BED, GFF3, VCF.
  *
@@ -108,7 +110,7 @@ struct TabixIndexedFile {
     /** region(r)
      *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
      */
-    auto region(CoordSystem cs)(string chrom, Interval!cs coords)
+    auto region(CoordSystem cs)(Interval!cs coords)
     {
         auto newCoords = coords.to!(CoordSystem.zbho);
         struct Region
@@ -127,11 +129,16 @@ struct TabixIndexedFile {
             private bool active;
             private string chrom;
 
-            this(TabixIndexedFile tbx,  string chrom, Interval!(CoordSystem.zbho) coords)
+            this(TabixIndexedFile tbx, Interval!(CoordSystem.zbho) coords)
             {
                 this.tbx = tbx;
-                this.chrom = chrom;
-                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(this.chrom)), coords.start, coords.end);
+                coords.contig.match!(
+                    (string chrom) => this.chrom = chrom,
+                    () {
+                        throw new Exception("Interval contig field is none");
+                    }    
+                );
+                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(this.chrom)), coords.start.pos, coords.end.pos);
                 debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
                 if (this.itr) {
                     // Load the first record
@@ -184,7 +191,7 @@ struct TabixIndexedFile {
             }
         }
 
-        return Region(this, chrom, newCoords);
+        return Region(this, newCoords);
     }
 
 }
@@ -218,8 +225,6 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     TabixIndexedFile file;
     /// file reader range
     ReturnType!(this.initializeRange) range;
-    /// chrom of region
-    string chrom;
     /// coordinates of region
     Interval!cs coords;
     /// keep the header
@@ -228,10 +233,9 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     bool emptyLine = false;
     
     /// string chrom and Interval ctor
-    this(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+    this(string fn, Interval!cs coords, string fnIdx = "")
     {
         this.file = TabixIndexedFile(fn, fnIdx);
-        this.chrom = chrom;
         this.coords = coords;
         this.header = this.file.header;
         this.range = this.initializeRange;
@@ -241,7 +245,7 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     /// copy the TabixIndexedFile.region range
     auto initializeRange()
     {
-        return this.file.region(this.chrom, this.coords);
+        return this.file.region(this.coords);
     }
 
     /// returns RecType

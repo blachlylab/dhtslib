@@ -49,6 +49,8 @@ import htslib.sam : bam_name2id;
 import htslib.vcf : bcf_hdr_id2name;
 import htslib.hts : hts_parse_region, hts_parse_reg64, hts_parse_decimal, hts_name2id_f, HTS_PARSE_FLAGS;
 
+import optional;
+
 /// Represents 0-based vs 1-based coordinate types
 enum Basis
 {
@@ -69,9 +71,27 @@ enum End
 /// (zero or one-based)
 struct Coordinate(Basis bs)
 {
+    /// potential contig name
+    Optional!string contig;
+
     /// Coordinate value
     long pos;
-    alias pos this;
+
+    /// string, integral ctor
+    this(T)(string contig, T pos)
+    if (isIntegral!T)
+    {
+        this.contig = contig;
+        this.pos = pos.to!long;
+    }
+
+    /// integral ctor
+    this(T)(T pos)
+    if (isIntegral!T)
+    {
+        this.contig = none;
+        this.pos = pos.to!long;
+    }
 
     invariant
     {
@@ -89,9 +109,9 @@ struct Coordinate(Basis bs)
         // return same Base type
         static if (bs == tobs) return Coordinate!bs(pos);
         // one to zero base, decrement
-        else static if (tobs == Basis.zero) return Coordinate!bs(pos - 1);
+        else static if (tobs == Basis.zero) return Coordinate!tobs(pos - 1);
         // zero to one base, increment
-        else static if (tobs == Basis.one) return Coordinate!bs(pos + 1);
+        else static if (tobs == Basis.one) return Coordinate!tobs(pos + 1);
         else static assert(0, "Coordinate Type error");
     }
 
@@ -111,7 +131,56 @@ struct Coordinate(Basis bs)
     auto offset(T)(T off)
     if(isIntegral!T)
     {
-        return Coordinatse!(bs)(cast(long)(this.pos + off));
+        return Coordinate!(bs)(cast(long)(this.pos + off));
+    }
+
+    auto opOpAssign(string op, T)(const T value)
+    if(is(T == Coordinate!bs) || isIntegral!T)
+    {
+        static if(is(T == Coordinate!bs)){
+            if(this.contig != value.contig) throw new Exception("Coordinates must have the same contig to use op " ~ op);
+            mixin("this.pos = this.pos " ~ op ~ " value.pos;");
+        }else{
+            mixin("this.pos = this.pos " ~ op ~ " value;");
+        }
+        return this;
+    }
+
+    auto opBinary(string op, T)(const T value) const
+    if(is(T == Coordinate!bs) || isIntegral!T)
+    {
+        static if(is(T == Coordinate!bs)){
+            if(this.contig != value.contig) throw new Exception("Coordinates must have the same contig to use op " ~ op);
+        }
+        Coordinate!bs ret = this;
+        ret.opOpAssign!(op, T)(value);
+        return ret;
+    }
+
+    int opCmp(const Coordinate!bs other) const
+    {
+        if(this == other) return 0;
+        if(this.pos < other.pos) return -1;
+        else return 1;
+    }
+
+    int opCmp(T)(const T other) const
+    if(isIntegral!T)
+    {
+        if(this == other) return 0;
+        if(this.pos < other) return -1;
+        else return 1;
+    }
+
+    bool opEquals(const Coordinate!bs other) const
+    {
+        return this.pos == other.pos;
+    }
+
+    bool opEquals(T)(const T other) const
+    if(isIntegral!T)
+    {
+        return this.pos == other;
     }
 }
 
@@ -211,16 +280,62 @@ struct Interval(CoordSystem cs)
     alias basetype = coordinateSystemToBasis!cs;
     alias endtype = coordinateSystemToEnd!cs;
 
+    /// potential contig name
+    Optional!string contig;
+
     /// Starting coordinate
     Coordinate!basetype start;
     /// Ending coordinate
     Coordinate!basetype end;
+    
+    invariant
+    {
+        assert(this.contig == this.start.contig);
+        assert(this.contig == this.end.contig);
+    }
+
+    /// string, integral ctor
+    this(T1, T2)(string contig, T1 start, T2 end)
+    if (isIntegral!T1 && isIntegral!T2)
+    {
+        this.contig = contig;
+        this.start = Coordinate!basetype(contig, start);
+        this.end = Coordinate!basetype(contig, end);
+    }
+
+    /// integral ctor
+    this(T1, T2)(T1 start, T2 end)
+    if (isIntegral!T1 && isIntegral!T2)
+    {
+        this.contig = none;
+        this.start = Coordinate(this.contig, start);
+        this.end = Coordinate(this.contig, end);
+    }
 
     /// long constructor
     this(long start, long end)
     {
         this.start.pos = start;
         this.end.pos = end;
+    }
+
+    this(string contig, Coordinate!basetype start, Coordinate!basetype end)
+    {
+        this.contig = contig;
+        this.start = start;
+        this.end = end;
+        this.start.contig = contig;
+        this.end.contig = contig;
+    }
+
+    this(Coordinate!basetype start, Coordinate!basetype end)
+    {
+        if(start.contig != end.contig) throw new Exception("Both Coordinate's must have the same contig");
+        this.contig = start.contig;
+        this.start = start;
+        this.end = end;
+        this.start.contig = this.contig;
+        this.end.contig = this.contig;
     }
 
     invariant
@@ -237,9 +352,9 @@ struct Interval(CoordSystem cs)
     long size()
     {
         static if (cs == CoordSystem.zbho || cs == CoordSystem.obho)
-            return end - start;
+            return end.pos - start.pos;
         else static if (cs == CoordSystem.zbc || cs == CoordSystem.obc)
-            return end - start + 1;
+            return end.pos - start.pos + 1;
         else
             static assert(0, "Coordinate Type error");
     }
@@ -252,17 +367,13 @@ struct Interval(CoordSystem cs)
         alias tobasetype = coordinateSystemToBasis!tocs;
         alias toendtype = coordinateSystemToEnd!tocs;
 
-        // new coordinates
-        auto newStart = this.start;
-        auto newEnd = this.end;
-
         // return same CoordinateSystem type
         static if (cs == tocs)
-            return Interval!(tocs)(newStart, newEnd);
+            return Interval!(tocs)(this.start, this.end);
         else{
             // convert coordinates to new base type
-            newStart = newStart.to!tobasetype;
-            newEnd = newEnd.to!tobasetype;
+            auto newStart = this.start.to!tobasetype;
+            auto newEnd = this.end.to!tobasetype;
 
             // if going between end types
             static if (endtype != toendtype){
@@ -307,7 +418,10 @@ struct Interval(CoordSystem cs)
     auto offset(T)(T off)
     if(isIntegral!T)
     {
-        return Interval!(cs)(cast(long)(this.start + off), cast(long)(this.end + off));
+        Interval!(cs) ret = this;
+        ret.start.offset(off);
+        ret.end.offset(off);
+        return ret;
     }
 
     /// intersection of two regions
@@ -381,7 +495,7 @@ struct Interval(CoordSystem cs)
 /// Returns tuple of String and ZBHO coordinates
 /// representing input string. Supports htslib coordinate strings.
 /// i.e chr1:1-10
-auto getIntervalFromString(string region){
+ZBHO getIntervalFromString(string region){
     ZBHO coords;
     auto regStr = toStringz(region);
     auto ptr = hts_parse_reg64(regStr,&coords.start.pos,&coords.end.pos);
@@ -389,7 +503,8 @@ auto getIntervalFromString(string region){
         throw new Exception("Region string could not be parsed");
     }
     auto contig = region[0..ptr - regStr];
-    return tuple!("contig","interval")(contig,coords);
+    coords.contig = contig;
+    return coords;
 }
 
 /// TODO: complete getIntervalFromString with the ability to check headers
@@ -444,8 +559,7 @@ debug(dhtslib_unittest) unittest
 {
     auto reg = getIntervalFromString("chrom1:0-100");
     assert(reg.contig == "chrom1");
-    auto c0 = reg.interval;
-    assert(c0 == Interval!(CoordSystem.zbho)(0, 100));
+    assert(reg == Interval!(CoordSystem.zbho)("chrom1",0, 100));
 }
 
 debug(dhtslib_unittest) unittest

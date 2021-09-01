@@ -349,7 +349,7 @@ struct GFFRecord(GFFVersion ver)
     }
 
     /// Computed feature length
-    @property length() const { return this.end - (this.start-1); }
+    @property length() const { return this.end.pos - (this.start.pos - 1); }
     /// Relative start === 1
     @property relativeStart() const { return OB(1); }
     /// Relative start === the feature length
@@ -368,7 +368,7 @@ struct GFFRecord(GFFVersion ver)
         // for - strand count backward; for +, ., and ? strand count forward
         immutable auto direction = (this.strand == '-' ? -1 : 1);
 
-        return OB(begin + (direction * offset));
+        return OB(begin.pos + (direction * offset));
     }
     /// Genomic coordinate at beginning of feature, taking strandedness into account
     @property coordinateAtBegin() const

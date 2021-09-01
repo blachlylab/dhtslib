@@ -89,7 +89,7 @@ debug(dhtslib_unittest) unittest
     auto reg = getIntervalFromString("X:1000-1400");
     auto bed = BedReader(
         buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","bed_file.bed.gz"),
-        reg.contig, reg.interval
+        reg
         );
 
     assert(bed.array.length == 2);

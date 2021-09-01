@@ -14,9 +14,9 @@ auto GFF3Reader(string fn)
 }
 
 /// ditto
-auto GFF3Reader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+auto GFF3Reader(CoordSystem cs)(string fn, Interval!cs coords, string fnIdx = "")
 {
-    return RecordReaderRegion!(GFF3Record, cs)(fn, chrom, coords, fnIdx);
+    return RecordReaderRegion!(GFF3Record, cs)(fn, coords, fnIdx);
 }
 
 /// Returns a RecordReader range for a GTF file
@@ -26,9 +26,9 @@ auto GTFReader(string fn)
 }
 
 /// ditto
-auto GTFReader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+auto GTFReader(CoordSystem cs)(string fn, Interval!cs coords, string fnIdx = "")
 {
-    return RecordReaderRegion!(GTFRecord, cs)(fn, chrom, coords, fnIdx);
+    return RecordReaderRegion!(GTFRecord, cs)(fn, coords, fnIdx);
 }
 
 /// Returns a RecordReader range for a GFF2 file
@@ -38,9 +38,9 @@ auto GFF2Reader(string fn)
 }
 
 /// ditto
-auto GFF2Reader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+auto GFF2Reader(CoordSystem cs)(string fn, Interval!cs coords, string fnIdx = "")
 {
-    return RecordReaderRegion!(GTFRecord, cs)(fn, chrom, coords, fnIdx);
+    return RecordReaderRegion!(GTFRecord, cs)(fn, coords, fnIdx);
 }
 
 debug(dhtslib_unittest) unittest
@@ -105,7 +105,7 @@ debug(dhtslib_unittest) unittest
     auto reg = getIntervalFromString("X:2934832-2935190");
     auto gff = GFF3Reader(
         buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","gff_file.gff.gz"),
-        reg.contig, reg.interval
+        reg
         );
 
     assert(gff.array.length == 4);

@@ -5,6 +5,7 @@
     "homepage": "https://github.com/blachlylab/dhtslib",
     "license": "MIT",
     "dependencies": {
+        "optional": "~>1.2.1"
     },
     "configurations": [
         {

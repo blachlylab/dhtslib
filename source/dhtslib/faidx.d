@@ -17,6 +17,8 @@ import core.stdc.stdlib : malloc, free;
 import dhtslib.coordinates;
 import htslib.faidx;
 
+import optional.match;
+
 /** Build index for a FASTA or bgzip-compressed FASTA file.
 
     @param  fn  FASTA file name
@@ -126,7 +128,7 @@ struct IndexedFastaFile {
 
     /// Fetch sequencing in a region by function call with contig, start, end
     /// `string sequence = fafile.fetchSequence("chr2", 20123, 30456)`
-    string fetchSequence(CoordSystem cs)(string contig, Interval!cs coords)
+    string fetchSequence(CoordSystem cs)(Interval!cs coords)
     {
         char *fetchedSeq;
         long fetchedLen;
@@ -146,7 +148,15 @@ struct IndexedFastaFile {
          *  by end users by calling `free()` on it.
          *
         */
-        fetchedSeq = faidx_fetch_seq64(this.faidx, toStringz(contig), newcoords.start, newcoords.end, &fetchedLen);
+        string contig;
+
+        coords.contig.match!(
+            (string chrom) => contig = chrom,
+            () {
+                throw new Exception("Interval contig field is none");
+            }    
+        );
+        fetchedSeq = faidx_fetch_seq64(this.faidx, toStringz(contig), newcoords.start.pos, newcoords.end.pos, &fetchedLen);
         
         if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
         else if (fetchedLen == -2) throw new Exception("fai_fetch: sequence not found");
@@ -206,20 +216,19 @@ debug(dhtslib_unittest) unittest
 
     fai.setCacheSize(4000000);
 
-    assert(fai.fetchSequence("CHROMOSOME_I",ZBHO(0, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",OBHO(1, 30)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",ZBC(0, 28)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",OBC(1, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ZBHO("CHROMOSOME_I",0, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(OBHO("CHROMOSOME_I",1, 30)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ZBC("CHROMOSOME_I",0, 28)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(OBC("CHROMOSOME_I",1, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
 
-    assert(fai.fetchSequence("CHROMOSOME_I",ZBHO(1, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",OBHO(2, 30)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",ZBC(1, 28)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    assert(fai.fetchSequence("CHROMOSOME_I",OBC(2, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ZBHO("CHROMOSOME_I",1, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(OBHO("CHROMOSOME_I",2, 30)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(ZBC("CHROMOSOME_I",1, 28)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence(OBC("CHROMOSOME_I",2, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
 
-    assert(fai["CHROMOSOME_I",ZB(0) .. ZB(29)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
-    import std.stdio;
-    writeln(fai["CHROMOSOME_I",OB(1) .. OB(30)]);
-    assert(fai["CHROMOSOME_I",OB(1) .. OB(30)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    // assert(fai["CHROMOSOME_I",ZB(0) .. ZB(29)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    
+    // assert(fai["CHROMOSOME_I",OB(1) .. OB(30)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
 
     assert(fai.seqLen("CHROMOSOME_I") == 1009800);
     assert(fai.nSeq == 7);
