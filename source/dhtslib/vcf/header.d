@@ -5,9 +5,116 @@ import std.string: fromStringz, toStringz;
 import std.format: format;
 import std.traits : isArray, isIntegral, isSomeString;
 import std.conv: to, ConvException;
+import std.algorithm : map;
+import std.array : array;
+import std.utf : toUTFz;
 
 import htslib.vcf;
 import htslib.hts_log;
+
+/// Replacement for htslib BCF_HL_*
+enum HDR_LINE
+{
+    FILTER =    0, /// header line: FILTER
+    INFO =      1, /// header line: INFO
+    FORMAT =    2, /// header line: FORMAT
+    CONTIG =    3, /// header line: contig
+    STRUCT =    4, /// header line: structured header line TAG=<A=..,B=..>
+    GENERIC =   5, /// header line: generic header line
+}
+
+/// Replacement for htslib BCF_HT_*
+enum HDR_TYPE
+{
+    FLAG =  0, /// header type: FLAG// header type
+    INT =   1, /// header type: INTEGER
+    REAL =  2, /// header type: REAL
+    STR =   3, /// header type: STRING
+    LONG =  BCF_HT_INT | 0x100, // BCF_HT_INT, but for int64_t values; VCF only!
+}
+
+/// Replacement for htslib BCF_VL_*
+enum HDR_LENGTH
+{
+    FIXED = 0, /// variable length: fixed (?)// variable length
+    VAR =   1, /// variable length: variable
+    A =     2, /// variable length: ?
+    G =     3, /// variable length: ?
+    R =     4, /// variable length: ?
+}
+
+/// Replacement for htslib BCF_DT_*
+enum HDR_DICT_TYPE
+{
+    BCF_DT_ID =     0, /// dictionary type: ID
+    BCF_DT_CTG =    1, /// dictionary type: CONTIG
+    BCF_DT_SAMPLE = 2, /// dictionary type: SAMPLE
+}
+
+struct HeaderRecord
+{
+    HDR_LINE type;
+    string key;
+    string value;
+    int nkeys;
+    string[] keys;
+    string[] vals;
+
+    /// ctor from a bcf_hrec_t
+    this(bcf_hrec_t * rec){
+        this.type = cast(HDR_LINE) rec.type;
+        this.key = fromStringz(rec.key).dup;
+        this.value = fromStringz(rec.value).dup;
+        this.nkeys = rec.nkeys;
+
+        for(auto i=0; i < rec.nkeys; i++){
+            keys ~= fromStringz(rec.keys[i]).dup;
+            vals ~= fromStringz(rec.vals[i]).dup;
+        }
+    }
+
+    /// get a value from the KV pairs
+    /// if key isn't present thows exception
+    ref auto opIndex(string index)
+    {
+        foreach (i, string key; keys)
+        {
+            if(key == index){
+                return vals[i];
+            }
+        }
+        throw new Exception("Key " ~ index ~" not found");
+    }
+
+    /// set a value from the KV pairs
+    /// if key isn't present a new KV pair is 
+    /// added
+    void opIndexAssign(string value, string index)
+    {
+        foreach (i, string key; keys)
+        {
+            if(key == index){
+                vals[i] = value;
+                return;
+            }
+        }
+        this.nkeys++;
+        keys~=key;
+        keys~=value;
+    }
+
+    bcf_hrec_t * convert()
+    {
+        bcf_hrec_t rec;
+        rec.type = this.type;
+        rec.key = toUTFz!(char *)(this.key);
+        rec.value = toUTFz!(char *)(this.value);
+        rec.nkeys = this.nkeys;
+        rec.keys = this.keys.map!(x=> toUTFz!(char *)(x)).array.ptr;
+        rec.vals = this.vals.map!(x=> toUTFz!(char *)(x)).array.ptr;
+        return bcf_hrec_dup(&rec);
+    }
+}
 
 /** Wrapper around bcf_hdr_t
 
@@ -114,6 +221,39 @@ struct VCFHeader
         bcf_hdr_sync(this.hdr);
         return ret;
     }
+
+    /// Add a new header line -- must be formatted ##key=value
+    int addHeaderRecord(HeaderRecord rec)
+    {
+        assert(this.hdr != null);
+        auto ret = bcf_hdr_add_hrec(this.hdr, rec.convert);
+        bcf_hdr_sync(this.hdr);
+        return ret;
+    }
+
+    /// Remove all header lines of a particular type
+    void removeHeaderLines(HDR_LINE linetype)
+    {
+        bcf_hdr_remove(this.hdr, linetype, null);
+        bcf_hdr_sync(this.hdr);
+    }
+
+    /// Remove a header line of a particular type with the key
+    void removeHeaderLines(HDR_LINE linetype, string key)
+    {
+        bcf_hdr_remove(this.hdr, linetype, toStringz(key));
+        bcf_hdr_sync(this.hdr);
+    }
+
+    HeaderRecord getHeaderRecord(HDR_LINE linetype, string key, string value)
+    {
+        auto rec = bcf_hdr_get_hrec(this.hdr, linetype, toUTFz!(const(char) *)(key),toUTFz!(const(char) *)(value), null);
+        if(!rec) throw new Exception("Record could not be found");
+        auto ret = HeaderRecord(rec);
+        // bcf_hrec_destroy(rec);
+        return ret;
+    }
+
     /// Add a filedate= headerline, which is not called out specifically in  the spec,
     /// but appears in the spec's example files. We could consider allowing a param here.
     int addFiledate()
@@ -263,4 +403,39 @@ unittest
     assert(hdr.nsamples == 0);
     hdr.addSample("NA12878");
     assert(hdr.nsamples == 1);
+}
+
+///
+debug(dhtslib_unittest)
+unittest
+{
+    import std.exception: assertThrown;
+    import std.stdio: writeln, writefln;
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+
+
+    auto hdr = VCFHeader(bcf_hdr_init("w\0"c.ptr));
+
+    hdr.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
+    hdr.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
+
+    auto rec = hdr.getHeaderRecord(HDR_LINE.INFO,"ID","NS");
+    assert(rec.type == HDR_LINE.INFO);
+    writeln(rec.key);
+    writeln(rec.value);
+    writeln(rec.vals);
+    assert(rec.key == "INFO");
+    assert(rec.nkeys == 5);
+    assert(rec.keys == ["ID", "Number", "Type", "Description", "IDX"]);
+    assert(rec.vals == ["NS", "1", "Integer", "\"Number of Samples With Data\"", "1"]);
+    // // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
+    // hdr.addTag!"INFO"("AF", "A", "Integer", "Number of Samples With Data");
+    // hdr.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
+    // hdr.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
+
+    // // Exercise header
+    // assert(hdr.nsamples == 0);
+    // hdr.addSample("NA12878");
+    // assert(hdr.nsamples == 1);
 }
