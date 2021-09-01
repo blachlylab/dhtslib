@@ -44,10 +44,9 @@ import std.conv : to;
 import std.string : toStringz;
 import std.typecons : tuple;
 
-import dhtslib : VCFHeader, SAMHeader;
 import htslib.sam : bam_name2id;
 import htslib.vcf : bcf_hdr_id2name;
-import htslib.hts : hts_parse_region, hts_parse_reg64, hts_parse_decimal, hts_name2id_f, HTS_PARSE_FLAGS;
+import htslib.hts : hts_parse_reg64;
 
 /// Represents 0-based vs 1-based coordinate types
 enum Basis
