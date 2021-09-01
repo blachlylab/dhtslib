@@ -72,7 +72,7 @@ struct SAMRecord
     {
         if(refct > 0) refct--;
         // remove only if no references to this or underlying bam1_t data
-        if (refct == 0 && p_cigar.references == 0 && p_tagval.references == 0)
+        if (refct == 0 && p_cigar.references <= 1 && p_tagval.references <= 1)
             bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
     }
 
