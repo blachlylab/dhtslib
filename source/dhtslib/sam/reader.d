@@ -559,6 +559,11 @@ struct SAMReader
         private bam1_t* b;
 
         private int r;  // sam_itr_next: >= 0 on success; -1 when there is no more data; < -1 on error
+        
+        private bool initialized;   // Needed to support both foreach and immediate .front()
+        private int success;        // sam_read1 return code
+
+        private int refct = 1;      // Postblit refcounting in case the object is passed around
 
         /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
         this(htsFile* fp, SAMHeader header, hts_itr_t* itr)
@@ -567,18 +572,38 @@ struct SAMReader
             this.h = header;
             this.itr = itr;
             this.b = bam_init1();
-            
-            //assert(itr !is null, "itr was null");
+            assert(itr !is null, "itr was null");
  
-            if (this.itr !is null)
-                popFront();
         }
+
+        this(this)
+        {
+            refct++;
+        }
+
+        invariant(){
+            assert(refct >= 0);
+        }
+
+        ~this()
+    {
+        if(refct > 0) refct--;
+        // remove only if no references to this or underlying bam1_t data
+        if (refct == 0){
+            bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
+            hts_itr_destroy(this.itr);
+        }
+    }
 
         /// InputRange interface
         @property bool empty()
         {
             // TODO, itr.finished shouldn't be used
-            if (this.itr is null) return true;
+            if (!this.initialized) {
+                this.popFront();
+                this.initialized = true;
+            }
+            assert(this.itr !is null);
             return (r < 0 || itr.finished) ? true : false;
         }
         /// ditto
