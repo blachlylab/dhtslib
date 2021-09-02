@@ -131,32 +131,32 @@ struct VCFWriter
     *   source:      Annotation source  (eg dbSNP)
     *   version:     Annotation version (eg 142)
     */
-    deprecated("use VCFHeader methods instead")
-    void addTag(string tagType, T)( string id,
-                                    T number,
-                                    string type,
-                                    string description,
-                                    string source="",
-                                    string _version="")
-    if((tagType == "INFO" || tagType == "FORMAT") && (isIntegral!T || isSomeString!T))
-    {
-        this.vcfhdr.addTag!(tagType, T)(id, number, type, description, source, _version);
-    }
+    // deprecated("use VCFHeader methods instead")
+    // void addTag(string tagType, T)( string id,
+    //                                 T number,
+    //                                 string type,
+    //                                 string description,
+    //                                 string source="",
+    //                                 string _version="")
+    // if((tagType == "INFO" || tagType == "FORMAT") && (isIntegral!T || isSomeString!T))
+    // {
+    //     this.vcfhdr.addTag!(tagType, T)(id, number, type, description, source, _version);
+    // }
 
     /** Add FILTER tag (§1.2.3) */
-    deprecated("use VCFHeader methods instead")
-    void addTag(string tagType)(string id, string description)
-    if(tagType == "FILTER")
-    {
-        this.vcfhdr.addTag!(tagType)(id, description);
-    }
+    // deprecated("use VCFHeader methods instead")
+    // void addTag(string tagType)(string id, string description)
+    // if(tagType == "FILTER")
+    // {
+    //     this.vcfhdr.addTag!(tagType)(id, description);
+    // }
 
     /** Add FILTER tag (§1.2.3) */
-    deprecated("use VCFHeader methods instead")
-    void addFilterTag(string id, string description)
-    {
-        this.vcfhdr.addFilterTag(id, description);
-    }
+    // deprecated("use VCFHeader methods instead")
+    // void addFilterTag(string id, string description)
+    // {
+    //     this.vcfhdr.addFilterTag(id, description);
+    // }
 
     /** Add contig definition (§1.2.7) to header meta-info 
     

@@ -702,7 +702,7 @@ unittest
     vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-    vw.addTag!"INFO"("AF", "A", "Integer", "Number of Samples With Data");
+    vw.vcfhdr.addHeaderLine!(HDR_LINE.INFO)("AF", HDR_LENGTH.A, HDR_TYPE.INT, "Number of Samples With Data");
     vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
 
