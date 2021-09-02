@@ -459,8 +459,12 @@ struct VCFRecord
     /// "If flt_id is PASS, all existing filters are removed first. If other than PASS, existing PASS is removed."
     int addFilter(string f)
     {
-        return bcf_add_filter(this.vcfheader.hdr, this.line, 
-            bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f)));
+        
+        if(f == "") hts_log_warning(__FUNCTION__, "filter was empty");
+        const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
+        if (fid == -1) hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
+
+        return bcf_add_filter(this.vcfheader.hdr, this.line, fid);
     }
     /// Remove a filter by name
     int removeFilter(string f)
@@ -552,12 +556,12 @@ struct VCFRecord
         int ret = -1;
 
         static if(isIntegral!T) {
-            auto integer = cast(int) data;
+            auto integer = data.to!int;
             ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), &integer, 1);
         }
         
         else static if(isFloatingPoint!T) {
-            auto flt = cast(float) data;    // simply passing "2.0" (or whatever) => data is a double
+            auto flt = data.to!float;    // simply passing "2.0" (or whatever) => data is a double
             ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, 1);
         }
 
@@ -577,13 +581,13 @@ struct VCFRecord
                 int ret = -1;
 
         static if(isIntegral!T) {
-            auto integer = cast(int[]) data;
+            auto integer = data.to!(int[]);
             ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag),
                                             integer.ptr, cast(int)data.length);
         }
         
         else static if(isFloatingPoint!T) {
-            auto flt = cast(float[]) data;    // simply passing "2.0" (or whatever) => data is a double
+            auto flt = data.to!(float[]);    // simply passing "2.0" (or whatever) => data is a double
             ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag),
                                             flt.ptr, cast(int)data.length);
         }
@@ -592,10 +596,17 @@ struct VCFRecord
 
     }
 
+    /// remove a format section
+    void removeFormat(string tag)
+    {
+        bcf_update_format(this.vcfheader.hdr,this.line, toStringz(tag),null,0,BCF_BT_NULL);
+    }
+
+
     /// add INFO or FORMAT key:value pairs to a record
-    /// add a single datapoint OR vector of values, OR, values to each sample (if tagType == FORMAT)
-    void add(string tagType, T)(const(char)[] tag, T data)
-    if((tagType == "INFO" || tagType == "FORMAT") &&
+    /// add a single datapoint OR vector of values, OR, values to each sample (if lineType == FORMAT)
+    void add(HDR_LINE lineType, T)(const(char)[] tag, T data)
+    if((lineType == HDR_LINE.INFO || lineType == HDR_LINE.FORMAT) &&
         (isIntegral!T       || isIntegral!(ElementType!T)   ||
         isFloatingPoint!T   || isFloatingPoint!(ElementType!T) ||
         isSomeString!T      || isSomeString!(ElementType!T) ||
@@ -637,7 +648,7 @@ struct VCFRecord
         }
         else static assert(0);
 
-        static if (tagType == "INFO") {
+        static if (lineType == HDR_LINE.INFO) {
             static if (is(Unqual!T == int) || is(Unqual!(ElementType!T) == int))
                 ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static if (is(Unqual!T == float) || is(Unqual!(ElementType!T) == float))
@@ -648,7 +659,7 @@ struct VCFRecord
                 ret = bcf_update_info_flag(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static assert(0, "Type not recognized for INFO tag");
         }
-        else static if (tagType == "FORMAT") {
+        else static if (lineType == HDR_LINE.FORMAT) {
             static if (is(Unqual!T == int) || is(Unqual!(ElementType!T) == int))
                 ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static if (is(Unqual!T == float) || is(Unqual!(ElementType!T) == float))
@@ -705,6 +716,16 @@ unittest
     vw.vcfhdr.addHeaderLine!(HDR_LINE.INFO)("AF", HDR_LENGTH.A, HDR_TYPE.INT, "Number of Samples With Data");
     vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
+    HeaderRecord hrec;
+    hrec.setHeaderRecordType(HDR_LINE.FORMAT);
+    hrec.setID("AF");
+    hrec.setLength(HDR_LENGTH.A);
+    hrec.setValueType(HDR_TYPE.FLOAT);
+    hrec.setDescription("Allele Freq");
+    writeln(hrec);
+    vw.vcfhdr.addHeaderRecord(hrec);
+    
+    writeln(vw.vcfhdr.getHeaderRecord(HDR_LINE.FORMAT, "ID","AF"));
 
     // Exercise header
     assert(vw.vcfhdr.nsamples == 0);
@@ -843,10 +864,22 @@ unittest
     assert(r.hasFilter("q10"));
     r.removeFilter("q10");
     assert(r.hasFilter("PASS"));
+    assert(r.toString == "20\t62435966\trs001;rs999\tA\tC,T\t1\t.\t.\n");
+
+    r.addFormat("AF",[0.1, 0.5]);
+    assert(r.toString == "20\t62435966\trs001;rs999\tA\tC,T\t1\t.\t.\tAF\t0.1,0.5\n");
+
+    rr.addFormat("AF",[0.1]);
+    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0\tAF\t0.1\n");
+
+    rr.removeFormat("AF");
+    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0\t.\t.\n");
+
+    assert(rr.coordinates == ZBHO(17329,17330));
 
 
     // Finally, print the records:
-    writefln("VCF records via toString:\n%s%s", r, rr);
+    writefln("VCF records via toString:\n%s%s", (*r), (*rr));
 
     writeln("\ndhtslib.vcf: all tests passed\n");
 }
