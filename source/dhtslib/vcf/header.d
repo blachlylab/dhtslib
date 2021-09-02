@@ -156,13 +156,13 @@ struct HeaderRecord
                         throw new Exception(vals[i]~" is not a know BCF Header Type");
                 }
             }
-        }
-        /// grab the hdr IDX
-        if(this.nkeys > 0 && keys[$-1] == "IDX"){
-            this.nkeys--;
-            this.idx = this.vals[$-1].to!int;
-            this.keys = this.keys[0..$-1];
-            this.vals = this.vals[0..$-1];
+            if(keys[i] == "IDX"){
+                this.nkeys--;
+                this.idx = this.vals[$-1].to!int;
+                this.keys = this.keys[0..$-1];
+                this.vals = this.vals[0..$-1];
+            }
+
         }
     }
 
@@ -267,37 +267,33 @@ struct HeaderRecord
         vals~=value;
     }
 
-    bcf_hrec_t * convert()
+    bcf_hrec_t * convert(bcf_hdr_t * hdr)
     {
-        bcf_hrec_t rec;
-        rec.type = this.recType;
-        rec.key = toUTFz!(char *)(this.key);
-        rec.value = toUTFz!(char *)(this.value);
-        
-        if(this.idx != -1){
-            this.nkeys++;
-            this.keys ~= "IDX";
-            this.vals ~= this.idx.to!string;
-        }
-        rec.nkeys = this.nkeys;
-        if(this.nkeys > 0){
-            rec.keys = this.keys.map!(x=> toUTFz!(char *)(x)).array.ptr;
-            rec.vals = this.vals.map!(x=> toUTFz!(char *)(x)).array.ptr;
+        if(this.recType == HDR_LINE.INFO || this.recType == HDR_LINE.FORMAT){
+            assert(this.valueType != HDR_TYPE.NULL);
+            assert(this.lenthType != HDR_LENGTH.NULL);
         }
 
-        return bcf_hrec_dup(&rec);
+        auto str = this.toString;
+        int parsed;
+        auto rec = bcf_hdr_parse_line(hdr, toUTFz!(char *)(str), &parsed);
+        rec.type = this.recType;
+        return rec;
     }
 
     /// print a string representation of the header record
     string toString()
     {
-        string ret = "##" ~ this.key ~ "=" ~ this.value ~ "<";
-        
-        for(auto i =0; i < this.nkeys - 1; i++)
-        {
-            ret ~= this.keys[i] ~ "=" ~ this.vals[i] ~ ", ";
+        string ret = "##" ~ this.key ~ "=" ~ this.value;
+        if(this.nkeys > 0){
+            ret ~= "<";
+            for(auto i =0; i < this.nkeys - 1; i++)
+            {
+                ret ~= this.keys[i] ~ "=" ~ this.vals[i] ~ ", ";
+            }
+            ret ~= this.keys[$-1] ~ "=" ~ this.vals[$-1] ~ ">";    
         }
-        ret ~= this.keys[$-1] ~ "=" ~ this.vals[$-1] ~ ">";
+        
         return ret;
     }
 }
@@ -413,8 +409,12 @@ struct VCFHeader
     int addHeaderRecord(HeaderRecord rec)
     {
         assert(this.hdr != null);
-        auto ret = bcf_hdr_add_hrec(this.hdr, rec.convert);
-        bcf_hdr_sync(this.hdr);
+        auto ret = bcf_hdr_add_hrec(this.hdr, rec.convert(this.hdr));
+        if(ret < 0)
+            hts_log_error(__FUNCTION__, "Couldn't add HeaderRecord");
+        auto notAdded = bcf_hdr_sync(this.hdr);
+        if(notAdded != 0)
+            hts_log_error(__FUNCTION__, "Couldn't add HeaderRecord");
         return ret;
     }
 
@@ -508,6 +508,21 @@ struct VCFHeader
     {
         addHeaderLine!(HDR_LINE.FILTER)(id, description);
     }
+
+    string toString(){
+        import htslib.kstring;
+        kstring_t s;
+
+        const int ret = bcf_hdr_format(this.hdr, 0, &s);
+        if (ret)
+        {
+            hts_log_error(__FUNCTION__,
+                format("bcf_hdr_format returned nonzero (%d) (likely EINVAL, invalid bcf_hdr_t struct?)", ret));
+            return "[VCFHeader bcf_hdr_format parse_error]";
+        }
+
+        return cast(string) s.s[0 .. s.l];
+    }
 }
 
 ///
@@ -560,15 +575,35 @@ unittest
 
     assert(rec.idx == 1);
 
+    writeln(rec.toString);
+
+
+    rec = HeaderRecord(rec.convert(hdr.hdr));
+
+    assert(rec.recType == HDR_LINE.INFO);
+    assert(rec.key == "INFO");
+    assert(rec.nkeys == 4);
+    assert(rec.keys == ["ID", "Number", "Type", "Description"]);
+    assert(rec.vals == ["NS", "1", "Integer", "\"Number of Samples With Data\""]);
+    assert(rec["ID"] == "NS");
+    // assert(rec["IDX"] == "1");
+    // assert(rec.idx == 1);
+
     rec = hdr.getHeaderRecord(HDR_LINE.INFO,"ID","NS");
+
+    assert(rec.recType == HDR_LINE.INFO);
+    assert(rec.getLength == "1");
+    assert(rec.getValueType == HDR_TYPE.INT);
     
     rec.idx = -1;
 
     rec["ID"] = "NS2";
 
     hdr.addHeaderRecord(rec);
+    auto hdr2 = hdr.dup;
+    // writeln(hdr2.toString);
 
-    rec = hdr.getHeaderRecord(HDR_LINE.INFO,"ID","NS2");
+    rec = hdr2.getHeaderRecord(HDR_LINE.INFO,"ID","NS2");
     assert(rec.recType == HDR_LINE.INFO);
     assert(rec.key == "INFO");
     assert(rec.nkeys == 4);
@@ -589,4 +624,35 @@ unittest
     assert(rec.key == "source");
     assert(rec.value == "hello");
     assert(rec.nkeys == 0);
+
+    hdr.addHeaderLine!(HDR_LINE.FILTER)("nonsense","filter");
+
+    rec = hdr.getHeaderRecord(HDR_LINE.FILTER,"ID","nonsense");
+    assert(rec.recType == HDR_LINE.FILTER);
+    assert(rec.key == "FILTER");
+    assert(rec.value == "");
+    assert(rec.getID == "nonsense");
+    writeln(rec.idx);
+    assert(rec.idx == 4);
+
+    hdr.removeHeaderLines(HDR_LINE.FILTER);
+
+    auto expected = "##fileformat=VCFv4.2\n" ~ 
+        "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
+        "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n"~
+        "##INFO=<ID=NS2,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
+        "##source=hello\n"~
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+    assert(hdr.toString == expected);
+
+    rec = rec.init;
+    rec.setHeaderRecordType(HDR_LINE.CONTIG);
+    rec.setID("test");
+    rec["length"] = "5";
+
+    hdr.addHeaderRecord(rec);
+
+    assert(hdr.sequences == ["test"]);
+
+
 }
