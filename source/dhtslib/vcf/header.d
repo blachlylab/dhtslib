@@ -263,7 +263,7 @@ struct HeaderRecord
             }
         }
         this.nkeys++;
-        keys~=key;
+        keys~=index;
         vals~=value;
     }
 
