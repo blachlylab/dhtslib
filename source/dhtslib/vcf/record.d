@@ -722,10 +722,9 @@ unittest
     hrec.setLength(HDR_LENGTH.A);
     hrec.setValueType(HDR_TYPE.FLOAT);
     hrec.setDescription("Allele Freq");
-    writeln(hrec);
     vw.vcfhdr.addHeaderRecord(hrec);
     
-    writeln(vw.vcfhdr.getHeaderRecord(HDR_LINE.FORMAT, "ID","AF"));
+    assert(vw.vcfhdr.getHeaderRecord(HDR_LINE.FORMAT, "ID","AF")["ID"] == "AF");
 
     // Exercise header
     assert(vw.vcfhdr.nsamples == 0);

@@ -36,6 +36,9 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
 
     private static int refct;
 
+    private bool initialized;
+    private int success;
+
     this(this)
     {
         this.refct++;
@@ -160,39 +163,42 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     /// InputRange interface: iterate over all records
     @property bool empty()
     {
-        //     int bcf_read(htsFile *fp, const(bcf_hdr_t) *h, bcf1_t *v);
-        // documentation claims returns -1 on critical errors, 0 otherwise
-        // however it looks like -1 is EOF and -2 is critical errors?
+        if (!this.initialized) {
+            this.popFront();
+            this.initialized = true;
+        }
         static if(isTabixFile){
             if(this.tbxRange.empty) return true;
-            auto str = this.tbxRange.front;
-            kstring_t kstr;
-            kputs(toUTFz!(char *)(str), &kstr);
-            immutable success = vcf_parse(&kstr, this.vcfhdr.hdr, this.b);
-            this.tbxRange.popFront;
-        }else
-            immutable success = bcf_read(this.fp, this.vcfhdr.hdr, this.b);
-        if (success >= 0) return false;
-        else if (success == -1) {
-            // EOF
-            // see htslib my comments https://github.com/samtools/htslib/issues/246
-            // and commit 9845bc9a947350d0f34e6ce69e79ab81b6339bd2
+        }
+        if (success >= 0)
+            return false;
+        else if (success == -1)
+            return true;
+        else
+        {
+            static if(isTabixFile)
+                hts_log_error(__FUNCTION__, "*** ERROR vcf_parse < -1");
+            else
+                hts_log_error(__FUNCTION__, "*** ERROR bcf_read < -1");
             return true;
         }
-        else {
-            hts_log_error(__FUNCTION__, "*** CRITICAL ERROR bcf_read < -1");
-            // TODO: check b->errcode
-            return true;
-        }
+        
     }
     /// ditto
     void popFront()
     {
-        // noop? 
-        // free this.b ?
-        //bam_destroy1(this.b);
+        //     int bcf_read(htsFile *fp, const(bcf_hdr_t) *h, bcf1_t *v);
+        // documentation claims returns -1 on critical errors, 0 otherwise
+        // however it looks like -1 is EOF and -2 is critical errors?
+        static if(isTabixFile){
+            auto str = this.tbxRange.front;
+            kstring_t kstr;
+            kputs(toUTFz!(char *)(str), &kstr);
+            this.success = vcf_parse(&kstr, this.vcfhdr.hdr, this.b);
+            if (this.initialized) this.tbxRange.popFront;
+        }else
+            this.success = bcf_read(this.fp, this.vcfhdr.hdr, this.b);
 
-        // TODO: clear (not destroy) the bcf1_t for reuse?
     }
     /// ditto
     VCFRecord front()
