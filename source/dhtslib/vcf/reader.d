@@ -163,12 +163,12 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     /// InputRange interface: iterate over all records
     @property bool empty()
     {
+        static if(isTabixFile){
+            if(this.tbxRange.empty) return true;
+        }
         if (!this.initialized) {
             this.popFront();
             this.initialized = true;
-        }
-        static if(isTabixFile){
-            if(this.tbxRange.empty) return true;
         }
         if (success >= 0)
             return false;
@@ -191,11 +191,12 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         // documentation claims returns -1 on critical errors, 0 otherwise
         // however it looks like -1 is EOF and -2 is critical errors?
         static if(isTabixFile){
+            if (this.initialized) this.tbxRange.popFront;
             auto str = this.tbxRange.front;
             kstring_t kstr;
             kputs(toUTFz!(char *)(str), &kstr);
             this.success = vcf_parse(&kstr, this.vcfhdr.hdr, this.b);
-            if (this.initialized) this.tbxRange.popFront;
+            
         }else
             this.success = bcf_read(this.fp, this.vcfhdr.hdr, this.b);
 
@@ -235,6 +236,17 @@ debug(dhtslib_unittest) unittest
     assert(rec.allelesAsArray == ["C","T"]);
     assert(approxEqual(rec.qual,59.2));
     assert(rec.filter == "PASS");
+    
+    vcf.popFront;
+    rec = vcf.front;
+
+    assert(rec.chrom == "1");
+    assert(rec.pos == 3000150);
+    assert(rec.refAllele == "C");
+    assert(rec.altAllelesAsArray == ["T"]);
+    assert(rec.allelesAsArray == ["C","T"]);
+    assert(approxEqual(rec.qual,59.2));
+    assert(rec.filter == "PASS");
     // assert(rec. == ["C","T"]);
 }
 
@@ -264,5 +276,16 @@ debug(dhtslib_unittest) unittest
     assert(rec.allelesAsArray == ["C","T"]);
     assert(approxEqual(rec.qual, 59.2));
     assert(rec.filter == "PASS");
+
+    vcf.popFront;
+    rec = vcf.front;
+
+    assert(rec.chrom == "1");
+    assert(rec.pos == 3062914);
+    assert(rec.refAllele == "GTTT");
+    assert(rec.altAllelesAsArray == ["G"]);
+    assert(rec.allelesAsArray == ["GTTT","G"]);
+    assert(approxEqual(rec.qual,12.9));
+    assert(rec.filter == "q10");
     // assert(rec. == ["C","T"]);
 }
