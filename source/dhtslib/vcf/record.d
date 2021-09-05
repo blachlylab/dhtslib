@@ -30,18 +30,29 @@ import htslib.vcf;
 
 alias BCFRecord = VCFRecord;
 
+/// Struct to aid in conversion of VCF info data
+/// into D types
 struct InfoField
 {
+    /// String identifier of info field
     string key;
+    /// BCF TYPE indicator
     RecordType type;
+    /// number of data elements
     int len;
+    /// copy of info field data
     ubyte[] data;
 
+    /// string, info field ctor
     this(string key, bcf_info_t * info)
     {
+        /// get type
         this.type = cast(RecordType)(info.type & 0b1111);
+        /// get len
         this.len = info.len;
+        /// copy data
         this.data = info.vptr[0.. info.vptr_len].dup;
+        /// double check our lengths
         debug{
             final switch(this.type){
                 case RecordType.INT8:
@@ -68,18 +79,22 @@ struct InfoField
         }
     }
 
+    /// convert to a D type array if int, float, or bool type array
     T[] to(T: T[])()
     if(isIntegral!T || is(T == float) || isBoolean!T)
     {
         static if(isIntegral!T){
+            /// if we select the correct type just slice and return
             if(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType))
                 return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+            /// if we select type that is too small log error and return
             if(RecordTypeSizes[this.type] > T.sizeof)
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return [];
             }
             T[] ret;
+            /// if we select type that is bigger slice, convert and return
             switch(this.type){
                 case RecordType.INT8:
                     ret = ((cast(byte *)this.data.ptr)[0 .. this.len]).to!(T[]);
@@ -99,6 +114,7 @@ struct InfoField
             }
             return ret;
         }else{
+            /// if we select type the wrong type error and return
             if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
@@ -108,65 +124,84 @@ struct InfoField
         }
     }
 
-
+    /// convert to a D type if int, float, or bool type
     T to(T)()
     if(isIntegral!T || is(T == float) || isBoolean!T)
     {
+        /// if bool return true
         static if(isBoolean!T)
             return true;
         else{
+            /// if info field has > 1 element error and return
             if(this.len != 1){
                 hts_log_error(__FUNCTION__, "This info field has a length of %d not 1".format(this.len));
                 return T.init;
             }
             static if(isIntegral!T){
+                /// if we select type that is too small log error and return
                 if(RecordTypeSizes[this.type] > T.sizeof)
                 {
                     hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                     return T.init;
                 }
+                /// just gonna use the array impl and grab index 0
                 return this.to!(T[])[0];
             }else{
+                /// if we select type the wrong type error and return
                 if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
                 {
                     hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                     return T.init;
                 }
+                /// just gonna use the array impl and grab index 0
                 return this.to!(T[])[0];
             }
         }   
     }
 
+    /// convert to a string
     T to(T)()
     if(isSomeString!T)
     {
+        /// if we select type the wrong type error and return
         if(!(this.type == RecordType.CHAR))
         {
             hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
             return T.init;
         }
+        /// otherwise slice and dup
         return cast(T)(cast(char *)this.data.ptr)[0 .. this.len].dup;
     }
 }
 
+/// Struct to aid in conversion of VCF format data
+/// into D types
 struct FormatField
 {
+    /// String identifier of info field
     string key;
+    /// BCF TYPE indicator
     RecordType type;
+    /// number of samples
     int nSamples;
+    /// number of data elements per sample
     int n;
+    /// number of bytes per sample
     int size;
+    /// copy of info field data
     ubyte[] data;
 
-
+    /// string and format ctor
     this(string key, bcf_fmt_t * fmt)
     {
+        /// set all our data
         this.key = key;
         this.type = cast(RecordType)(fmt.type & 0b1111);
         this.n = fmt.n;
         this.nSamples = fmt.p_len / fmt.size;
         this.data = fmt.p[0 .. fmt.p_len].dup;
         this.size = fmt.size;
+        /// double check our work
         debug{
             final switch(this.type){
                 case RecordType.INT8:
@@ -193,6 +228,9 @@ struct FormatField
         }
     }
 
+    /// convert to a D type array if int, float, bool, or string type array
+    /// very similar to InfoField.to 
+    /// This returns chunks as we separated FORMAT values by sample
     auto to(T)()
     if(isIntegral!T || is(T == float) || isBoolean!T || isSomeString!T)
     {
@@ -819,7 +857,7 @@ struct VCFRecord
 
     }
 
-    /// remove a format section
+    /// remove an info section
     void removeInfo(string tag)
     {
         bcf_update_info(this.vcfheader.hdr,this.line, toStringz(tag),null,0,HeaderTypes.NULL);
@@ -903,14 +941,20 @@ struct VCFRecord
             hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
 
-    auto getInfos()
+    /// returns a hashmap of info data by field
+    InfoField[string] getInfos()
     {
+        /// unpack
         if (this.line.max_unpack < UNPACK.INFO) bcf_unpack(this.line, UNPACK.INFO);
+
+        /// copy some data
         InfoField[string] infoMap;
         bcf_info_t[] infos = this.line.d.info[0..this.line.n_info].dup;
 
         foreach (bcf_info_t info; infos)
         {
+            /// if variable data is null then value is set for deletion
+            /// skip
             if(!info.vptr) continue;
             auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.ID][info.key].key).idup;
             infoMap[key] = InfoField(key, &info);
@@ -918,13 +962,16 @@ struct VCFRecord
         return infoMap;
     }
 
-    auto getFormats()
+    /// returns a hashmap of format data by field
+    FormatField[string] getFormats()
     {
         if (this.line.max_unpack < UNPACK.FMT) bcf_unpack(this.line, UNPACK.FMT);
         FormatField[string] fmtMap;
         bcf_fmt_t[] fmts = this.line.d.fmt[0..this.line.n_fmt].dup;
         foreach (bcf_fmt_t fmt; fmts)
         {
+            /// if variable data is null then value is set for deletion
+            /// skip
             if(!fmt.p) continue;
             auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.ID][fmt.id].key).idup;
             fmtMap[key] = FormatField(key, &fmt);

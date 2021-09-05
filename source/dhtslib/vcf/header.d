@@ -14,16 +14,20 @@ import htslib.vcf;
 import htslib.hts_log;
 
 
-
+/// Struct for easy setting and getting of hrec values for VCFheader
 struct HeaderRecord
 {
     /// HeaderRecordType type i.e INFO, contig, FORMAT
     HeaderRecordType recType = HeaderRecordType.NULL;
 
     /// string of HeaderRecordType type i.e INFO, contig, FORMAT ?
+    /// or could be ##source=program
+    ///               ======
     string key;
 
-    /// mostly empty ?
+    /// mostly empty except for
+    /// this ##source=program
+    ///               =======
     string value;
 
     /// number kv pairs
@@ -220,6 +224,7 @@ struct HeaderRecord
         vals~=value;
     }
 
+    /// convert to bcf_hrec_t for use with htslib functions
     bcf_hrec_t * convert(bcf_hdr_t * hdr)
     {
         if(this.recType == HeaderRecordType.INFO || this.recType == HeaderRecordType.FORMAT){
@@ -468,6 +473,7 @@ struct VCFHeader
         addHeaderLine!(HeaderRecordType.FILTER)(id, description);
     }
 
+    /// string representation of header
     string toString(){
         import htslib.kstring;
         kstring_t s;
