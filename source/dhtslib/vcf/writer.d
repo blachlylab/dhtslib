@@ -6,8 +6,7 @@ import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoi
 import std.conv: to, ConvException;
 import std.format: format;
 
-import dhtslib.vcf.header;
-import dhtslib.vcf.record;
+import dhtslib.vcf;
 import htslib.vcf;
 import htslib.hts_log;
 

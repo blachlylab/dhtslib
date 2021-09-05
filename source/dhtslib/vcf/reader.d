@@ -4,8 +4,7 @@ import std.string: fromStringz, toStringz;
 import std.utf: toUTFz;
 import std.traits : ReturnType;
 
-import dhtslib.vcf.header;
-import dhtslib.vcf.record;
+import dhtslib.vcf;
 import dhtslib.tabix;
 import dhtslib.coordinates;
 import htslib.vcf;
@@ -14,12 +13,12 @@ import htslib.kstring;
 
 alias BCFReader = VCFReader;
 
-auto VCFReader(string fn, int MAX_UNPACK = BCF_UN_ALL)
+auto VCFReader(string fn, UNPACK MAX_UNPACK = UNPACK.ALL)
 {
     return VCFReaderImpl!(CoordSystem.zbc, false)(fn, MAX_UNPACK);
 }
 
-auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, int MAX_UNPACK = BCF_UN_ALL)
+auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UNPACK MAX_UNPACK = UNPACK.ALL)
 {
     return VCFReaderImpl!(cs,true)(tbxFile, chrom, coords, MAX_UNPACK);
 }
@@ -32,7 +31,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     //bcf_hdr_t   *hdr;   /// header
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
     bcf1_t* b;          /// record for use in iterator, will be recycled
-    int MAX_UNPACK;     /// see htslib.vcf
+    UNPACK MAX_UNPACK;     /// see htslib.vcf
 
     private static int refct;
 
@@ -50,7 +49,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         ReturnType!(this.initializeTabixRange) tbxRange; /// For tabix use
 
         /// TabixIndexedFile and coordinates ctor
-        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, int MAX_UNPACK = BCF_UN_ALL)
+        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UNPACK MAX_UNPACK = UNPACK.ALL)
         {
             this.tbx = tbxFile;
             this.tbxRange = initializeTabixRange(chrom, coords);
@@ -73,7 +72,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     }else{
         /// read existing VCF file
         /// MAX_UNPACK: setting alternate value could speed reading
-        this(string fn, int MAX_UNPACK = BCF_UN_ALL)
+        this(string fn, UNPACK MAX_UNPACK = UNPACK.ALL)
         {
             import htslib.hts : hts_set_threads;
 

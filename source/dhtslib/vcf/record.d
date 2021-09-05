@@ -20,38 +20,15 @@ import std.utf : toUTFz;
 import std.algorithm : map;
 import std.array : array;
 import std.traits;
-import std.meta : AliasSeq, staticIndexOf;
+import std.meta : staticIndexOf;
 
+import dhtslib.vcf;
 import dhtslib.coordinates;
-import dhtslib.vcf.header;
 import htslib.hts_log;
 import htslib.kstring;
 import htslib.vcf;
 
 alias BCFRecord = VCFRecord;
-
-enum RecordType{
-    NULL =   0,  /// null
-    INT8 =   1,  /// int8
-    INT16 =  2,  /// int16
-    INT32 =  3,  /// int32
-    INT64 =  4,  /// Unofficial, for internal use only per htslib headers 
-    FLOAT =  5,  /// float (32?)
-    CHAR =   7  /// char (8 bit)
-}
-enum TYPE_SIZES = [0, 1, 2, 4, 8, 4, 1];
-alias TYPES = AliasSeq!(null, byte, short, int, long, float, string);
-
-enum VariantType
-{
-    REF =       0,  /// ref (e.g. in a gVCF)
-    SNP =       1,  /// SNP 
-    MNP =       2,  /// MNP
-    INDEL =     4,  /// INDEL
-    OTHER =     8,  /// other (e.g. SV)
-    BND =       16, /// breakend
-    OVERLAP =   32, /// overlapping deletion, ALT=* 
-}
 
 struct InfoField
 {
@@ -95,9 +72,9 @@ struct InfoField
     if(isIntegral!T || is(T == float) || isBoolean!T)
     {
         static if(isIntegral!T){
-            if(this.type == cast(RecordType) staticIndexOf!(T, TYPES))
+            if(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType))
                 return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
-            if(TYPE_SIZES[this.type] > T.sizeof)
+            if(RecordTypeSizes[this.type] > T.sizeof)
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return [];
@@ -122,7 +99,7 @@ struct InfoField
             }
             return ret;
         }else{
-            if(!(this.type == cast(RecordType) staticIndexOf!(T, TYPES)))
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return [];
@@ -140,14 +117,14 @@ struct InfoField
             return T.init;
         }
         static if(isIntegral!T){
-            if(TYPE_SIZES[this.type] > T.sizeof)
+            if(RecordTypeSizes[this.type] > T.sizeof)
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return T.init;
             }
             return this.to!(T[])[0];
         }else{
-            if(!(this.type == cast(RecordType) staticIndexOf!(T, TYPES)))
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return T.init;
@@ -222,11 +199,11 @@ struct FormatField
     {
         T[] ret;
         static if(isIntegral!T){
-            if(this.type == cast(RecordType) staticIndexOf!(T, TYPES)){
+            if(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)){
                 ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
                 return ret.chunks(this.n);
             }
-            if(TYPE_SIZES[this.type] > T.sizeof)
+            if(RecordTypeSizes[this.type] > T.sizeof)
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return ret.chunks(this.n);
@@ -249,7 +226,7 @@ struct FormatField
                     return ret.chunks(this.n);
             }
         }else{
-            if(!(this.type == cast(RecordType) staticIndexOf!(T, TYPES)))
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return ret.chunks(this.n);
@@ -259,20 +236,6 @@ struct FormatField
         return ret.chunks(this.n);
 
     }
-    
-
-    // T[] to(T)(int sampleId)
-    // if(isSomeString!T)
-    // {
-    //     if(!(this.type == RecordType.CHAR))
-    //     {
-    //         hts_log_error(__FUNCTION__, "Cannot convert "~RecordType.to!string~" to "~T.stringof);
-    //         return T.init;
-    //     }
-    //     if(this.len > 1)
-    //         hts_log_warning(__FUNCTION__, "You are accessing only the first value");
-    //     return cast(T)(cast(char *)this.data)[0 .. T.sizeof * this.len];
-    // }
 }
 
 
@@ -298,13 +261,13 @@ struct FormatField
 After parsing a BCF or VCF line, bcf1_t must be unpacked. (not applicable when building bcf1_t from scratch)
 Depending on information needed, this can be done to various levels with performance tradeoff.
 Unpacking symbols:
-BCF_UN_ALL: all
-BCF_UN_SHR: all shared information (BCF_UN_STR|BCF_UN_FLT|BCF_UN_INFO)
+UNPACK.ALL: all
+UNPACK.SHR: all shared information (UNPACK.ALT|UNPACK.FILT|UNPACK.INFO)
 
-                        BCF_UN_STR
-                       /               BCF_UN_FLT
-                      |               /      BCF_UN_INFO
-                      |              |      /       ____________________________ BCF_UN_FMT
+                        UNPACK.ALT
+                       /               UNPACK.FILT
+                      |               /      UNPACK.INFO
+                      |              |      /       ____________________________ UNPACK.FMT
                       V              V     V       /       |       |       |
 #CHROM  POS ID  REF ALT QUAL    FILTER  INFO    FORMAT  NA00001 NA00002 NA00003 ...
 
@@ -327,9 +290,9 @@ struct VCFRecord
 
     Protip: specifying alternate MAX_UNPACK can speed it tremendously
         as it will not unpack all fields, only up to those requested (see htslib.vcf)
-        For example, BCF_UN_STR is up to ALT inclusive, and BCF_UN_STR is up to FILTER
+        For example, UNPACK.ALT is up to ALT inclusive, and UNPACK.ALT is up to FILTER
     */
-    this(T)(T *h, bcf1_t *b, int MAX_UNPACK = BCF_UN_ALL)
+    this(T)(T *h, bcf1_t *b, UNPACK MAX_UNPACK = UNPACK.ALL)
     if(is(T == VCFHeader) || is(T == bcf_hdr_t))
     {
         static if (is(T == VCFHeader)) this.vcfheader = h;
@@ -360,7 +323,7 @@ struct VCFRecord
         this.filter = filter;
     }
     /// ditto
-    this(VCFHeader *vcfhdr, string line, int MAX_UNPACK = BCF_UN_ALL)
+    this(VCFHeader *vcfhdr, string line, UNPACK MAX_UNPACK = UNPACK.ALL)
     {
         this.vcfheader = vcfhdr;
 
@@ -406,7 +369,7 @@ struct VCFRecord
     string chrom()
     {
         if (!this.line.unpacked)
-            bcf_unpack(this.line, BCF_UN_STR);
+            bcf_unpack(this.line, UNPACK.ALT);
         
         return fromStringz(bcf_hdr_id2name(this.vcfheader.hdr, this.line.rid)).idup;
     }
@@ -433,7 +396,7 @@ struct VCFRecord
     out(coord) { assert(coord >= 0); }
     do
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        if (!this.line.unpacked) bcf_unpack(this.line, UNPACK.ALT);
         return ZB(this.line.pos);
     }
     /// Set position (POS, column 2)
@@ -452,7 +415,7 @@ struct VCFRecord
     /// Get ID string
     @property string id()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        if (!this.line.unpacked) bcf_unpack(this.line, UNPACK.ALT);
         return fromStringz(this.line.d.id).idup;
     }
     /// Sets new ID string; comma-separated list allowed but no dup checking performed
@@ -514,20 +477,20 @@ struct VCFRecord
     /// Reference allele getter
     @property string refAllele()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        if (!this.line.unpacked) bcf_unpack(this.line, UNPACK.ALT);
         if (this.line.n_allele < 1) return ""; // a valid record could have no ref (or alt) alleles
         else return fromStringz(this.line.d.als).idup;
     }
     // NB WIP: there could be zero, or multiple alt alleles
     /+@property string altAlleles()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        if (!this.line.unpacked) bcf_unpack(this.line, UNPACK.ALT);
         return fromStringz(this.line.d.als)
     }+/
     /// Alternate alleles getter version 1: ["A", "ACTG", ...]
     @property string[] altAllelesAsArray()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        if (!this.line.unpacked) bcf_unpack(this.line, UNPACK.ALT);
 
         string[] ret;
         if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
@@ -536,7 +499,7 @@ struct VCFRecord
     /// Alternate alleles getter version 2: "A,ACTG,..."
     @property string altAllelesAsString()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        if (!this.line.unpacked) bcf_unpack(this.line, UNPACK.ALT);
 
         string ret;
         if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
@@ -595,13 +558,12 @@ struct VCFRecord
             bcf_update_alleles(this.vcfheader.hdr, this.line, &allelesp[0], cast(int)a.length);
         }
     }
+
     /// Set REF allele only
-    /// param r is \0-term Cstring
-    /// TODO: UNTESTED
     void setRefAllele(string r)
     {
         // first, get REF
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        if (!this.line.unpacked) bcf_unpack(this.line, UNPACK.ALT);
         // a valid record could have no ref (or alt) alleles
         auto alleles = [toUTFz!(char *)(r)];
         if (this.line.n_allele < 2) // if none or 1 (=REF only), just add the REF we receieved
@@ -642,7 +604,7 @@ struct VCFRecord
     out(result) { assert(result >= 0); }
     do
     {
-        if (this.line.max_unpack < BCF_UN_FLT) bcf_unpack(this.line, BCF_UN_FLT);
+        if (this.line.max_unpack < UNPACK.FILT) bcf_unpack(this.line, UNPACK.FILT);
         return this.line.qual;
     }
     /// Set variant quality (QUAL, column 6)
@@ -657,7 +619,7 @@ struct VCFRecord
     {
         const(char)[] ret;
 
-        if (this.line.max_unpack < BCF_UN_FLT) bcf_unpack(this.line, BCF_UN_FLT);
+        if (this.line.max_unpack < UNPACK.FILT) bcf_unpack(this.line, UNPACK.FILT);
 
         if (this.line.d.n_flt) {
             for(int i; i< this.line.d.n_flt; i++) {
@@ -848,8 +810,8 @@ struct VCFRecord
 
     /// add INFO or FORMAT key:value pairs to a record
     /// add a single datapoint OR vector of values, OR, values to each sample (if lineType == FORMAT)
-    void add(HDR_LINE lineType, T)(const(char)[] tag, T data)
-    if((lineType == HDR_LINE.INFO || lineType == HDR_LINE.FORMAT) &&
+    void add(HeaderRecordType lineType, T)(const(char)[] tag, T data)
+    if((lineType == HeaderRecordType.INFO || lineType == HeaderRecordType.FORMAT) &&
         (isIntegral!T       || isIntegral!(ElementType!T)   ||
         isFloatingPoint!T   || isFloatingPoint!(ElementType!T) ||
         isSomeString!T      || isSomeString!(ElementType!T) ||
@@ -891,7 +853,7 @@ struct VCFRecord
         }
         else static assert(0);
 
-        static if (lineType == HDR_LINE.INFO) {
+        static if (lineType == HeaderRecordType.INFO) {
             static if (is(Unqual!T == int) || is(Unqual!(ElementType!T) == int))
                 ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static if (is(Unqual!T == float) || is(Unqual!(ElementType!T) == float))
@@ -902,7 +864,7 @@ struct VCFRecord
                 ret = bcf_update_info_flag(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static assert(0, "Type not recognized for INFO tag");
         }
-        else static if (lineType == HDR_LINE.FORMAT) {
+        else static if (lineType == HeaderRecordType.FORMAT) {
             static if (is(Unqual!T == int) || is(Unqual!(ElementType!T) == int))
                 ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static if (is(Unqual!T == float) || is(Unqual!(ElementType!T) == float))
@@ -924,7 +886,7 @@ struct VCFRecord
 
         foreach (bcf_info_t info; infos)
         {
-            auto key = fromStringz(this.vcfheader.hdr.id[HDR_DICT_TYPE.ID][info.key].key).idup;
+            auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.ID][info.key].key).idup;
             infoMap[key] = InfoField(key, &info);
         }
         return infoMap;
@@ -936,7 +898,7 @@ struct VCFRecord
         bcf_fmt_t[] fmts = this.line.d.fmt[0..this.line.n_fmt].dup;
         foreach (bcf_fmt_t fmt; fmts)
         {
-            auto key = fromStringz(this.vcfheader.hdr.id[HDR_DICT_TYPE.ID][fmt.id].key).idup;
+            auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.ID][fmt.id].key).idup;
             fmtMap[key] = FormatField(key, &fmt);
         }
         return fmtMap;
@@ -981,18 +943,18 @@ unittest
     vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-    vw.vcfhdr.addHeaderLine!(HDR_LINE.INFO)("AF", HDR_LENGTH.A, HDR_TYPE.INT, "Number of Samples With Data");
+    vw.vcfhdr.addHeaderLine!(HeaderRecordType.INFO)("AF", HeaderLengths.A, HeaderTypes.INT, "Number of Samples With Data");
     vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
     HeaderRecord hrec;
-    hrec.setHeaderRecordType(HDR_LINE.FORMAT);
+    hrec.setHeaderRecordType(HeaderRecordType.FORMAT);
     hrec.setID("AF");
-    hrec.setLength(HDR_LENGTH.A);
-    hrec.setValueType(HDR_TYPE.FLOAT);
+    hrec.setLength(HeaderLengths.A);
+    hrec.setValueType(HeaderTypes.FLOAT);
     hrec.setDescription("Allele Freq");
     vw.vcfhdr.addHeaderRecord(hrec);
     
-    assert(vw.vcfhdr.getHeaderRecord(HDR_LINE.FORMAT, "ID","AF")["ID"] == "AF");
+    assert(vw.vcfhdr.getHeaderRecord(HeaderRecordType.FORMAT, "ID","AF")["ID"] == "AF");
 
     // Exercise header
     assert(vw.vcfhdr.nsamples == 0);
@@ -1114,7 +1076,7 @@ unittest
     assert(r.qual == 1.0);
     // now test setting qual without unpacking
     // TODO: see https://forum.dlang.org/post/hebouvswxlslqhovzaia@forum.dlang.org, once resolved (or once factory function written),
-    //  add template value param BCF_UN_STR
+    //  add template value param UNPACK.ALT
     auto rr = new VCFRecord(vw.vcfhdr, "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0.017\n"); // @suppress(dscanner.style.long_line)
     rr.qual = 3.0;
     assert(rr.qual == 3.0);

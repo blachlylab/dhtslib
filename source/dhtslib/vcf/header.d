@@ -9,65 +9,18 @@ import std.algorithm : map;
 import std.array : array;
 import std.utf : toUTFz;
 
+import dhtslib.vcf;
 import htslib.vcf;
 import htslib.hts_log;
 
-/// Replacement for htslib BCF_HL_*
-enum HDR_LINE
-{
-    NULL = -1,
-    FILTER =    0, /// header line: FILTER
-    INFO =      1, /// header line: INFO
-    FORMAT =    2, /// header line: FORMAT
-    CONTIG =    3, /// header line: contig
-    STRUCT =    4, /// header line: structured header line TAG=<A=..,B=..>
-    GENERIC =   5, /// header line: generic header line
-}
 
-enum HDR_LINE_STRINGS = ["FILTER","INFO","FORMAT","contig", "struct", "generic"];
-
-/// Replacement for htslib BCF_HT_*
-enum HDR_TYPE
-{
-    NULL = -1,
-    FLAG =  0, /// header type: FLAG// header type
-    INT =   1, /// header type: INTEGER
-    REAL =  2, /// header type: REAL,
-    FLOAT =  2, /// copy of REAL
-    STR =   3, /// header type: STRING
-    CHAR = 4,
-    LONG =  INT | 0x100, // BCF_HT_INT, but for int64_t values; VCF only!
-}
-
-enum HDR_TYPE_STRINGS = ["Flag","Integer","Float","String","Character","Long"];
-
-/// Replacement for htslib BCF_VL_*
-enum HDR_LENGTH
-{
-    NULL = -1,
-    FIXED = 0, /// variable length: fixed length
-    VAR =   1, /// variable length: variable
-    A =     2, /// variable length: one field per alt allele
-    G =     3, /// variable length: one field per genotype
-    R =     4, /// variable length: one field per allele including ref
-}
-
-enum HDR_LENGTH_STRINGS = ["FIXED",".","A","G","R"];
-
-/// Replacement for htslib BCF_DT_*
-enum HDR_DICT_TYPE
-{
-    ID =     0, /// dictionary type: ID
-    CTG =    1, /// dictionary type: CONTIG
-    SAMPLE = 2, /// dictionary type: SAMPLE
-}
 
 struct HeaderRecord
 {
-    /// HDR_LINE type i.e INFO, contig, FORMAT
-    HDR_LINE recType = HDR_LINE.NULL;
+    /// HeaderRecordType type i.e INFO, contig, FORMAT
+    HeaderRecordType recType = HeaderRecordType.NULL;
 
-    /// string of HDR_LINE type i.e INFO, contig, FORMAT ?
+    /// string of HeaderRecordType type i.e INFO, contig, FORMAT ?
     string key;
 
     /// mostly empty ?
@@ -86,14 +39,14 @@ struct HeaderRecord
     int idx = -1;
 
     /// HDR Length value A, R, G, ., FIXED
-    HDR_LENGTH lenthType = HDR_LENGTH.NULL;
+    HeaderLengths lenthType = HeaderLengths.NULL;
 
     /// if HDR Length value is FIXED
     /// this is the number
     int length = -1;
 
     /// HDR Length value INT, FLOAT, STRING
-    HDR_TYPE valueType = HDR_TYPE.NULL;
+    HeaderTypes valueType = HeaderTypes.NULL;
 
     invariant
     {
@@ -103,7 +56,7 @@ struct HeaderRecord
     this(bcf_hrec_t * rec){
 
         /// Set the easy stuff
-        this.recType = cast(HDR_LINE) rec.type;
+        this.recType = cast(HeaderRecordType) rec.type;
         this.key = fromStringz(rec.key).dup;
         this.value = fromStringz(rec.value).dup;
         this.nkeys = rec.nkeys;
@@ -117,19 +70,19 @@ struct HeaderRecord
             {
                 switch(vals[i]){
                     case "A":
-                        this.lenthType = HDR_LENGTH.A;
+                        this.lenthType = HeaderLengths.A;
                         break;
                     case "G":
-                        this.lenthType = HDR_LENGTH.G;
+                        this.lenthType = HeaderLengths.G;
                         break;
                     case "R":
-                        this.lenthType = HDR_LENGTH.R;
+                        this.lenthType = HeaderLengths.R;
                         break;
                     case ".":
-                        this.lenthType = HDR_LENGTH.VAR;
+                        this.lenthType = HeaderLengths.VAR;
                         break;
                     default:
-                        this.lenthType = HDR_LENGTH.FIXED;
+                        this.lenthType = HeaderLengths.FIXED;
                         this.length = vals[i].to!int;
                         break;
                 }
@@ -138,19 +91,19 @@ struct HeaderRecord
             {
                 switch(vals[i]){
                     case "Flag":
-                        this.valueType = HDR_TYPE.FLAG;
+                        this.valueType = HeaderTypes.FLAG;
                         break;
                     case "Integer":
-                        this.valueType = HDR_TYPE.INT;
+                        this.valueType = HeaderTypes.INT;
                         break;
                     case "Float":
-                        this.valueType = HDR_TYPE.REAL;
+                        this.valueType = HeaderTypes.REAL;
                         break;
                     case "Character":
-                        this.valueType = HDR_TYPE.CHAR;
+                        this.valueType = HeaderTypes.CHAR;
                         break;
                     case "String":
-                        this.valueType = HDR_TYPE.STR;
+                        this.valueType = HeaderTypes.STR;
                         break;
                     default:
                         throw new Exception(vals[i]~" is not a know BCF Header Type");
@@ -167,14 +120,14 @@ struct HeaderRecord
     }
 
     /// set Record Type i.e INFO, FORMAT ...
-    void setHeaderRecordType(HDR_LINE line)
+    void setHeaderRecordType(HeaderRecordType line)
     {
         this.recType = line;
-        this.key = HDR_LINE_STRINGS[line];
+        this.key = HeaderRecordTypeStrings[line];
     }
 
     /// get Record Type i.e INFO, FORMAT ...
-    HDR_LINE getHeaderRecordType()
+    HeaderRecordType getHeaderRecordType()
     {
         return this.recType;
     }
@@ -183,15 +136,15 @@ struct HeaderRecord
     void setLength(T)(T number)
     if(isIntegral!T)
     {
-        this.lenthType = HDR_LENGTH.FIXED;
+        this.lenthType = HeaderLengths.FIXED;
         this["Number"] = number.to!string;
     }
 
     /// set Value Type length i.e A, R, G, .
-    void setLength(HDR_LENGTH number)
+    void setLength(HeaderLengths number)
     {
         this.lenthType = number;
-        this["Number"] = HDR_LENGTH_STRINGS[number];
+        this["Number"] = HeaderLengthsStrings[number];
     }
 
     /// get Value Type length
@@ -201,14 +154,14 @@ struct HeaderRecord
     }
 
     /// set Value Type i.e Integer, String, Float
-    void setValueType(HDR_TYPE type)
+    void setValueType(HeaderTypes type)
     {
         this.valueType = type;
-        this["Type"] = HDR_TYPE_STRINGS[type];
+        this["Type"] = HeaderTypesStrings[type];
     }
 
     /// get Value Type i.e Integer, String, Float
-    HDR_TYPE getValueType()
+    HeaderTypes getValueType()
     {
         return this.valueType;
     }
@@ -269,9 +222,9 @@ struct HeaderRecord
 
     bcf_hrec_t * convert(bcf_hdr_t * hdr)
     {
-        if(this.recType == HDR_LINE.INFO || this.recType == HDR_LINE.FORMAT){
-            assert(this.valueType != HDR_TYPE.NULL);
-            assert(this.lenthType != HDR_LENGTH.NULL);
+        if(this.recType == HeaderRecordType.INFO || this.recType == HeaderRecordType.FORMAT){
+            assert(this.valueType != HeaderTypes.NULL);
+            assert(this.lenthType != HeaderLengths.NULL);
         }
 
         auto str = this.toString;
@@ -419,20 +372,20 @@ struct VCFHeader
     }
 
     /// Remove all header lines of a particular type
-    void removeHeaderLines(HDR_LINE linetype)
+    void removeHeaderLines(HeaderRecordType linetype)
     {
         bcf_hdr_remove(this.hdr, linetype, null);
         bcf_hdr_sync(this.hdr);
     }
 
     /// Remove a header line of a particular type with the key
-    void removeHeaderLines(HDR_LINE linetype, string key)
+    void removeHeaderLines(HeaderRecordType linetype, string key)
     {
         bcf_hdr_remove(this.hdr, linetype, toStringz(key));
         bcf_hdr_sync(this.hdr);
     }
 
-    HeaderRecord getHeaderRecord(HDR_LINE linetype, string key, string value)
+    HeaderRecord getHeaderRecord(HeaderRecordType linetype, string key, string value)
     {
         auto rec = bcf_hdr_get_hrec(this.hdr, linetype, toUTFz!(const(char) *)(key),toUTFz!(const(char) *)(value), null);
         if(!rec) throw new Exception("Record could not be found");
@@ -466,20 +419,20 @@ struct VCFHeader
     *   version:     Annotation version (eg 142)
     */
 
-    void addHeaderLine(HDR_LINE lineType, T)(string id, T number, HDR_TYPE type,
+    void addHeaderLine(HeaderRecordType lineType, T)(string id, T number, HeaderTypes type,
                                     string description="",
                                     string source="",
                                     string _version="")
-    if((isIntegral!T || is(T == HDR_LENGTH)) && lineType != HDR_LINE.NULL )       
+    if((isIntegral!T || is(T == HeaderLengths)) && lineType != HeaderRecordType.NULL )       
     {
         HeaderRecord rec;
         rec.setHeaderRecordType = lineType;
         rec.setID(id);
         rec.setLength(number);
         rec.setValueType(type);
-        static if(lineType == HDR_LINE.INFO || lineType == HDR_LINE.FILTER || lineType == HDR_LINE.FORMAT){
+        static if(lineType == HeaderRecordType.INFO || lineType == HeaderRecordType.FILTER || lineType == HeaderRecordType.FORMAT){
             if(description == ""){
-                throw new Exception("description cannot be empty for " ~ HDR_LINE_STRINGS[lineType]);    
+                throw new Exception("description cannot be empty for " ~ HeaderRecordTypeStrings[lineType]);    
             }
         }
         rec.setDescription(description);
@@ -492,8 +445,8 @@ struct VCFHeader
     }
 
     /** Add FILTER tag (§1.2.3) */
-    void addHeaderLine(HDR_LINE lineType)(string id, string description)
-    if(lineType == HDR_LINE.FILTER)
+    void addHeaderLine(HeaderRecordType lineType)(string id, string description)
+    if(lineType == HeaderRecordType.FILTER)
     {
         HeaderRecord rec;
         rec.setHeaderRecordType = lineType;
@@ -506,7 +459,7 @@ struct VCFHeader
     /** Add FILTER tag (§1.2.3) */
     deprecated void addFilter(string id, string description)
     {
-        addHeaderLine!(HDR_LINE.FILTER)(id, description);
+        addHeaderLine!(HeaderRecordType.FILTER)(id, description);
     }
 
     string toString(){
@@ -540,7 +493,7 @@ unittest
     hdr.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     hdr.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-    hdr.addHeaderLine!(HDR_LINE.INFO)("AF", HDR_LENGTH.A, HDR_TYPE.INT, "Number of Samples With Data");
+    hdr.addHeaderLine!(HeaderRecordType.INFO)("AF", HeaderLengths.A, HeaderTypes.INT, "Number of Samples With Data");
     hdr.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     hdr.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
 
@@ -565,8 +518,8 @@ unittest
     hdr.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     hdr.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
 
-    auto rec = hdr.getHeaderRecord(HDR_LINE.INFO,"ID","NS");
-    assert(rec.recType == HDR_LINE.INFO);
+    auto rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"ID","NS");
+    assert(rec.recType == HeaderRecordType.INFO);
     assert(rec.key == "INFO");
     assert(rec.nkeys == 4);
     assert(rec.keys == ["ID", "Number", "Type", "Description"]);
@@ -580,7 +533,7 @@ unittest
 
     rec = HeaderRecord(rec.convert(hdr.hdr));
 
-    assert(rec.recType == HDR_LINE.INFO);
+    assert(rec.recType == HeaderRecordType.INFO);
     assert(rec.key == "INFO");
     assert(rec.nkeys == 4);
     assert(rec.keys == ["ID", "Number", "Type", "Description"]);
@@ -589,11 +542,11 @@ unittest
     // assert(rec["IDX"] == "1");
     // assert(rec.idx == 1);
 
-    rec = hdr.getHeaderRecord(HDR_LINE.INFO,"ID","NS");
+    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"ID","NS");
 
-    assert(rec.recType == HDR_LINE.INFO);
+    assert(rec.recType == HeaderRecordType.INFO);
     assert(rec.getLength == "1");
-    assert(rec.getValueType == HDR_TYPE.INT);
+    assert(rec.getValueType == HeaderTypes.INT);
     
     rec.idx = -1;
 
@@ -603,8 +556,8 @@ unittest
     auto hdr2 = hdr.dup;
     // writeln(hdr2.toString);
 
-    rec = hdr2.getHeaderRecord(HDR_LINE.INFO,"ID","NS2");
-    assert(rec.recType == HDR_LINE.INFO);
+    rec = hdr2.getHeaderRecord(HeaderRecordType.INFO,"ID","NS2");
+    assert(rec.recType == HeaderRecordType.INFO);
     assert(rec.key == "INFO");
     assert(rec.nkeys == 4);
     assert(rec.keys == ["ID", "Number", "Type", "Description"]);
@@ -614,28 +567,28 @@ unittest
     assert(rec.idx == 3);
 
     rec = HeaderRecord.init;
-    rec.setHeaderRecordType(HDR_LINE.GENERIC);
+    rec.setHeaderRecordType(HeaderRecordType.GENERIC);
     rec.key = "source";
     rec.value = "hello";
     hdr.addHeaderRecord(rec);
 
-    rec = hdr.getHeaderRecord(HDR_LINE.GENERIC,"source","hello");
-    assert(rec.recType == HDR_LINE.GENERIC);
+    rec = hdr.getHeaderRecord(HeaderRecordType.GENERIC,"source","hello");
+    assert(rec.recType == HeaderRecordType.GENERIC);
     assert(rec.key == "source");
     assert(rec.value == "hello");
     assert(rec.nkeys == 0);
 
-    hdr.addHeaderLine!(HDR_LINE.FILTER)("nonsense","filter");
+    hdr.addHeaderLine!(HeaderRecordType.FILTER)("nonsense","filter");
 
-    rec = hdr.getHeaderRecord(HDR_LINE.FILTER,"ID","nonsense");
-    assert(rec.recType == HDR_LINE.FILTER);
+    rec = hdr.getHeaderRecord(HeaderRecordType.FILTER,"ID","nonsense");
+    assert(rec.recType == HeaderRecordType.FILTER);
     assert(rec.key == "FILTER");
     assert(rec.value == "");
     assert(rec.getID == "nonsense");
     writeln(rec.idx);
     assert(rec.idx == 4);
 
-    hdr.removeHeaderLines(HDR_LINE.FILTER);
+    hdr.removeHeaderLines(HeaderRecordType.FILTER);
 
     auto expected = "##fileformat=VCFv4.2\n" ~ 
         "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
@@ -646,7 +599,7 @@ unittest
     assert(hdr.toString == expected);
 
     rec = rec.init;
-    rec.setHeaderRecordType(HDR_LINE.CONTIG);
+    rec.setHeaderRecordType(HeaderRecordType.CONTIG);
     rec.setID("test");
     rec["length"] = "5";
 
