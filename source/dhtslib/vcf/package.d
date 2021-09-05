@@ -19,7 +19,7 @@ enum HeaderRecordType
     GENERIC =   5, /// header line: generic header line
 }
 
-/// Strings for HDR_LINE
+/// Strings for HeaderRecordType
 static immutable HeaderRecordTypeStrings = ["FILTER","INFO","FORMAT","contig", "struct", "generic"];
 
 /// Replacement for htslib BCF_HT_*
@@ -35,7 +35,7 @@ enum HeaderTypes
     LONG =  INT | 0x100, // BCF_HT_INT, but for int64_t values; VCF only!
 }
 
-/// Strings for HDR_TYPE
+/// Strings for HeaderTypes
 static immutable HeaderTypesStrings = ["Flag","Integer","Float","String","Character","Long"];
 
 /// Replacement for htslib BCF_VL_*
@@ -61,7 +61,8 @@ enum HeaderDictTypes
 }
 
 /// Replacement for htslib BCF_BT_*
-enum RecordType{
+enum RecordType
+{
     NULL =   0,  /// null
     INT8 =   1,  /// int8
     INT16 =  2,  /// int16
