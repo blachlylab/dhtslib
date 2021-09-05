@@ -73,7 +73,7 @@ enum RecordType{
 
 /// Byte sizes for RecordType
 static immutable RecordTypeSizes = [0, 1, 2, 4, 8, 4, 1];
-alias RecordTypeToDType = AliasSeq!(null, byte, short, int, long, float, string);
+alias RecordTypeToDType = AliasSeq!(null, byte, short, int, long, float, null, string);
 
 /// Replacement for htslib VCF_*
 enum VariantType

@@ -313,6 +313,12 @@ struct VCFHeader
     pragma(inline, true)
     @property int nsamples() { return bcf_hdr_nsamples(this.hdr); }
 
+    int getSampleId(string sam){
+        auto ret = bcf_hdr_id2int(this.hdr, HeaderDictTypes.SAMPLE, toUTFz!(char *)(sam));
+        if(ret == -1) hts_log_error(__FUNCTION__, "Couldn't find sample in header: " ~ sam);
+        return ret;
+    }
+
     // TODO
     /// copy header lines from a template without overwiting existing lines
     void copyHeaderLines(bcf_hdr_t *other)

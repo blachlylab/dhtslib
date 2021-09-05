@@ -112,24 +112,28 @@ struct InfoField
     T to(T)()
     if(isIntegral!T || is(T == float) || isBoolean!T)
     {
-        if(this.len != 1){
-            hts_log_error(__FUNCTION__, "This info field has a length of %d not 1".format(this.len));
-            return T.init;
-        }
-        static if(isIntegral!T){
-            if(RecordTypeSizes[this.type] > T.sizeof)
-            {
-                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+        static if(isBoolean!T)
+            return true;
+        else{
+            if(this.len != 1){
+                hts_log_error(__FUNCTION__, "This info field has a length of %d not 1".format(this.len));
                 return T.init;
             }
-            return this.to!(T[])[0];
-        }else{
-            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
-            {
-                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
-                return T.init;
+            static if(isIntegral!T){
+                if(RecordTypeSizes[this.type] > T.sizeof)
+                {
+                    hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                    return T.init;
+                }
+                return this.to!(T[])[0];
+            }else{
+                if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+                {
+                    hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                    return T.init;
+                }
+                return this.to!(T[])[0];
             }
-            return this.to!(T[])[0];
         }   
     }
 
@@ -151,6 +155,7 @@ struct FormatField
     RecordType type;
     int nSamples;
     int n;
+    int size;
     ubyte[] data;
 
 
@@ -161,13 +166,7 @@ struct FormatField
         this.n = fmt.n;
         this.nSamples = fmt.p_len / fmt.size;
         this.data = fmt.p[0 .. fmt.p_len].dup;
-        // import std.stdio;
-        // writeln(key);
-        // writeln(fmt.n);
-        // writeln(fmt.size);
-        // writeln(fmt.p_len);
-        // writeln(this.nSamples);
-        // writeln(this.type);
+        this.size = fmt.size;
         debug{
             final switch(this.type){
                 case RecordType.INT8:
@@ -195,7 +194,7 @@ struct FormatField
     }
 
     auto to(T)()
-    if(isIntegral!T || is(T == float) || isBoolean!T)
+    if(isIntegral!T || is(T == float) || isBoolean!T || isSomeString!T)
     {
         T[] ret;
         static if(isIntegral!T){
@@ -224,6 +223,17 @@ struct FormatField
                 default:
                     hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(this.type, T.stringof));
                     return ret.chunks(this.n);
+            }
+        }else static if(isSomeString!T){
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return ret.chunks(this.n);
+            }
+            auto ptr = this.data.ptr;
+            for(auto i=0; i < nSamples; i++)
+            {
+                ret ~= (cast(char *)ptr)[i*size .. (i+1) * size].idup;
             }
         }else{
             if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
@@ -756,7 +766,7 @@ struct VCFRecord
      *  Templated on data type, calls one of bc_update_format_{int32,float,string,flag}
     */
     void addFormat(T)(string tag, T data)
-    if(!isArray!T)
+    if(!isArray!T || isSomeString!T)
     {
         int ret = -1;
 
@@ -770,8 +780,10 @@ struct VCFRecord
             ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, 1);
         }
 
-        else static if(isSomeString!T)
-            ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), toStringz(data));
+        else static if(isSomeString!T){
+            auto strs = [data].map!(toUTFz!(char*)).array;
+            ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), strs.ptr, 1);
+        }
         
         else static if(isBoolean!T) {
             immutable int set = data ? 1 : 0; // if data == true, pass 1 to bcf_update_info_flag(n=); n=0 => clear flag 
@@ -782,6 +794,7 @@ struct VCFRecord
     }
     /// ditto
     void addFormat(T)(string tag, T[] data)
+    if((!isArray!T || isSomeString!T) && !is(T == immutable(char)))
     {
                 int ret = -1;
 
@@ -796,15 +809,26 @@ struct VCFRecord
             ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag),
                                             flt.ptr, cast(int)data.length);
         }
-        
+
+        else static if(isSomeString!T){
+            auto strs = data.map!(toUTFz!(char*)).array;
+            ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), strs.ptr, cast(int)strs.length);
+        }
+
         if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add format (ignoring): %s", data));
 
     }
 
     /// remove a format section
+    void removeInfo(string tag)
+    {
+        bcf_update_info(this.vcfheader.hdr,this.line, toStringz(tag),null,0,HeaderTypes.NULL);
+    }
+
+    /// remove a format section
     void removeFormat(string tag)
     {
-        bcf_update_format(this.vcfheader.hdr,this.line, toStringz(tag),null,0,BCF_BT_NULL);
+        bcf_update_format(this.vcfheader.hdr,this.line, toStringz(tag),null,0,HeaderTypes.NULL);
     }
 
 
@@ -881,11 +905,13 @@ struct VCFRecord
 
     auto getInfos()
     {
+        if (this.line.max_unpack < UNPACK.INFO) bcf_unpack(this.line, UNPACK.INFO);
         InfoField[string] infoMap;
         bcf_info_t[] infos = this.line.d.info[0..this.line.n_info].dup;
 
         foreach (bcf_info_t info; infos)
         {
+            if(!info.vptr) continue;
             auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.ID][info.key].key).idup;
             infoMap[key] = InfoField(key, &info);
         }
@@ -894,10 +920,12 @@ struct VCFRecord
 
     auto getFormats()
     {
+        if (this.line.max_unpack < UNPACK.FMT) bcf_unpack(this.line, UNPACK.FMT);
         FormatField[string] fmtMap;
         bcf_fmt_t[] fmts = this.line.d.fmt[0..this.line.n_fmt].dup;
         foreach (bcf_fmt_t fmt; fmts)
         {
+            if(!fmt.p) continue;
             auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.ID][fmt.id].key).idup;
             fmtMap[key] = FormatField(key, &fmt);
         }
@@ -955,6 +983,7 @@ unittest
     vw.vcfhdr.addHeaderRecord(hrec);
     
     assert(vw.vcfhdr.getHeaderRecord(HeaderRecordType.FORMAT, "ID","AF")["ID"] == "AF");
+    vw.addHeaderLineRaw("##FORMAT=<ID=CH,Number=3,Type=String,Description=\"test\">");
 
     // Exercise header
     assert(vw.vcfhdr.nsamples == 0);
@@ -1112,8 +1141,24 @@ unittest
     rr.addFormat("AF",[0.1]);
     assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0\tAF\t0.1\n");
 
+
+    assert(rr.getFormats["AF"].to!float[0][0] == 0.1f);
+
+    rr.addInfo("AF",0.5);
+    assert(rr.getInfos["AF"].to!float == 0.5f);
+    
+    rr.removeInfo("AF");
+
     rr.removeFormat("AF");
-    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0\t.\t.\n");
+
+    rr.addFormat("CH", "test");
+
+    
+    writeln(rr.toString);
+    writeln(rr.getFormats["CH"].to!string);
+    assert(rr.getFormats["CH"].to!string[0][0] == "test");
+
+    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11\tCH\ttest\n");
 
     assert(rr.coordinates == ZBHO(17329,17330));
 
@@ -1181,6 +1226,8 @@ debug(dhtslib_unittest) unittest
     vcf.popFront;
     rec = vcf.front;
     assert(rec.refAllele == "GTTT");
+    assert(rec.getInfos["INDEL"].to!bool == true);
+
     assert(rec.getInfos["DP4"].to!(int[]) == [1, 2, 3, 4]);
     assert(rec.getInfos["DP4"].to!(byte[]) == [1, 2, 3, 4]);
     assert(rec.getInfos["DP4"].to!(short[]) == [1, 2, 3, 4]);
@@ -1195,17 +1242,28 @@ debug(dhtslib_unittest) unittest
     rec.addInfo("DP4", [2, 2, 3, 4]);
     assert(rec.getInfos["DP4"].to!(int[]) == [2, 2, 3, 4]);
 
+    assert(rec.getFormats["GQ"].to!int.array == [[409], [409]]);
+
+    rec.addFormat("GQ", [32768,32768]);
+
+    assert(rec.getFormats["GQ"].to!byte.array == []);
+    assert(rec.getFormats["GQ"].to!short.array == []);
+    assert(rec.getFormats["GQ"].to!int[0][0] == 32768);
+    
+
     assert(rec.getInfos["STR"].to!string == "test");
 
     assert(rec.getInfos["DP4"].to!string == "");
-    // rec.addInfo("DP4", [2, 2, 2, 3, 4]);
-    // assert(rec.getInfos["DP4"].to!(int[]) == [2, 2, 3, 4]);
-    
-    assert(rec.getFormats["GQ"].to!int.array == [[409], [409]]);
-    // assert(rec.getFormats["GQ"].to!short.array == [[409], [409]]);
-    // assert(rec.getFormats["GQ"].to!byte.array == []);
-    // assert(rec.getFormats["GQ"].to!long.array == [[409], [409]]);
 
     assert(rec.getFormats["GT"].to!int.array == [[2, 4], [2, 4]]);
-    // assert(rec.getFormats["GT"].to!byte.array == [[2, 4], [2, 4]]);
+    
+
+    vcf.popFront;
+    rec = vcf.front;
+
+    auto fmts = rec.getFormats;
+    auto sam = vcf.vcfhdr.getSampleId("A");
+    assert(fmts["GT"].to!int[sam] == [2, 4]);
+    sam = vcf.vcfhdr.getSampleId("B");
+    assert(fmts["GT"].to!int[sam] == [6, -127]);
 }
