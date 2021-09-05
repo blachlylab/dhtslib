@@ -396,6 +396,13 @@ struct VCFHeader
         bcf_hdr_sync(this.hdr);
     }
 
+    /// get a header record via ID field
+    HeaderRecord getHeaderRecord(HeaderRecordType linetype, string id)
+    {
+        return this.getHeaderRecord(linetype, "ID", id);
+    }
+
+    /// get a header record via a string value pair
     HeaderRecord getHeaderRecord(HeaderRecordType linetype, string key, string value)
     {
         auto rec = bcf_hdr_get_hrec(this.hdr, linetype, toUTFz!(const(char) *)(key),toUTFz!(const(char) *)(value), null);
@@ -462,7 +469,7 @@ struct VCFHeader
         HeaderRecord rec;
         rec.setHeaderRecordType = lineType;
         rec.setID(id);
-        rec.setDescription(description);
+        rec.setDescription("\"%s\"".format(description));
 
         this.addHeaderRecord(rec);
     }
@@ -597,7 +604,6 @@ unittest
     assert(rec.key == "FILTER");
     assert(rec.value == "");
     assert(rec.getID == "nonsense");
-    writeln(rec.idx);
     assert(rec.idx == 4);
 
     hdr.removeHeaderLines(HeaderRecordType.FILTER);
@@ -618,6 +624,109 @@ unittest
     hdr.addHeaderRecord(rec);
 
     assert(hdr.sequences == ["test"]);
+    hdr.removeHeaderLines(HeaderRecordType.GENERIC, "source");
+    hdr.addFilter("test","test");
+    expected = "##fileformat=VCFv4.2\n" ~ 
+        "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
+        "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n"~
+        "##INFO=<ID=NS2,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
+        "##contig=<ID=test,length=5>\n"~
+        "##FILTER=<ID=test,Description=\"test\">\n"~
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+    assert(hdr.toString == expected);
+    rec = hdr.getHeaderRecord(HeaderRecordType.FILTER,"test");
+    assert(rec.getDescription() == "\"test\"");
 
+    rec = HeaderRecord.init;
+    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setID("test");
+    rec.setLength(HeaderLengths.G);
+    rec.setValueType(HeaderTypes.INT);
+    hdr.addHeaderRecord(rec);
+
+    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test");
+    assert(rec.recType == HeaderRecordType.INFO);
+    assert(rec.getLength == "G");
+    assert(rec.getID == "test");
+    assert(rec.getValueType == HeaderTypes.INT);
+
+    rec = HeaderRecord.init;
+    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setID("test2");
+    rec.setLength(HeaderLengths.R);
+    rec.setValueType(HeaderTypes.INT);
+    hdr.addHeaderRecord(rec);
+
+    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test2");
+    assert(rec.recType == HeaderRecordType.INFO);
+    assert(rec.getLength == "R");
+    assert(rec.getID == "test2");
+    assert(rec.getValueType == HeaderTypes.INT);
+
+    rec = HeaderRecord.init;
+    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setID("test3");
+    rec.setLength(HeaderLengths.VAR);
+    rec.setValueType(HeaderTypes.INT);
+    hdr.addHeaderRecord(rec);
+
+    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test3");
+    assert(rec.recType == HeaderRecordType.INFO);
+    assert(rec.getLength == ".");
+    assert(rec.getID == "test3");
+    assert(rec.getValueType == HeaderTypes.INT);
+
+    rec = HeaderRecord.init;
+    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setID("test4");
+    rec.setLength(1);
+    rec.setValueType(HeaderTypes.FLAG);
+    hdr.addHeaderRecord(rec);
+
+    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test4");
+    assert(rec.recType == HeaderRecordType.INFO);
+    assert(rec.getID == "test4");
+    assert(rec.getValueType == HeaderTypes.FLAG);
+
+    rec = HeaderRecord.init;
+    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setID("test5");
+    rec.setLength(1);
+    rec.setValueType(HeaderTypes.CHAR);
+    hdr.addHeaderRecord(rec);
+
+    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test5");
+    assert(rec.recType == HeaderRecordType.INFO);
+    assert(rec.getLength == "1");
+    assert(rec.getID == "test5");
+    assert(rec.getValueType == HeaderTypes.CHAR);
+
+    rec = HeaderRecord.init;
+    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setID("test6");
+    rec.setLength(HeaderLengths.VAR);
+    rec.setValueType(HeaderTypes.STR);
+    hdr.addHeaderRecord(rec);
+
+    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test6");
+    assert(rec.recType == HeaderRecordType.INFO);
+    assert(rec.getLength == ".");
+    assert(rec.getID == "test6");
+    assert(rec.getValueType == HeaderTypes.STR);
+
+    expected = "##fileformat=VCFv4.2\n" ~ 
+        "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
+        "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n"~
+        "##INFO=<ID=NS2,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
+        "##contig=<ID=test,length=5>\n"~
+        "##FILTER=<ID=test,Description=\"test\">\n"~
+        "##INFO=<ID=test,Number=G,Type=Integer>\n"~
+        "##INFO=<ID=test2,Number=R,Type=Integer>\n"~
+        "##INFO=<ID=test3,Number=.,Type=Integer>\n"~
+        "##INFO=<ID=test4,Number=1,Type=Flag>\n"~
+        "##INFO=<ID=test5,Number=1,Type=Character>\n"~
+        "##INFO=<ID=test6,Number=.,Type=String>\n"~
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+    assert(hdr.toString == expected);
 
 }

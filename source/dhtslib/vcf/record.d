@@ -1037,6 +1037,8 @@ unittest
     vw.addSample("NA12878");
     assert(vw.vcfhdr.nsamples == 1);
 
+    vw.writeHeader();
+
     auto r = new VCFRecord(vw.vcfhdr, bcf_init1());
     
     r.chrom = "20";
@@ -1208,6 +1210,8 @@ unittest
     assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11\tCH\ttest\n");
 
     assert(rr.coordinates == ZBHO(17329,17330));
+    vw.writeRecord(*r);
+    vw.writeRecord(vw.vcfhdr.hdr, r.line);
 
 
     // Finally, print the records:
