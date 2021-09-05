@@ -14,9 +14,13 @@ import core.vararg;
 
 import std.conv: to, ConvException;
 import std.format: format;
-import std.range: ElementType;
+import std.range: ElementType, chunks;
 import std.string: fromStringz, toStringz;
+import std.utf : toUTFz;
+import std.algorithm : map;
+import std.array : array;
 import std.traits;
+import std.meta : AliasSeq, staticIndexOf;
 
 import dhtslib.coordinates;
 import dhtslib.vcf.header;
@@ -25,6 +29,251 @@ import htslib.kstring;
 import htslib.vcf;
 
 alias BCFRecord = VCFRecord;
+
+enum RecordType{
+    NULL =   0,  /// null
+    INT8 =   1,  /// int8
+    INT16 =  2,  /// int16
+    INT32 =  3,  /// int32
+    INT64 =  4,  /// Unofficial, for internal use only per htslib headers 
+    FLOAT =  5,  /// float (32?)
+    CHAR =   7  /// char (8 bit)
+}
+enum TYPE_SIZES = [0, 1, 2, 4, 8, 4, 1];
+alias TYPES = AliasSeq!(null, byte, short, int, long, float, string);
+
+enum VariantType
+{
+    REF =       0,  /// ref (e.g. in a gVCF)
+    SNP =       1,  /// SNP 
+    MNP =       2,  /// MNP
+    INDEL =     4,  /// INDEL
+    OTHER =     8,  /// other (e.g. SV)
+    BND =       16, /// breakend
+    OVERLAP =   32, /// overlapping deletion, ALT=* 
+}
+
+struct InfoField
+{
+    string key;
+    RecordType type;
+    int len;
+    ubyte[] data;
+
+    this(string key, bcf_info_t * info)
+    {
+        this.type = cast(RecordType)(info.type & 0b1111);
+        this.len = info.len;
+        this.data = info.vptr[0.. info.vptr_len].dup;
+        debug{
+            final switch(this.type){
+                case RecordType.INT8:
+                    assert(data.length == this.len * byte.sizeof);
+                    break;
+                case RecordType.INT16:
+                    assert(data.length == this.len * short.sizeof);
+                    break;
+                case RecordType.INT32:
+                    assert(data.length == this.len * int.sizeof);
+                    break;
+                case RecordType.INT64:
+                    assert(data.length == this.len * long.sizeof);
+                    break;
+                case RecordType.FLOAT:
+                    assert(data.length == this.len * float.sizeof);
+                    break;
+                case RecordType.CHAR:
+                    assert(data.length == this.len * char.sizeof);
+                    break;
+                case RecordType.NULL:
+                    assert(data.length == 0);
+            }
+        }
+    }
+
+    T[] to(T: T[])()
+    if(isIntegral!T || is(T == float) || isBoolean!T)
+    {
+        static if(isIntegral!T){
+            if(this.type == cast(RecordType) staticIndexOf!(T, TYPES))
+                return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+            if(TYPE_SIZES[this.type] > T.sizeof)
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return [];
+            }
+            T[] ret;
+            switch(this.type){
+                case RecordType.INT8:
+                    ret = ((cast(byte *)this.data.ptr)[0 .. this.len]).to!(T[]);
+                    break;
+                case RecordType.INT16:
+                    ret = ((cast(short *)this.data.ptr)[0 .. short.sizeof * this.len]).to!(T[]);
+                    break;
+                case RecordType.INT32:
+                    ret = ((cast(int *)this.data.ptr)[0 .. int.sizeof * this.len]).to!(T[]);
+                    break;
+                case RecordType.INT64:
+                    ret = ((cast(long *)this.data.ptr)[0 .. long.sizeof * this.len]).to!(T[]);
+                    break;
+                default:
+                    hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(this.type, T.stringof));
+                    return [];
+            }
+            return ret;
+        }else{
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, TYPES)))
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return [];
+            }
+            return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+        }
+    }
+
+
+    T to(T)()
+    if(isIntegral!T || is(T == float) || isBoolean!T)
+    {
+        if(this.len != 1){
+            hts_log_error(__FUNCTION__, "This info field has a length of %d not 1".format(this.len));
+            return T.init;
+        }
+        static if(isIntegral!T){
+            if(TYPE_SIZES[this.type] > T.sizeof)
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return T.init;
+            }
+            return this.to!(T[])[0];
+        }else{
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, TYPES)))
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return T.init;
+            }
+            return this.to!(T[])[0];
+        }   
+    }
+
+    T to(T)()
+    if(isSomeString!T)
+    {
+        if(!(this.type == RecordType.CHAR))
+        {
+            hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+            return T.init;
+        }
+        return cast(T)(cast(char *)this.data.ptr)[0 .. this.len].dup;
+    }
+}
+
+struct FormatField
+{
+    string key;
+    RecordType type;
+    int nSamples;
+    int n;
+    ubyte[] data;
+
+
+    this(string key, bcf_fmt_t * fmt)
+    {
+        this.key = key;
+        this.type = cast(RecordType)(fmt.type & 0b1111);
+        this.n = fmt.n;
+        this.nSamples = fmt.p_len / fmt.size;
+        this.data = fmt.p[0 .. fmt.p_len].dup;
+        // import std.stdio;
+        // writeln(key);
+        // writeln(fmt.n);
+        // writeln(fmt.size);
+        // writeln(fmt.p_len);
+        // writeln(this.nSamples);
+        // writeln(this.type);
+        debug{
+            final switch(this.type){
+                case RecordType.INT8:
+                    assert(data.length == this.nSamples * this.n * byte.sizeof);
+                    break;
+                case RecordType.INT16:
+                    assert(data.length == this.nSamples * this.n * short.sizeof);
+                    break;
+                case RecordType.INT32:
+                    assert(data.length == this.nSamples * this.n * int.sizeof);
+                    break;
+                case RecordType.INT64:
+                    assert(data.length == this.nSamples * this.n * long.sizeof);
+                    break;
+                case RecordType.FLOAT:
+                    assert(data.length == this.nSamples * this.n * float.sizeof);
+                    break;
+                case RecordType.CHAR:
+                    assert(data.length == this.nSamples * this.n * char.sizeof);
+                    break;
+                case RecordType.NULL:
+                    assert(data.length == 0);
+            }
+        }
+    }
+
+    auto to(T)()
+    if(isIntegral!T || is(T == float) || isBoolean!T)
+    {
+        T[] ret;
+        static if(isIntegral!T){
+            if(this.type == cast(RecordType) staticIndexOf!(T, TYPES)){
+                ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
+                return ret.chunks(this.n);
+            }
+            if(TYPE_SIZES[this.type] > T.sizeof)
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return ret.chunks(this.n);
+            }
+            switch(this.type){
+                case RecordType.INT8:
+                    ret = ((cast(byte *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
+                    break;
+                case RecordType.INT16:
+                    ret = ((cast(short *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
+                    break;
+                case RecordType.INT32:
+                    ret = ((cast(int *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
+                    break;
+                case RecordType.INT64:
+                    ret = ((cast(long *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
+                    break;
+                default:
+                    hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(this.type, T.stringof));
+                    return ret.chunks(this.n);
+            }
+        }else{
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, TYPES)))
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return ret.chunks(this.n);
+            }
+            ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
+        }
+        return ret.chunks(this.n);
+
+    }
+    
+
+    // T[] to(T)(int sampleId)
+    // if(isSomeString!T)
+    // {
+    //     if(!(this.type == RecordType.CHAR))
+    //     {
+    //         hts_log_error(__FUNCTION__, "Cannot convert "~RecordType.to!string~" to "~T.stringof);
+    //         return T.init;
+    //     }
+    //     if(this.len > 1)
+    //         hts_log_warning(__FUNCTION__, "You are accessing only the first value");
+    //     return cast(T)(cast(char *)this.data)[0 .. T.sizeof * this.len];
+    // }
+}
 
 
 
@@ -349,27 +598,20 @@ struct VCFRecord
     /// Set REF allele only
     /// param r is \0-term Cstring
     /// TODO: UNTESTED
-    void setRefAllele(const(char)* r)
+    void setRefAllele(string r)
     {
         // first, get REF
         if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
         // a valid record could have no ref (or alt) alleles
+        auto alleles = [toUTFz!(char *)(r)];
         if (this.line.n_allele < 2) // if none or 1 (=REF only), just add the REF we receieved
-            bcf_update_alleles(this.vcfheader.hdr, this.line, &r, 1);
+            bcf_update_alleles(this.vcfheader.hdr, this.line, alleles.ptr, 1);
         else {
             // length of REF allele is allele[1] - allele[0], (minus one more for \0)
             // TODO ** TODO ** : there is a property line.refLen already
             const auto reflen = (this.line.d.allele[1] - this.line.d.allele[0]) - 1;
-            if (strlen(r) <= reflen) {
-                memcpy(this.line.d.allele[0], r, reflen + 1);   // +1 -> copy a trailing \0 in case original REF was longer than new 
-                // TODO: do we need to call _sync ?
-            } else {
-                // slower way: replace allele[0] with r, but keep rest of pointers poitning at existing allele block,
-                // then call bcf_update_alleles; this will make complete new copy of this.line.d.allele, so forgive the casts
-                this.line.d.allele[0] = cast(char*) r;
-                bcf_update_alleles(this.vcfheader.hdr, this.line,
-                    cast( const(char)** ) this.line.d.allele, this.line.n_allele);
-            }
+            alleles ~= this.altAllelesAsArray.map!(toUTFz!(char *)).array;
+            bcf_update_alleles(this.vcfheader.hdr, this.line, alleles.ptr, cast(int)alleles.length);
         }
     }
     /// Set alleles; alt can be comma separated
@@ -502,6 +744,7 @@ struct VCFRecord
      *  Both singletons and arrays are supported.
     */
     void addInfo(T)(string tag, T data)
+    if(isSomeString!T || ((isIntegral!T || isFloatingPoint!T || isBoolean!T) && !isArray!T))
     {
         int ret = -1;
 
@@ -527,19 +770,19 @@ struct VCFRecord
             hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
     /// ditto
-    void addInfo(T)(string tag, T[] data)
-    if(!is(T==immutable(char)))             // otherwise string::immutable(char)[] will match the other template
+    void addInfo(T)(string tag, T data)
+    if(isIntegral!(ElementType!T) || isFloatingPoint!(ElementType!T))             // otherwise string::immutable(char)[] will match the other template
     {
         int ret = -1;
 
-        static if(isIntegral!T) {
-            auto integer = cast(int) data;
-            ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), &integer, data.length);
+        static if(isIntegral!(ElementType!T)) {
+            auto integer = data.to!(int[]);
+            ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), integer.ptr, cast(int)data.length);
         }
         
-        else static if(isFloatingPoint!T) {
-            auto flt = cast(float) data;    // simply passing "2.0" (or whatever) => data is a double
-            ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, data.length);
+        else static if(isFloatingPoint!(ElementType!T)) {
+            auto flt = data.to!(float[]);    // simply passing "2.0" (or whatever) => data is a double
+            ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), flt.ptr, cast(int)data.length);
         }
         
         if (ret == -1)
@@ -672,6 +915,31 @@ struct VCFRecord
 
         if (ret == -1)
             hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
+    }
+
+    auto getInfos()
+    {
+        InfoField[string] infoMap;
+        bcf_info_t[] infos = this.line.d.info[0..this.line.n_info].dup;
+
+        foreach (bcf_info_t info; infos)
+        {
+            auto key = fromStringz(this.vcfheader.hdr.id[HDR_DICT_TYPE.ID][info.key].key).idup;
+            infoMap[key] = InfoField(key, &info);
+        }
+        return infoMap;
+    }
+
+    auto getFormats()
+    {
+        FormatField[string] fmtMap;
+        bcf_fmt_t[] fmts = this.line.d.fmt[0..this.line.n_fmt].dup;
+        foreach (bcf_fmt_t fmt; fmts)
+        {
+            auto key = fromStringz(this.vcfheader.hdr.id[HDR_DICT_TYPE.ID][fmt.id].key).idup;
+            fmtMap[key] = FormatField(key, &fmt);
+        }
+        return fmtMap;
     }
 
     /// Return a string representation of the VCFRecord (i.e. as would appear in .vcf)
@@ -829,6 +1097,17 @@ unittest
     assert(r.refAllele == "A");
     assert(r.altAllelesAsString == "C,T");
 
+    r.setRefAllele("G");
+    assert(r.allelesAsArray == ["G", "C", "T"]);
+    assert(r.refAllele == "G");
+    assert(r.altAllelesAsString == "C,T");
+
+    r.setRefAllele("A");
+    assert(r.allelesAsArray == ["A", "C", "T"]);
+    assert(r.refAllele == "A");
+    assert(r.altAllelesAsString == "C,T");
+
+
 
     // Test QUAL
     r.qual = 1.0;
@@ -881,4 +1160,90 @@ unittest
     writefln("VCF records via toString:\n%s%s", (*r), (*rr));
 
     writeln("\ndhtslib.vcf: all tests passed\n");
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import htslib.hts_log;
+    import std.algorithm : map, count;
+    import std.array : array;
+    import std.path : buildPath, dirName;
+    import std.math : approxEqual, isNaN;
+    import dhtslib.tabix;
+    import dhtslib.vcf;
+    hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+    hts_log_info(__FUNCTION__, "Testing VCFReader");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
+    auto tbx = TabixIndexedFile(fn);
+    auto reg = getIntervalFromString("1:3000151-3062916");
+    auto vcf = VCFReader(tbx, reg.contig, reg.interval);
+    assert(!vcf.empty);
+
+    VCFRecord rec = vcf.front;
+    assert(rec.getInfos["AN"].to!int == 4);
+    rec.addInfo("AN", rec.getInfos["AN"].to!int + 1);
+    assert(rec.getInfos["AN"].to!int == 5);
+    assert(rec.getInfos["AN"].to!byte == 5);
+    assert(rec.getInfos["AN"].to!short == 5);
+    assert(rec.getInfos["AN"].to!long == 5);
+
+    assert(rec.getInfos["AN"].to!uint == 5);
+    assert(rec.getInfos["AN"].to!ubyte == 5);
+    assert(rec.getInfos["AN"].to!ushort == 5);
+    assert(rec.getInfos["AN"].to!ulong == 5);
+
+    assert(rec.getInfos["AN"].to!float.isNaN);
+
+    rec.addInfo("AN", 128);
+    assert(rec.getInfos["AN"].to!int == 128);
+    assert(rec.getInfos["AN"].to!byte == 0);
+    assert(rec.getInfos["AN"].to!short == 128);
+    assert(rec.getInfos["AN"].to!long == 128);
+
+    rec.addInfo("AN", 32768);
+    assert(rec.getInfos["AN"].to!int == 32768);
+    assert(rec.getInfos["AN"].to!byte == 0);
+    assert(rec.getInfos["AN"].to!short == 0);
+    assert(rec.getInfos["AN"].to!long == 32768);
+
+    assert(rec.getInfos["AN"].to!long == 32768);
+
+    // rec.addInfo("AN", 2147483648);
+    // assert(rec.getInfos["AN"].to!int == 0);
+    // assert(rec.getInfos["AN"].to!byte == 0);
+    // assert(rec.getInfos["AN"].to!short == 0);
+    // assert(rec.getInfos["AN"].to!long == 2147483648);
+
+    vcf.popFront;
+    rec = vcf.front;
+    assert(rec.refAllele == "GTTT");
+    assert(rec.getInfos["DP4"].to!(int[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(byte[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(short[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(long[]) == [1, 2, 3, 4]);
+
+    assert(rec.getInfos["DP4"].to!(uint[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(ubyte[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(ushort[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(ulong[]) == [1, 2, 3, 4]);
+
+    assert(rec.getInfos["DP4"].to!(float[]) == []);
+    rec.addInfo("DP4", [2, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(int[]) == [2, 2, 3, 4]);
+
+    assert(rec.getInfos["STR"].to!string == "test");
+
+    assert(rec.getInfos["DP4"].to!string == "");
+    // rec.addInfo("DP4", [2, 2, 2, 3, 4]);
+    // assert(rec.getInfos["DP4"].to!(int[]) == [2, 2, 3, 4]);
+    
+    assert(rec.getFormats["GQ"].to!int.array == [[409], [409]]);
+    // assert(rec.getFormats["GQ"].to!short.array == [[409], [409]]);
+    // assert(rec.getFormats["GQ"].to!byte.array == []);
+    // assert(rec.getFormats["GQ"].to!long.array == [[409], [409]]);
+
+    assert(rec.getFormats["GT"].to!int.array == [[2, 4], [2, 4]]);
+    // assert(rec.getFormats["GT"].to!byte.array == [[2, 4], [2, 4]]);
 }

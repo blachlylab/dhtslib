@@ -57,9 +57,9 @@ enum HDR_LENGTH_STRINGS = ["FIXED",".","A","G","R"];
 /// Replacement for htslib BCF_DT_*
 enum HDR_DICT_TYPE
 {
-    BCF_DT_ID =     0, /// dictionary type: ID
-    BCF_DT_CTG =    1, /// dictionary type: CONTIG
-    BCF_DT_SAMPLE = 2, /// dictionary type: SAMPLE
+    ID =     0, /// dictionary type: ID
+    CTG =    1, /// dictionary type: CONTIG
+    SAMPLE = 2, /// dictionary type: SAMPLE
 }
 
 struct HeaderRecord
