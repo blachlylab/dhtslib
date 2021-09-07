@@ -10,7 +10,7 @@ import htslib.vcf;
 
 /// Represents the classification of a headerline
 ///
-/// ##INFO<...>
+/// ##INFO=<...>
 ///   ====
 /// 
 /// Replacement for htslib BCF_HL_*
@@ -30,7 +30,7 @@ static immutable HeaderRecordTypeStrings = ["FILTER","INFO","FORMAT","contig", "
 
 /// Represents the classification of a headerline
 ///
-/// ##INFO<Number=A, Type=Integer>
+/// ##INFO=<Number=A, Type=Integer>
 ///                       =======
 /// 
 /// Replacement for htslib BCF_HT_*
@@ -57,11 +57,11 @@ enum HeaderTypesStrings = [__traits(allMembers, HeaderTypes)][1..$];
 
 /// Represents the classification of a headerline
 ///
-/// ##INFO<Number=A, Type=Integer>
+/// ##INFO=<Number=A, Type=Integer>
 ///               =
 ///
 /// if FIXED
-/// ##INFO<Number=2, Type=Integer>
+/// ##INFO=<Number=2, Type=Integer>
 ///               =
 /// 
 /// Replacement for htslib BCF_VL_*
