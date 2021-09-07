@@ -356,7 +356,13 @@ struct VCFHeader
         // TODO check that key is not Info, FILTER, FORMAT (or contig?)
         string line = format("##%s=%s", key, value);
 
-        return bcf_hdr_append(this.hdr, toStringz(line));
+        auto ret = bcf_hdr_append(this.hdr, toStringz(line));
+        if(ret < 0)
+            hts_log_error(__FUNCTION__, "Couldn't add header line with key=%s and value =%s".format(key, value));
+        auto notAdded = bcf_hdr_sync(this.hdr);
+        if(notAdded < 0)
+            hts_log_error(__FUNCTION__, "Couldn't add header line with key=%s and value =%s".format(key, value));
+        return ret;
     }
 
     /// Add a new header line -- must be formatted ##key=value
