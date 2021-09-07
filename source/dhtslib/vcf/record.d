@@ -350,7 +350,7 @@ struct VCFRecord
 
         this.line = b;
 
-        // Now it must be UnpackLevelsed
+        // Now it must be UNPACKed
         // Protip: specifying alternate MAX_UNPACK can speed it tremendously
         immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
     }
@@ -409,16 +409,20 @@ struct VCFRecord
             bcf_destroy1(this.line);
     }
 
+    /// ensure that vcf variable length data is unpacked to at least desired level
+    pragma(inline, true)
+    void unpack(UnpackLevels unpackLevel)
+    {
+        if (this.line.max_unpack < unpackLevel) bcf_unpack(this.line, unpackLevel);
+    }
+
     //----- FIXED FIELDS -----//
     
     /* CHROM */
     /// Get chromosome (CHROM)
     @property
     string chrom()
-    {
-        if (!this.line.unpacked)
-            bcf_unpack(this.line, UnpackLevels.AltAllele);
-        
+    {   
         return fromStringz(bcf_hdr_id2name(this.vcfheader.hdr, this.line.rid)).idup;
     }
     /// Set chromosome (CHROM)
@@ -444,7 +448,6 @@ struct VCFRecord
     out(coord) { assert(coord >= 0); }
     do
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevels.AltAllele);
         return ZB(this.line.pos);
     }
     /// Set position (POS, column 2)
@@ -463,7 +466,7 @@ struct VCFRecord
     /// Get ID string
     @property string id()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevels.AltAllele);
+        this.unpack(UnpackLevels.AltAllele);
         return fromStringz(this.line.d.id).idup;
     }
     /// Sets new ID string; comma-separated list allowed but no dup checking performed
@@ -514,6 +517,7 @@ struct VCFRecord
     /// All alleles getter (array)
     @property string[] allelesAsArray()
     {
+        this.unpack(UnpackLevels.AltAllele);
         string[] ret;
         ret.length = this.line.n_allele;        // n=0, no reference; n=1, ref but no alt
         foreach(int i; 0 .. this.line.n_allele) // ref allele is index 0
@@ -525,7 +529,7 @@ struct VCFRecord
     /// Reference allele getter
     @property string refAllele()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevels.AltAllele);
+        this.unpack(UnpackLevels.AltAllele);
         if (this.line.n_allele < 1) return ""; // a valid record could have no ref (or alt) alleles
         else return fromStringz(this.line.d.als).idup;
     }
@@ -538,7 +542,7 @@ struct VCFRecord
     /// Alternate alleles getter version 1: ["A", "ACTG", ...]
     @property string[] altAllelesAsArray()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevels.AltAllele);
+        this.unpack(UnpackLevels.AltAllele);
 
         string[] ret;
         if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
@@ -547,7 +551,7 @@ struct VCFRecord
     /// Alternate alleles getter version 2: "A,ACTG,..."
     @property string altAllelesAsString()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevels.AltAllele);
+        this.unpack(UnpackLevels.AltAllele);
 
         string ret;
         if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
@@ -578,6 +582,7 @@ struct VCFRecord
     /// Set alleles; comma-separated list
     @property void alleles(string a)
     {
+        this.unpack(UnpackLevels.AltAllele);
         if (a == "") {
             this.line.n_allele = 0;
             if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
@@ -588,6 +593,7 @@ struct VCFRecord
     /// Set alleles; array
     @property void alleles(string[] a)
     {
+        this.unpack(UnpackLevels.AltAllele);
         if (a.length == 0) {
             this.line.n_allele = 0;
             if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
@@ -611,7 +617,7 @@ struct VCFRecord
     void setRefAllele(string r)
     {
         // first, get REF
-        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevels.AltAllele);
+        this.unpack(UnpackLevels.AltAllele);
         // a valid record could have no ref (or alt) alleles
         auto alleles = [toUTFz!(char *)(r)];
         if (this.line.n_allele < 2) // if none or 1 (=REF only), just add the REF we receieved
@@ -652,7 +658,6 @@ struct VCFRecord
     out(result) { assert(result >= 0); }
     do
     {
-        if (this.line.max_unpack < UnpackLevels.Filter) bcf_unpack(this.line, UnpackLevels.Filter);
         return this.line.qual;
     }
     /// Set variant quality (QUAL, column 6)
@@ -667,7 +672,7 @@ struct VCFRecord
     {
         const(char)[] ret;
 
-        if (this.line.max_unpack < UnpackLevels.Filter) bcf_unpack(this.line, UnpackLevels.Filter);
+        this.unpack(UnpackLevels.Filter);
 
         if (this.line.d.n_flt) {
             for(int i; i< this.line.d.n_flt; i++) {
@@ -945,7 +950,7 @@ struct VCFRecord
     InfoField[string] getInfos()
     {
         /// UnpackLevels
-        if (this.line.max_unpack < UnpackLevels.Info) bcf_unpack(this.line, UnpackLevels.Info);
+        this.unpack(UnpackLevels.Info);
 
         /// copy some data
         InfoField[string] infoMap;
@@ -965,7 +970,7 @@ struct VCFRecord
     /// returns a hashmap of format data by field
     FormatField[string] getFormats()
     {
-        if (this.line.max_unpack < UnpackLevels.Format) bcf_unpack(this.line, UnpackLevels.Format);
+        this.unpack(UnpackLevels.Format);
         FormatField[string] fmtMap;
         bcf_fmt_t[] fmts = this.line.d.fmt[0..this.line.n_fmt].dup;
         foreach (bcf_fmt_t fmt; fmts)

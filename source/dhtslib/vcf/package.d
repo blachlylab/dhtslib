@@ -130,6 +130,7 @@ enum VariantType
 /// Replacement for htslib BCF_UN_*
 enum UnpackLevels
 {
+    None =              0,
     AltAllele =         BCF_UN_STR, // up to ALT inclusive
     Filter =            BCF_UN_FLT, // up to Filter
     Info =              BCF_UN_INFO, // up to Info

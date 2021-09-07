@@ -288,3 +288,63 @@ debug(dhtslib_unittest) unittest
     assert(rec.filter == "q10");
     // assert(rec. == ["C","T"]);
 }
+
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import htslib.hts_log;
+    import std.algorithm : map, count;
+    import std.array : array;
+    import std.path : buildPath, dirName;
+    import std.math : approxEqual;
+    hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+    hts_log_info(__FUNCTION__, "Testing bcf1_t Unpacking");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
+    auto tbx = TabixIndexedFile(fn);
+    auto reg = getIntervalFromString("1:3000151-3062916");
+
+    auto vcf = VCFReader(tbx, reg.contig, reg.interval);
+    assert(vcf.count == 3);
+    vcf = VCFReader(tbx, reg.contig, reg.interval, UnpackLevels.None);
+    vcf.empty;
+    VCFRecord rec = vcf.front;
+
+    assert(rec.chrom == "1");
+    assert(rec.pos == 3000150);
+
+    assert(approxEqual(rec.qual, 59.2));
+    assert(rec.line.unpacked == UnpackLevels.None);
+
+    assert(rec.id == ".");
+    assert(rec.line.unpacked == UnpackLevels.AltAllele);
+
+    assert(rec.refAllele == "C");
+    assert(rec.line.unpacked == UnpackLevels.AltAllele);
+
+    assert(rec.altAllelesAsArray == ["T"]);
+    assert(rec.line.unpacked == UnpackLevels.AltAllele);
+
+    assert(rec.filter == "PASS");
+    assert(rec.line.unpacked == (UnpackLevels.Filter | UnpackLevels.AltAllele));
+
+    assert(rec.getInfos["AN"].to!int == 4);
+    assert(rec.line.unpacked == UnpackLevels.SharedFields);
+
+    assert(rec.getFormats["DP"].to!int.array == [[32], [32]]);
+    assert(rec.line.unpacked == UnpackLevels.All);
+
+    /// only one extra test for pulling only format fields
+    ///
+    /// bcf_unpack automatically promotes UnpackLevels.Filter to
+    /// (UnpackLevels.Filter | UnpackLevels.AltAllele)
+    ///
+    /// bcf_unpack automatically promotes UnpackLevels.Info to
+    /// (UnpackLevels.Info | UnpackLevels.SharedFields)
+
+    /// since front calls bcf_dup, we get a fresh unpacked record
+    rec = vcf.front;
+    assert(rec.getFormats["DP"].to!int.array == [[32], [32]]);
+    assert(rec.line.unpacked == UnpackLevels.Format);
+    
+}
