@@ -340,7 +340,7 @@ struct VCFRecord
         as it will not UnpackLevels all fields, only up to those requested (see htslib.vcf)
         For example, UnpackLevels.ALT is up to ALT inclusive, and UnpackLevels.ALT is up to FILTER
     */
-    this(T)(T *h, bcf1_t *b, UnpackLevels MAX_UNPACK = UnpackLevels.All)
+    this(T)(T *h, bcf1_t *b, UnpackLevels MAX_UNPACK = UnpackLevels.None)
     if(is(T == VCFHeader) || is(T == bcf_hdr_t))
     {
         static if (is(T == VCFHeader)) this.vcfheader = h;
@@ -371,7 +371,7 @@ struct VCFRecord
         this.filter = filter;
     }
     /// ditto
-    this(VCFHeader *vcfhdr, string line, UnpackLevels MAX_UNPACK = UnpackLevels.All)
+    this(VCFHeader *vcfhdr, string line, UnpackLevels MAX_UNPACK = UnpackLevels.None)
     {
         this.vcfheader = vcfhdr;
 

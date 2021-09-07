@@ -13,12 +13,12 @@ import htslib.kstring;
 
 alias BCFReader = VCFReader;
 
-auto VCFReader(string fn, UnpackLevels MAX_UNPACK = UnpackLevels.All)
+auto VCFReader(string fn, UnpackLevels MAX_UNPACK = UnpackLevels.None)
 {
     return VCFReaderImpl!(CoordSystem.zbc, false)(fn, MAX_UNPACK);
 }
 
-auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevels MAX_UNPACK = UnpackLevels.All)
+auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevels MAX_UNPACK = UnpackLevels.None)
 {
     return VCFReaderImpl!(cs,true)(tbxFile, chrom, coords, MAX_UNPACK);
 }
@@ -49,7 +49,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         ReturnType!(this.initializeTabixRange) tbxRange; /// For tabix use
 
         /// TabixIndexedFile and coordinates ctor
-        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevels MAX_UNPACK = UnpackLevels.All)
+        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevels MAX_UNPACK = UnpackLevels.None)
         {
             this.tbx = tbxFile;
             this.tbxRange = initializeTabixRange(chrom, coords);
@@ -72,7 +72,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     }else{
         /// read existing VCF file
         /// MAX_UNPACK: setting alternate value could speed reading
-        this(string fn, UnpackLevels MAX_UNPACK = UnpackLevels.All)
+        this(string fn, UnpackLevels MAX_UNPACK = UnpackLevels.None)
         {
             import htslib.hts : hts_set_threads;
 
