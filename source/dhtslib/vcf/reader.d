@@ -13,12 +13,12 @@ import htslib.kstring;
 
 alias BCFReader = VCFReader;
 
-auto VCFReader(string fn, UNPACK MAX_UNPACK = UNPACK.ALL)
+auto VCFReader(string fn, UnpackLevels MAX_UNPACK = UnpackLevels.All)
 {
     return VCFReaderImpl!(CoordSystem.zbc, false)(fn, MAX_UNPACK);
 }
 
-auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UNPACK MAX_UNPACK = UNPACK.ALL)
+auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevels MAX_UNPACK = UnpackLevels.All)
 {
     return VCFReaderImpl!(cs,true)(tbxFile, chrom, coords, MAX_UNPACK);
 }
@@ -31,7 +31,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     //bcf_hdr_t   *hdr;   /// header
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
     bcf1_t* b;          /// record for use in iterator, will be recycled
-    UNPACK MAX_UNPACK;     /// see htslib.vcf
+    UnpackLevels MAX_UNPACK;     /// see htslib.vcf
 
     private static int refct;
 
@@ -49,7 +49,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         ReturnType!(this.initializeTabixRange) tbxRange; /// For tabix use
 
         /// TabixIndexedFile and coordinates ctor
-        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UNPACK MAX_UNPACK = UNPACK.ALL)
+        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevels MAX_UNPACK = UnpackLevels.All)
         {
             this.tbx = tbxFile;
             this.tbxRange = initializeTabixRange(chrom, coords);
@@ -72,7 +72,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     }else{
         /// read existing VCF file
         /// MAX_UNPACK: setting alternate value could speed reading
-        this(string fn, UNPACK MAX_UNPACK = UNPACK.ALL)
+        this(string fn, UnpackLevels MAX_UNPACK = UnpackLevels.All)
         {
             import htslib.hts : hts_set_threads;
 
@@ -204,7 +204,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     VCFRecord front()
     {
         // note that VCFRecord's constructor will be responsible for
-        // * unpacking and
+        // * UnpackLevelsing and
         // * destroying
         // its copy
         return VCFRecord(this.vcfhdr, bcf_dup(this.b), this.MAX_UNPACK);

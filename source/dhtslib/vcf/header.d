@@ -18,7 +18,7 @@ import htslib.hts_log;
 struct HeaderRecord
 {
     /// HeaderRecordType type i.e INFO, contig, FORMAT
-    HeaderRecordType recType = HeaderRecordType.NULL;
+    HeaderRecordType recType = HeaderRecordType.None;
 
     /// string of HeaderRecordType type i.e INFO, contig, FORMAT ?
     /// or could be ##source=program
@@ -43,14 +43,14 @@ struct HeaderRecord
     int idx = -1;
 
     /// HDR Length value A, R, G, ., FIXED
-    HeaderLengths lenthType = HeaderLengths.NULL;
+    HeaderLengths lenthType = HeaderLengths.None;
 
     /// if HDR Length value is FIXED
     /// this is the number
     int length = -1;
 
     /// HDR Length value INT, FLOAT, STRING
-    HeaderTypes valueType = HeaderTypes.NULL;
+    HeaderTypes valueType = HeaderTypes.None;
 
     invariant
     {
@@ -74,19 +74,19 @@ struct HeaderRecord
             {
                 switch(vals[i]){
                     case "A":
-                        this.lenthType = HeaderLengths.A;
+                        this.lenthType = HeaderLengths.OnePerAltAllele;
                         break;
                     case "G":
-                        this.lenthType = HeaderLengths.G;
+                        this.lenthType = HeaderLengths.OnePerGenotype;
                         break;
                     case "R":
-                        this.lenthType = HeaderLengths.R;
+                        this.lenthType = HeaderLengths.OnePerAllele;
                         break;
                     case ".":
-                        this.lenthType = HeaderLengths.VAR;
+                        this.lenthType = HeaderLengths.Variable;
                         break;
                     default:
-                        this.lenthType = HeaderLengths.FIXED;
+                        this.lenthType = HeaderLengths.Fixed;
                         this.length = vals[i].to!int;
                         break;
                 }
@@ -95,19 +95,19 @@ struct HeaderRecord
             {
                 switch(vals[i]){
                     case "Flag":
-                        this.valueType = HeaderTypes.FLAG;
+                        this.valueType = HeaderTypes.Flag;
                         break;
                     case "Integer":
-                        this.valueType = HeaderTypes.INT;
+                        this.valueType = HeaderTypes.Integer;
                         break;
                     case "Float":
-                        this.valueType = HeaderTypes.REAL;
+                        this.valueType = HeaderTypes.Float;
                         break;
                     case "Character":
-                        this.valueType = HeaderTypes.CHAR;
+                        this.valueType = HeaderTypes.Character;
                         break;
                     case "String":
-                        this.valueType = HeaderTypes.STR;
+                        this.valueType = HeaderTypes.String;
                         break;
                     default:
                         throw new Exception(vals[i]~" is not a know BCF Header Type");
@@ -140,7 +140,7 @@ struct HeaderRecord
     void setLength(T)(T number)
     if(isIntegral!T)
     {
-        this.lenthType = HeaderLengths.FIXED;
+        this.lenthType = HeaderLengths.Fixed;
         this["Number"] = number.to!string;
     }
 
@@ -227,9 +227,9 @@ struct HeaderRecord
     /// convert to bcf_hrec_t for use with htslib functions
     bcf_hrec_t * convert(bcf_hdr_t * hdr)
     {
-        if(this.recType == HeaderRecordType.INFO || this.recType == HeaderRecordType.FORMAT){
-            assert(this.valueType != HeaderTypes.NULL);
-            assert(this.lenthType != HeaderLengths.NULL);
+        if(this.recType == HeaderRecordType.Info || this.recType == HeaderRecordType.Format){
+            assert(this.valueType != HeaderTypes.None);
+            assert(this.lenthType != HeaderLengths.None);
         }
 
         auto str = this.toString;
@@ -319,7 +319,7 @@ struct VCFHeader
     @property int nsamples() { return bcf_hdr_nsamples(this.hdr); }
 
     int getSampleId(string sam){
-        auto ret = bcf_hdr_id2int(this.hdr, HeaderDictTypes.SAMPLE, toUTFz!(char *)(sam));
+        auto ret = bcf_hdr_id2int(this.hdr, HeaderDictTypes.Sample, toUTFz!(char *)(sam));
         if(ret == -1) hts_log_error(__FUNCTION__, "Couldn't find sample in header: " ~ sam);
         return ret;
     }
@@ -353,7 +353,7 @@ struct VCFHeader
     /// Add a new header line
     int addHeaderLineKV(string key, string value)
     {
-        // TODO check that key is not INFO, FILTER, FORMAT (or contig?)
+        // TODO check that key is not Info, FILTER, FORMAT (or contig?)
         string line = format("##%s=%s", key, value);
 
         return bcf_hdr_append(this.hdr, toStringz(line));
@@ -441,14 +441,14 @@ struct VCFHeader
                                     string description="",
                                     string source="",
                                     string _version="")
-    if((isIntegral!T || is(T == HeaderLengths)) && lineType != HeaderRecordType.NULL )       
+    if((isIntegral!T || is(T == HeaderLengths)) && lineType != HeaderRecordType.None )       
     {
         HeaderRecord rec;
         rec.setHeaderRecordType = lineType;
         rec.setID(id);
         rec.setLength(number);
         rec.setValueType(type);
-        static if(lineType == HeaderRecordType.INFO || lineType == HeaderRecordType.FILTER || lineType == HeaderRecordType.FORMAT){
+        static if(lineType == HeaderRecordType.Info || lineType == HeaderRecordType.Filter || lineType == HeaderRecordType.FORMAT){
             if(description == ""){
                 throw new Exception("description cannot be empty for " ~ HeaderRecordTypeStrings[lineType]);    
             }
@@ -464,7 +464,7 @@ struct VCFHeader
 
     /** Add FILTER tag (§1.2.3) */
     void addHeaderLine(HeaderRecordType lineType)(string id, string description)
-    if(lineType == HeaderRecordType.FILTER)
+    if(lineType == HeaderRecordType.Filter)
     {
         HeaderRecord rec;
         rec.setHeaderRecordType = lineType;
@@ -477,7 +477,7 @@ struct VCFHeader
     /** Add FILTER tag (§1.2.3) */
     deprecated void addFilter(string id, string description)
     {
-        addHeaderLine!(HeaderRecordType.FILTER)(id, description);
+        addHeaderLine!(HeaderRecordType.Filter)(id, description);
     }
 
     /// string representation of header
@@ -512,7 +512,7 @@ unittest
     hdr.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     hdr.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-    hdr.addHeaderLine!(HeaderRecordType.INFO)("AF", HeaderLengths.A, HeaderTypes.INT, "Number of Samples With Data");
+    hdr.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
     hdr.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     hdr.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
 
@@ -537,8 +537,8 @@ unittest
     hdr.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     hdr.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
 
-    auto rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"ID","NS");
-    assert(rec.recType == HeaderRecordType.INFO);
+    auto rec = hdr.getHeaderRecord(HeaderRecordType.Info,"ID","NS");
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.key == "INFO");
     assert(rec.nkeys == 4);
     assert(rec.keys == ["ID", "Number", "Type", "Description"]);
@@ -552,7 +552,7 @@ unittest
 
     rec = HeaderRecord(rec.convert(hdr.hdr));
 
-    assert(rec.recType == HeaderRecordType.INFO);
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.key == "INFO");
     assert(rec.nkeys == 4);
     assert(rec.keys == ["ID", "Number", "Type", "Description"]);
@@ -561,11 +561,11 @@ unittest
     // assert(rec["IDX"] == "1");
     // assert(rec.idx == 1);
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"ID","NS");
+    rec = hdr.getHeaderRecord(HeaderRecordType.Info,"ID","NS");
 
-    assert(rec.recType == HeaderRecordType.INFO);
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.getLength == "1");
-    assert(rec.getValueType == HeaderTypes.INT);
+    assert(rec.getValueType == HeaderTypes.Integer);
     
     rec.idx = -1;
 
@@ -575,8 +575,8 @@ unittest
     auto hdr2 = hdr.dup;
     // writeln(hdr2.toString);
 
-    rec = hdr2.getHeaderRecord(HeaderRecordType.INFO,"ID","NS2");
-    assert(rec.recType == HeaderRecordType.INFO);
+    rec = hdr2.getHeaderRecord(HeaderRecordType.Info,"ID","NS2");
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.key == "INFO");
     assert(rec.nkeys == 4);
     assert(rec.keys == ["ID", "Number", "Type", "Description"]);
@@ -586,27 +586,27 @@ unittest
     assert(rec.idx == 3);
 
     rec = HeaderRecord.init;
-    rec.setHeaderRecordType(HeaderRecordType.GENERIC);
+    rec.setHeaderRecordType(HeaderRecordType.Generic);
     rec.key = "source";
     rec.value = "hello";
     hdr.addHeaderRecord(rec);
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.GENERIC,"source","hello");
-    assert(rec.recType == HeaderRecordType.GENERIC);
+    rec = hdr.getHeaderRecord(HeaderRecordType.Generic,"source","hello");
+    assert(rec.recType == HeaderRecordType.Generic);
     assert(rec.key == "source");
     assert(rec.value == "hello");
     assert(rec.nkeys == 0);
 
-    hdr.addHeaderLine!(HeaderRecordType.FILTER)("nonsense","filter");
+    hdr.addHeaderLine!(HeaderRecordType.Filter)("nonsense","filter");
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.FILTER,"ID","nonsense");
-    assert(rec.recType == HeaderRecordType.FILTER);
+    rec = hdr.getHeaderRecord(HeaderRecordType.Filter,"ID","nonsense");
+    assert(rec.recType == HeaderRecordType.Filter);
     assert(rec.key == "FILTER");
     assert(rec.value == "");
     assert(rec.getID == "nonsense");
     assert(rec.idx == 4);
 
-    hdr.removeHeaderLines(HeaderRecordType.FILTER);
+    hdr.removeHeaderLines(HeaderRecordType.Filter);
 
     auto expected = "##fileformat=VCFv4.2\n" ~ 
         "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
@@ -617,14 +617,14 @@ unittest
     assert(hdr.toString == expected);
 
     rec = rec.init;
-    rec.setHeaderRecordType(HeaderRecordType.CONTIG);
+    rec.setHeaderRecordType(HeaderRecordType.Contig);
     rec.setID("test");
     rec["length"] = "5";
 
     hdr.addHeaderRecord(rec);
 
     assert(hdr.sequences == ["test"]);
-    hdr.removeHeaderLines(HeaderRecordType.GENERIC, "source");
+    hdr.removeHeaderLines(HeaderRecordType.Generic, "source");
     hdr.addFilter("test","test");
     expected = "##fileformat=VCFv4.2\n" ~ 
         "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
@@ -634,85 +634,85 @@ unittest
         "##FILTER=<ID=test,Description=\"test\">\n"~
         "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
     assert(hdr.toString == expected);
-    rec = hdr.getHeaderRecord(HeaderRecordType.FILTER,"test");
+    rec = hdr.getHeaderRecord(HeaderRecordType.Filter,"test");
     assert(rec.getDescription() == "\"test\"");
 
     rec = HeaderRecord.init;
-    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setHeaderRecordType(HeaderRecordType.Info);
     rec.setID("test");
-    rec.setLength(HeaderLengths.G);
-    rec.setValueType(HeaderTypes.INT);
+    rec.setLength(HeaderLengths.OnePerGenotype);
+    rec.setValueType(HeaderTypes.Integer);
     hdr.addHeaderRecord(rec);
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test");
-    assert(rec.recType == HeaderRecordType.INFO);
+    rec = hdr.getHeaderRecord(HeaderRecordType.Info,"test");
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.getLength == "G");
     assert(rec.getID == "test");
-    assert(rec.getValueType == HeaderTypes.INT);
+    assert(rec.getValueType == HeaderTypes.Integer);
 
     rec = HeaderRecord.init;
-    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setHeaderRecordType(HeaderRecordType.Info);
     rec.setID("test2");
-    rec.setLength(HeaderLengths.R);
-    rec.setValueType(HeaderTypes.INT);
+    rec.setLength(HeaderLengths.OnePerAllele);
+    rec.setValueType(HeaderTypes.Integer);
     hdr.addHeaderRecord(rec);
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test2");
-    assert(rec.recType == HeaderRecordType.INFO);
+    rec = hdr.getHeaderRecord(HeaderRecordType.Info,"test2");
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.getLength == "R");
     assert(rec.getID == "test2");
-    assert(rec.getValueType == HeaderTypes.INT);
+    assert(rec.getValueType == HeaderTypes.Integer);
 
     rec = HeaderRecord.init;
-    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setHeaderRecordType(HeaderRecordType.Info);
     rec.setID("test3");
-    rec.setLength(HeaderLengths.VAR);
-    rec.setValueType(HeaderTypes.INT);
+    rec.setLength(HeaderLengths.Variable);
+    rec.setValueType(HeaderTypes.Integer);
     hdr.addHeaderRecord(rec);
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test3");
-    assert(rec.recType == HeaderRecordType.INFO);
+    rec = hdr.getHeaderRecord(HeaderRecordType.Info,"test3");
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.getLength == ".");
     assert(rec.getID == "test3");
-    assert(rec.getValueType == HeaderTypes.INT);
+    assert(rec.getValueType == HeaderTypes.Integer);
 
     rec = HeaderRecord.init;
-    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setHeaderRecordType(HeaderRecordType.Info);
     rec.setID("test4");
     rec.setLength(1);
-    rec.setValueType(HeaderTypes.FLAG);
+    rec.setValueType(HeaderTypes.Flag);
     hdr.addHeaderRecord(rec);
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test4");
-    assert(rec.recType == HeaderRecordType.INFO);
+    rec = hdr.getHeaderRecord(HeaderRecordType.Info,"test4");
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.getID == "test4");
-    assert(rec.getValueType == HeaderTypes.FLAG);
+    assert(rec.getValueType == HeaderTypes.Flag);
 
     rec = HeaderRecord.init;
-    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setHeaderRecordType(HeaderRecordType.Info);
     rec.setID("test5");
     rec.setLength(1);
-    rec.setValueType(HeaderTypes.CHAR);
+    rec.setValueType(HeaderTypes.Character);
     hdr.addHeaderRecord(rec);
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test5");
-    assert(rec.recType == HeaderRecordType.INFO);
+    rec = hdr.getHeaderRecord(HeaderRecordType.Info,"test5");
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.getLength == "1");
     assert(rec.getID == "test5");
-    assert(rec.getValueType == HeaderTypes.CHAR);
+    assert(rec.getValueType == HeaderTypes.Character);
 
     rec = HeaderRecord.init;
-    rec.setHeaderRecordType(HeaderRecordType.INFO);
+    rec.setHeaderRecordType(HeaderRecordType.Info);
     rec.setID("test6");
-    rec.setLength(HeaderLengths.VAR);
-    rec.setValueType(HeaderTypes.STR);
+    rec.setLength(HeaderLengths.Variable);
+    rec.setValueType(HeaderTypes.String);
     hdr.addHeaderRecord(rec);
 
-    rec = hdr.getHeaderRecord(HeaderRecordType.INFO,"test6");
-    assert(rec.recType == HeaderRecordType.INFO);
+    rec = hdr.getHeaderRecord(HeaderRecordType.Info,"test6");
+    assert(rec.recType == HeaderRecordType.Info);
     assert(rec.getLength == ".");
     assert(rec.getID == "test6");
-    assert(rec.getValueType == HeaderTypes.STR);
+    assert(rec.getValueType == HeaderTypes.String);
 
     expected = "##fileformat=VCFv4.2\n" ~ 
         "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
@@ -727,6 +727,7 @@ unittest
         "##INFO=<ID=test5,Number=1,Type=Character>\n"~
         "##INFO=<ID=test6,Number=.,Type=String>\n"~
         "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+    writeln(hdr.toString);
     assert(hdr.toString == expected);
 
 }
