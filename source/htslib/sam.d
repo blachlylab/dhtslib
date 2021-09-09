@@ -382,6 +382,11 @@ extern (D) auto bam_seqi(T0, T1)(auto ref T0 s, auto ref T1 i)
  @param b   Base in nt16 nomenclature (see seq_nt16_table)
 */
 
+extern (D) void bam_set_seqi(T0, T1, T3)(auto ref T0 s, auto ref T1 i, auto ref T3 b)
+{
+    s[i >> 1] = (s[i >> 1] & (0xf0 >> ((~i & 1) << 2))) | cast(ubyte)(b << ((~i & 1) << 2));
+}
+
 /**************************
  *** Exported functions ***
  **************************/
