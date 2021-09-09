@@ -51,6 +51,8 @@ struct SAMReader
 
     private kstring_t line;
 
+    private AllRecordsRange allRecordsRange;
+
     /// disallow copying
     @disable this(this);
 
@@ -129,8 +131,7 @@ struct SAMReader
         // SAMHeader now takes care of this
         // bam_hdr_destroy(this.header);
 
-        if((this.fp !is null) && (this.f is null))
-        {
+        if(this.allRecordsRange.references <= 1){
             if(this.idx !is null)
                 hts_idx_destroy(this.idx);
             const auto ret = hts_close(fp);
@@ -400,92 +401,18 @@ struct SAMReader
 
 
     /// Return an InputRange representing all records in the SAM/BAM/CRAM
-    InputRange!SAMRecord allRecords()
+    auto allRecords()
     {
-        if (this.fp.format.format == htsExactFormat.sam)
-            return SamRecordsRange(this.fp, this.header, this.header_offset).inputRangeObject;
-        else if(this.idx == null){
-            return BamRecordsRange(this.fp, this.header, this.header_offset).inputRangeObject;
-        }else{
-            assert(this.fp.format.format == htsExactFormat.bam);
-            //auto range = AllRecordsRange(this.fp, this.header);
-            import htslib.hts : HTS_IDX_START;
-            auto itr = sam_itr_queryi(this.idx, HTS_IDX_START, 0, 0);
-            return RecordRange(this.fp, this.header, itr).inputRangeObject;
-        }
+        this.allRecordsRange = AllRecordsRange(this.fp, this.header, this.header_offset);
+        return this.allRecordsRange;
     }
 
     deprecated("Avoid snake_case names")
     alias all_records = allRecords;
 
-    /// Iterate through all records in the BAM or BGZF compressed SAM with no index
-    struct BamRecordsRange
-    {
-        private htsFile*    fp;     // belongs to parent; shared
-        private off_t header_offset;
-        private SAMHeader header; // belongs to parent; shared
-        private bam1_t*     b;
-        private bool initialized;   // Needed to support both foreach and immediate .front()
-        private int success;        // sam_read1 return code
-
-        this(htsFile* fp, SAMHeader header, off_t header_offset)
-        {
-            this.fp = fp;
-            this.header_offset = header_offset;
-            this.header = header;
-            this.b = bam_init1();
-            
-            // Need to seek past header offset
-            bgzf_seek(fp.fp.bgzf, this.header_offset, SEEK_SET);
-        }
-
-        ~this()
-        {
-            //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
-            //TODO ?: free(this.b);
-        }
-
-        /// InputRange interface
-        @property bool empty() // @suppress(dscanner.suspicious.incorrect_infinite_range)
-        {
-            if (!this.initialized) {
-                this.popFront();
-                this.initialized = true;
-            }
-            if (success >= 0)
-                return false;
-            else if (success == -1)
-                return true;
-            else
-            {
-                hts_log_error(__FUNCTION__, "*** ERROR sam_read1 < -1");
-                return true;
-            }
-        }
-        /// ditto
-        void popFront()
-        {
-            success = sam_read1(this.fp, this.header.h, this.b);
-            //bam_destroy1(this.b);
-        }
-        /// ditto
-        SAMRecord front()
-        {
-            assert(this.initialized, "front called before empty");
-            return SAMRecord(bam_dup1(this.b), this.header);
-        }
-
-        SAMRecord moveFront()
-        {
-            auto ret = SAMRecord(bam_dup1(this.b), this.header);
-            popFront;
-            return ret;
-        }
-
-    }
 
     /// Iterate through all records in the SAM
-    struct SamRecordsRange
+    struct AllRecordsRange
     {
         private htsFile*    fp;     // belongs to parent; shared
         private SAMHeader  header; // belongs to parent; shared
@@ -494,22 +421,44 @@ struct SAMReader
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
+        private int refct = 1;      // Postblit refcounting in case the object is passed around
+
         this(htsFile* fp, SAMHeader header, off_t header_offset)
         {
             this.fp = fp;
             this.header_offset = header_offset;
-            assert(this.fp.format.format == htsExactFormat.sam);
+            assert(this.fp.format.format == htsExactFormat.sam || this.fp.format.format == htsExactFormat.bam);
             this.header = header;
             this.b = bam_init1();
 
             // Need to seek past header offset
-            hseek(fp.fp.hfile, this.header_offset, SEEK_SET);
+            if (this.fp.format.format == htsExactFormat.sam)
+                hseek(fp.fp.hfile, this.header_offset, SEEK_SET);
+            else
+                bgzf_seek(fp.fp.bgzf, this.header_offset, SEEK_SET);
+        }
+        
+        this(this)
+        {
+            refct++;
+        }
+
+        invariant(){
+            assert(refct >= 0);
+        }
+
+        auto references()
+        {
+            return this.refct;
         }
 
         ~this()
         {
-            //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
-            //TODO ?: free(this.b);
+            if(refct > 0) refct--;
+            // remove only if no references to this or underlying bam1_t data
+            if (refct == 0){
+                bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
+            }
         }
 
         /// InputRange interface
@@ -540,13 +489,6 @@ struct SAMReader
         {
             assert(this.initialized, "front called before empty");
             return SAMRecord(bam_dup1(this.b), this.header);
-        }
-
-        SAMRecord moveFront()
-        {
-            auto ret = SAMRecord(bam_dup1(this.b), this.header);
-            popFront;
-            return ret;
         }
 
     }
@@ -587,15 +529,20 @@ struct SAMReader
             assert(refct >= 0);
         }
 
-        ~this()
-    {
-        if(refct > 0) refct--;
-        // remove only if no references to this or underlying bam1_t data
-        if (refct == 0){
-            bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
-            hts_itr_destroy(this.itr);
+        auto references()
+        {
+            return this.refct;
         }
-    }
+
+        ~this()
+        {
+            if(refct > 0) refct--;
+            // remove only if no references to this or underlying bam1_t data
+            if (refct == 0){
+                bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
+                hts_itr_destroy(this.itr);
+            }
+        }
 
         /// InputRange interface
         @property bool empty()
