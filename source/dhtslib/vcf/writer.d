@@ -130,40 +130,40 @@ struct VCFWriter
     *   source:      Annotation source  (eg dbSNP)
     *   version:     Annotation version (eg 142)
     */
-    // deprecated("use VCFHeader methods instead")
-    // void addTag(string tagType, T)( string id,
-    //                                 T number,
-    //                                 string type,
-    //                                 string description,
-    //                                 string source="",
-    //                                 string _version="")
-    // if((tagType == "INFO" || tagType == "FORMAT") && (isIntegral!T || isSomeString!T))
-    // {
-    //     this.vcfhdr.addTag!(tagType, T)(id, number, type, description, source, _version);
-    // }
+    deprecated("use VCFHeader methods instead")
+    void addTag(HeaderRecordType tagType)( string id,
+                                    HeaderLengths number,
+                                    HeaderTypes type,
+                                    string description,
+                                    string source="",
+                                    string _version="")
+    if(tagType == HeaderRecordType.Info || tagType == HeaderRecordType.Format)
+    {
+        this.vcfhdr.addHeaderLine!(tagType)(id, number, type, description, source, _version);
+    }
 
     /** Add FILTER tag (§1.2.3) */
-    // deprecated("use VCFHeader methods instead")
-    // void addTag(string tagType)(string id, string description)
-    // if(tagType == "FILTER")
-    // {
-    //     this.vcfhdr.addTag!(tagType)(id, description);
-    // }
+    deprecated("use VCFHeader methods instead")
+    void addTag(HeaderRecordType tagType)(string id, string description)
+    if(tagType == HeaderRecordType.Filter)
+    {
+        this.vcfhdr.addHeaderLine!(tagType)(id, description);
+    }
 
     /** Add FILTER tag (§1.2.3) */
-    // deprecated("use VCFHeader methods instead")
-    // void addFilterTag(string id, string description)
-    // {
-    //     this.vcfhdr.addFilterTag(id, description);
-    // }
+    deprecated("use VCFHeader methods instead")
+    void addFilterTag(string id, string description)
+    {
+        this.vcfhdr.addFilter(id, description);
+    }
 
     /** Add contig definition (§1.2.7) to header meta-info 
     
         other: "url=...,md5=...,etc."
     */
     deprecated("use VCFHeader methods instead")
-    auto addTag(string tagType)(const(char)[] id, const int length = 0, string other = "")
-    if(tagType == "contig" || tagType == "CONTIG")
+    auto addTag(HeaderRecordType tagType)(const(char)[] id, const int length = 0, string other = "")
+    if(tagType == HeaderRecordType.Contig)
     {
         return this.vcfhdr.addTag!(tagType)(id, length, other);
     }
@@ -262,4 +262,39 @@ struct VCFWriter
         if (ret != 0) hts_log_error(__FUNCTION__, "bcf_write error");
         return ret;
     }
+}
+
+///
+debug(dhtslib_unittest)
+unittest
+{
+    import std.exception: assertThrown;
+    import std.stdio: writeln, writefln;
+    import dhtslib.vcf.writer;
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+
+
+    auto vw = VCFWriter("/dev/null");
+
+    vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
+    vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
+    // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
+    vw.addTag!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
+    vw.addTag!(HeaderRecordType.Filter)("filt","test");
+    vw.addFilterTag("filt2","test2");
+
+    auto expected = "##fileformat=VCFv4.2\n" ~
+    "##FILTER=<ID=PASS,Description=\"All filters passed\">\n" ~
+    "##filedate=20210909\n" ~
+    "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n" ~
+    "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n" ~
+    "##INFO=<ID=AF,Number=A,Type=Integer,Description=Number of Samples With Data>\n" ~
+    "##FILTER=<ID=filt,Description=\"test\">\n" ~
+    "##FILTER=<ID=filt2,Description=\"test2\">\n" ~
+    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+
+    assert(vw.getHeader.toString == expected);
+
+    vw.writeHeader();
 }
