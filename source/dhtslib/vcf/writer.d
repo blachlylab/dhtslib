@@ -284,18 +284,6 @@ unittest
     vw.addTag!(HeaderRecordType.Filter)("filt","test");
     vw.addFilterTag("filt2","test2");
 
-    writeln(vw.getHeader.toString);
-    auto expected = "##fileformat=VCFv4.2\n" ~
-    "##FILTER=<ID=PASS,Description=\"All filters passed\">\n" ~
-    "##filedate=20210909\n" ~
-    "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n" ~
-    "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n" ~
-    "##INFO=<ID=AF,Number=A,Type=Integer,Description=Number of Samples With Data>\n" ~
-    "##FILTER=<ID=filt,Description=\"test\">\n" ~
-    "##FILTER=<ID=filt2,Description=\"test2\">\n" ~
-    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
-
-    assert(vw.getHeader.toString == expected);
-
+    assert(vw.getHeader.getHeaderRecord(HeaderRecordType.Filter, "filt2").getDescription == "\"test2\"");
     vw.writeHeader();
 }
