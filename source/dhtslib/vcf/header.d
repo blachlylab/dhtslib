@@ -1,3 +1,15 @@
+/**
+
+This module provides structs that encapsulate VCFHeader and HeaderRecord
+
+`VCFHeader` encapsulates and owns a `bcf_hdr_t*`,
+and provides convenience functions to read and write header records.
+
+`HeaderRecord` provides an easy way to coonstruct new header records and
+convert them to bcf_hrec_t * for use by the htslib API.
+
+*/
+
 module dhtslib.vcf.header;
 
 import std.datetime;
@@ -14,7 +26,7 @@ import htslib.vcf;
 import htslib.hts_log;
 
 
-/// Struct for easy setting and getting of hrec values for VCFheader
+/// Struct for easy setting and getting of bcf_hrec_t values for VCFheader
 struct HeaderRecord
 {
     /// HeaderRecordType type i.e INFO, contig, FORMAT
@@ -256,17 +268,8 @@ struct HeaderRecord
     }
 }
 
-/** Wrapper around bcf_hdr_t
-
-    Q: Why do we have VCFHeader, but not SAMHeader?
-    A: Most (all)? of the SAM (bam1_t) manipulation functions do not require a ptr to the header,
-    whereas almost all of the VCF (bcf1_t) manipulation functions do. Therefore, we track bcf_hdr_t*
-    inside each VCFRecord; this is wrapped by VCFHeader for future convenience (for example,
-    now we have @property nsamples; may move the tag reader and writer functions here?)
-
-    In order to avoid double free()'ing an instance bcf_hdr_t,
-    this wrapper will be the authoritative holder of of bcf_hdr_t ptrs,
-    it shall be passed around by reference, and copies are disabled.
+/** VCFHeader encapsulates `bcf_hdr_t*`
+    and provides convenience wrappers to manipulate the header metadata/records.
 */
 struct VCFHeader
 {
@@ -349,6 +352,9 @@ struct VCFHeader
 
         return 0;
     }
+
+    /** VCF version, e.g. VCFv4.2 */
+    @property string vcfVersion() { return fromStringz( bcf_hdr_get_version(this.hdr) ).idup; }
 
     /// Add a new header line
     int addHeaderLineKV(string key, string value)
@@ -521,11 +527,13 @@ unittest
     hdr.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
     hdr.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     hdr.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
+    
 
     // Exercise header
     assert(hdr.nsamples == 0);
     hdr.addSample("NA12878");
     assert(hdr.nsamples == 1);
+    assert(hdr.vcfVersion == "VCFv4.2");
 }
 
 ///

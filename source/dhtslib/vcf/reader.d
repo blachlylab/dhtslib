@@ -121,44 +121,6 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         return this.vcfhdr;
     }
 
-    /** VCF version, e.g. VCFv4.2 */
-    @property string vcfVersion() { return cast(string) fromStringz( bcf_hdr_get_version(this.vcfhdr.hdr) ).idup; }
-
-    /++
-        bcf_hrec_t *bcf_hdr_get_hrec(const(bcf_hdr_t) *hdr, int type, const(char) *key, const(char) *value,
-                                                                                    const(char) *str_class);
-    +/
-    // TODO: check key for "", fail if empty
-    // TODO: check value, str_class for "" and replace with NULL
-    // TODO: Memory leak. We are never freeing the bcf_hrec_t, but, it escapes as pointer inside key/value string
-    // TODO: handle structured and general lines
-    string[string] getTagByKV(string tagType, T)(string key, string value, string str_class)
-    if((tagType == "FILTER" || tagType == "INFO" || tagType == "FORMAT" || tagType == "contig") &&
-        (isIntegral!T || isSomeString!T))
-    {
-        // hlt : header line type
-        static if (tagType == "FILTER")     const int hlt = BCF_HL_FLT;
-        else static if (tagType == "INFO")  const int hlt = BCF_HL_INFO; // @suppress(dscanner.suspicious.label_var_same_name)
-        else static if (tagType == "FORMAT") const int hlt= BCF_HL_FMT; // @suppress(dscanner.suspicious.label_var_same_name)
-        else static if (tagType == "contig") const int hlt= BCF_HL_CTG; // @suppress(dscanner.suspicious.label_var_same_name)
-        else assert(0);
-
-        bcf_hrec_t *hrec = bcf_hdr_get_hrec(this.vcfhdr.hdr, hlt,   toStringz(key),
-                                                                    toStringz(value),
-                                                                    toStringz(str_class));
-
-        const int nkeys = hrec.nkeys;
-        string[string] kv;
-
-        foreach(int i; 0 .. nkeys) {
-            string k = cast(string) fromStringz(hrec.keys[i]);
-            string v = cast(string) fromStringz(hrec.vals[i]); 
-            kv[k] = v;
-        }
-
-        return kv;
-    }
-
     /// InputRange interface: iterate over all records
     @property bool empty()
     {
