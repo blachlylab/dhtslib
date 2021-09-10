@@ -40,8 +40,30 @@ struct InfoField
     RecordType type;
     /// number of data elements
     int len;
-    /// copy of info field data
+    /// reference of info field data
     ubyte[] data;
+
+    /// VCFRecord refct
+    int * refct;
+
+    /// ctor from VCFRecord
+    this(string key, bcf_info_t * info, int * refct)
+    {
+        this.refct = refct;
+        (*this.refct)++;
+        this(key, info);
+    }
+
+    /// postblit
+    this(this){
+        if(this.refct) (*this.refct)++;
+    }
+
+    /// dtor
+    ~this()
+    {
+        if(this.refct) (*this.refct)--;
+    }
 
     /// string, info field ctor
     this(string key, bcf_info_t * info)
@@ -51,7 +73,7 @@ struct InfoField
         /// get len
         this.len = info.len;
         /// copy data
-        this.data = info.vptr[0.. info.vptr_len].dup;
+        this.data = info.vptr[0.. info.vptr_len];
         /// double check our lengths
         debug{
             final switch(this.type){
@@ -188,8 +210,30 @@ struct FormatField
     int n;
     /// number of bytes per sample
     int size;
-    /// copy of info field data
+    /// reference of info field data
     ubyte[] data;
+
+    /// VCFRecord refct
+    int * refct;
+
+    /// ctor from VCFRecord
+    this(string key, bcf_fmt_t * fmt, int * refct)
+    {
+        this.refct = refct;
+        (*this.refct)++;
+        this(key, fmt);
+    }
+
+    /// postblit
+    this(this){
+        if(this.refct) (*this.refct)++;
+    }
+
+    /// dtor
+    ~this()
+    {
+        if(this.refct) (*this.refct)--;
+    }
 
     /// string and format ctor
     this(string key, bcf_fmt_t * fmt)
@@ -962,7 +1006,7 @@ struct VCFRecord
             /// skip
             if(!info.vptr) continue;
             auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.Id][info.key].key).idup;
-            infoMap[key] = InfoField(key, &info);
+            infoMap[key] = InfoField(key, &info, &this.refct);
         }
         return infoMap;
     }
@@ -979,7 +1023,7 @@ struct VCFRecord
             /// skip
             if(!fmt.p) continue;
             auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.Id][fmt.id].key).idup;
-            fmtMap[key] = FormatField(key, &fmt);
+            fmtMap[key] = FormatField(key, &fmt, &this.refct);
         }
         return fmtMap;
     }
