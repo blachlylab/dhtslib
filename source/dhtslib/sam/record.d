@@ -473,7 +473,8 @@ struct SAMRecord
     if(!isSomeString!(T[]))
     {
         auto err = bam_aux_update_array(b, index[0..2], TypeChars[TypeIndex!T], cast(int) value.length, value.ptr);
-        switch(err){
+        if(err == 0) return;
+        switch(errno){
             case EINVAL:
                 throw new Exception("The bam record's aux data is corrupt or an existing tag" ~ 
                 " with the given ID is not of an integer type (c, C, s, S, i or I).");
