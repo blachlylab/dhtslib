@@ -284,6 +284,7 @@ unittest
     vw.addTag!(HeaderRecordType.Filter)("filt","test");
     vw.addFilterTag("filt2","test2");
 
+    writeln(vw.getHeader.toString);
     auto expected = "##fileformat=VCFv4.2\n" ~
     "##FILTER=<ID=PASS,Description=\"All filters passed\">\n" ~
     "##filedate=20210909\n" ~
