@@ -56,6 +56,13 @@
             "libs": ["hts"]
         },
         {
+            "name": "chunkby_test",
+            "targetType": "executable",
+            "targetName": "chunkby",
+            "mainSourceFile": "test/chunkby.d",
+            "libs": ["hts"]
+        },
+        {
             "name": "source-static",
             "targetType": "library",
             "sourceFiles": ["htslib/libhts.a"],
