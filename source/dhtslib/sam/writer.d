@@ -66,7 +66,7 @@ struct SAMWriter
         import std.parallelism : totalCPUs;
         char[] mode;
         if(t == SAMWriterTypes.BAM) mode=['w','b','\0'];
-        else if(t == SAMWriterTypes.UBAM) mode=['w','b','u','\0'];
+        else if(t == SAMWriterTypes.UBAM) mode=['w','b','0','\0'];
         else if(t == SAMWriterTypes.SAM) mode=['w','\0'];
         else if(t == SAMWriterTypes.CRAM) mode=['w','c','\0'];
         // open file
