@@ -13,12 +13,12 @@ import htslib.kstring;
 
 alias BCFReader = VCFReader;
 
-auto VCFReader(string fn, UnpackLevels MAX_UNPACK = UnpackLevels.None)
+auto VCFReader(string fn, UnpackLevel MAX_UNPACK = UnpackLevel.None)
 {
     return VCFReaderImpl!(CoordSystem.zbc, false)(fn, MAX_UNPACK);
 }
 
-auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevels MAX_UNPACK = UnpackLevels.None)
+auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevel MAX_UNPACK = UnpackLevel.None)
 {
     return VCFReaderImpl!(cs,true)(tbxFile, chrom, coords, MAX_UNPACK);
 }
@@ -31,7 +31,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     //bcf_hdr_t   *hdr;   /// header
     VCFHeader   *vcfhdr;    /// header wrapper -- no copies
     bcf1_t* b;          /// record for use in iterator, will be recycled
-    UnpackLevels MAX_UNPACK;     /// see htslib.vcf
+    UnpackLevel MAX_UNPACK;     /// see htslib.vcf
 
     private static int refct;
 
@@ -49,7 +49,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         ReturnType!(this.initializeTabixRange) tbxRange; /// For tabix use
 
         /// TabixIndexedFile and coordinates ctor
-        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevels MAX_UNPACK = UnpackLevels.None)
+        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevel MAX_UNPACK = UnpackLevel.None)
         {
             this.tbx = tbxFile;
             this.tbxRange = initializeTabixRange(chrom, coords);
@@ -72,7 +72,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     }else{
         /// read existing VCF file
         /// MAX_UNPACK: setting alternate value could speed reading
-        this(string fn, UnpackLevels MAX_UNPACK = UnpackLevels.None)
+        this(string fn, UnpackLevel MAX_UNPACK = UnpackLevel.None)
         {
             import htslib.hts : hts_set_threads;
 
@@ -204,7 +204,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     VCFRecord front()
     {
         // note that VCFRecord's constructor will be responsible for
-        // * UnpackLevelsing and
+        // * UnpackLeveling and
         // * destroying
         // its copy
         return VCFRecord(this.vcfhdr, bcf_dup(this.b), this.MAX_UNPACK);
@@ -306,7 +306,7 @@ debug(dhtslib_unittest) unittest
 
     auto vcf = VCFReader(tbx, reg.contig, reg.interval);
     assert(vcf.count == 3);
-    vcf = VCFReader(tbx, reg.contig, reg.interval, UnpackLevels.None);
+    vcf = VCFReader(tbx, reg.contig, reg.interval, UnpackLevel.None);
     vcf.empty;
     VCFRecord rec = vcf.front;
 
@@ -314,37 +314,37 @@ debug(dhtslib_unittest) unittest
     assert(rec.pos == 3000150);
 
     assert(approxEqual(rec.qual, 59.2));
-    assert(rec.line.unpacked == UnpackLevels.None);
+    assert(rec.line.unpacked == UnpackLevel.None);
 
     assert(rec.id == ".");
-    assert(rec.line.unpacked == UnpackLevels.AltAllele);
+    assert(rec.line.unpacked == UnpackLevel.AltAllele);
 
     assert(rec.refAllele == "C");
-    assert(rec.line.unpacked == UnpackLevels.AltAllele);
+    assert(rec.line.unpacked == UnpackLevel.AltAllele);
 
     assert(rec.altAllelesAsArray == ["T"]);
-    assert(rec.line.unpacked == UnpackLevels.AltAllele);
+    assert(rec.line.unpacked == UnpackLevel.AltAllele);
 
     assert(rec.filter == "PASS");
-    assert(rec.line.unpacked == (UnpackLevels.Filter | UnpackLevels.AltAllele));
+    assert(rec.line.unpacked == (UnpackLevel.Filter | UnpackLevel.AltAllele));
 
     assert(rec.getInfos["AN"].to!int == 4);
-    assert(rec.line.unpacked == UnpackLevels.SharedFields);
+    assert(rec.line.unpacked == UnpackLevel.SharedFields);
 
     assert(rec.getFormats["DP"].to!int.array == [[32], [32]]);
-    assert(rec.line.unpacked == UnpackLevels.All);
+    assert(rec.line.unpacked == UnpackLevel.All);
 
     /// only one extra test for pulling only format fields
     ///
-    /// bcf_unpack automatically promotes UnpackLevels.Filter to
-    /// (UnpackLevels.Filter | UnpackLevels.AltAllele)
+    /// bcf_unpack automatically promotes UnpackLevel.Filter to
+    /// (UnpackLevel.Filter | UnpackLevel.AltAllele)
     ///
-    /// bcf_unpack automatically promotes UnpackLevels.Info to
-    /// (UnpackLevels.Info | UnpackLevels.SharedFields)
+    /// bcf_unpack automatically promotes UnpackLevel.Info to
+    /// (UnpackLevel.Info | UnpackLevel.SharedFields)
 
     /// since front calls bcf_dup, we get a fresh unpacked record
     rec = vcf.front;
     assert(rec.getFormats["DP"].to!int.array == [[32], [32]]);
-    assert(rec.line.unpacked == UnpackLevels.Format);
+    assert(rec.line.unpacked == UnpackLevel.Format);
     
 }

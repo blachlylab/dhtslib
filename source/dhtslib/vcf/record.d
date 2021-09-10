@@ -306,16 +306,16 @@ struct FormatField
 
     2019-01-23 WIP: getters for chrom, pos, id, ref, alt are complete (untested)
 
-After parsing a BCF or VCF line, bcf1_t must be UnpackLevelsed. (not applicable when building bcf1_t from scratch)
+After parsing a BCF or VCF line, bcf1_t must be UnpackLeveled. (not applicable when building bcf1_t from scratch)
 Depending on information needed, this can be done to various levels with performance tradeoff.
 Unpacking symbols:
 UNPACK.ALL: all
 UNPACK.SHR: all shared information (UNPACK.ALT|UNPACK.FILT|UNPACK.INFO)
 
-                        UnpackLevels.ALT
-                       /               UnpackLevels.FILT
-                      |               /      UnpackLevels.INFO
-                      |              |      /       ____________________________ UnpackLevels.FMT
+                        UnpackLevel.ALT
+                       /               UnpackLevel.FILT
+                      |               /      UnpackLevel.INFO
+                      |              |      /       ____________________________ UnpackLevel.FMT
                       V              V     V       /       |       |       |
 #CHROM  POS ID  REF ALT QUAL    FILTER  INFO    FORMAT  NA00001 NA00002 NA00003 ...
 
@@ -337,10 +337,10 @@ struct VCFRecord
     appropriate INFO, CONTIG, and FILTER lines.
 
     Protip: specifying alternate MAX_UNPACK can speed it tremendously
-        as it will not UnpackLevels all fields, only up to those requested (see htslib.vcf)
-        For example, UnpackLevels.ALT is up to ALT inclusive, and UnpackLevels.ALT is up to FILTER
+        as it will not UnpackLevel all fields, only up to those requested (see htslib.vcf)
+        For example, UnpackLevel.ALT is up to ALT inclusive, and UnpackLevel.ALT is up to FILTER
     */
-    this(T)(T *h, bcf1_t *b, UnpackLevels MAX_UNPACK = UnpackLevels.None)
+    this(T)(T *h, bcf1_t *b, UnpackLevel MAX_UNPACK = UnpackLevel.None)
     if(is(T == VCFHeader) || is(T == bcf_hdr_t))
     {
         static if (is(T == VCFHeader)) this.vcfheader = h;
@@ -371,7 +371,7 @@ struct VCFRecord
         this.filter = filter;
     }
     /// ditto
-    this(VCFHeader *vcfhdr, string line, UnpackLevels MAX_UNPACK = UnpackLevels.None)
+    this(VCFHeader *vcfhdr, string line, UnpackLevel MAX_UNPACK = UnpackLevel.None)
     {
         this.vcfheader = vcfhdr;
 
@@ -411,7 +411,7 @@ struct VCFRecord
 
     /// ensure that vcf variable length data is unpacked to at least desired level
     pragma(inline, true)
-    void unpack(UnpackLevels unpackLevel)
+    void unpack(UnpackLevel unpackLevel)
     {
         if (this.line.max_unpack < unpackLevel) bcf_unpack(this.line, unpackLevel);
     }
@@ -466,7 +466,7 @@ struct VCFRecord
     /// Get ID string
     @property string id()
     {
-        this.unpack(UnpackLevels.AltAllele);
+        this.unpack(UnpackLevel.AltAllele);
         return fromStringz(this.line.d.id).idup;
     }
     /// Sets new ID string; comma-separated list allowed but no dup checking performed
@@ -517,7 +517,7 @@ struct VCFRecord
     /// All alleles getter (array)
     @property string[] allelesAsArray()
     {
-        this.unpack(UnpackLevels.AltAllele);
+        this.unpack(UnpackLevel.AltAllele);
         string[] ret;
         ret.length = this.line.n_allele;        // n=0, no reference; n=1, ref but no alt
         foreach(int i; 0 .. this.line.n_allele) // ref allele is index 0
@@ -529,20 +529,20 @@ struct VCFRecord
     /// Reference allele getter
     @property string refAllele()
     {
-        this.unpack(UnpackLevels.AltAllele);
+        this.unpack(UnpackLevel.AltAllele);
         if (this.line.n_allele < 1) return ""; // a valid record could have no ref (or alt) alleles
         else return fromStringz(this.line.d.als).idup;
     }
     // NB WIP: there could be zero, or multiple alt alleles
     /+@property string altAlleles()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevels.ALT);
+        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevel.ALT);
         return fromStringz(this.line.d.als)
     }+/
     /// Alternate alleles getter version 1: ["A", "ACTG", ...]
     @property string[] altAllelesAsArray()
     {
-        this.unpack(UnpackLevels.AltAllele);
+        this.unpack(UnpackLevel.AltAllele);
 
         string[] ret;
         if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
@@ -551,7 +551,7 @@ struct VCFRecord
     /// Alternate alleles getter version 2: "A,ACTG,..."
     @property string altAllelesAsString()
     {
-        this.unpack(UnpackLevels.AltAllele);
+        this.unpack(UnpackLevel.AltAllele);
 
         string ret;
         if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
@@ -582,7 +582,7 @@ struct VCFRecord
     /// Set alleles; comma-separated list
     @property void alleles(string a)
     {
-        this.unpack(UnpackLevels.AltAllele);
+        this.unpack(UnpackLevel.AltAllele);
         if (a == "") {
             this.line.n_allele = 0;
             if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
@@ -593,7 +593,7 @@ struct VCFRecord
     /// Set alleles; array
     @property void alleles(string[] a)
     {
-        this.unpack(UnpackLevels.AltAllele);
+        this.unpack(UnpackLevel.AltAllele);
         if (a.length == 0) {
             this.line.n_allele = 0;
             if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
@@ -617,7 +617,7 @@ struct VCFRecord
     void setRefAllele(string r)
     {
         // first, get REF
-        this.unpack(UnpackLevels.AltAllele);
+        this.unpack(UnpackLevel.AltAllele);
         // a valid record could have no ref (or alt) alleles
         auto alleles = [toUTFz!(char *)(r)];
         if (this.line.n_allele < 2) // if none or 1 (=REF only), just add the REF we receieved
@@ -672,7 +672,7 @@ struct VCFRecord
     {
         const(char)[] ret;
 
-        this.unpack(UnpackLevels.Filter);
+        this.unpack(UnpackLevel.Filter);
 
         if (this.line.d.n_flt) {
             for(int i; i< this.line.d.n_flt; i++) {
@@ -949,8 +949,8 @@ struct VCFRecord
     /// returns a hashmap of info data by field
     InfoField[string] getInfos()
     {
-        /// UnpackLevels
-        this.unpack(UnpackLevels.Info);
+        /// UnpackLevel
+        this.unpack(UnpackLevel.Info);
 
         /// copy some data
         InfoField[string] infoMap;
@@ -970,7 +970,7 @@ struct VCFRecord
     /// returns a hashmap of format data by field
     FormatField[string] getFormats()
     {
-        this.unpack(UnpackLevels.Format);
+        this.unpack(UnpackLevel.Format);
         FormatField[string] fmtMap;
         bcf_fmt_t[] fmts = this.line.d.fmt[0..this.line.n_fmt].dup;
         foreach (bcf_fmt_t fmt; fmts)
@@ -1157,9 +1157,9 @@ unittest
     // Test QUAL
     r.qual = 1.0;
     assert(r.qual == 1.0);
-    // now test setting qual without UnpackLevelsing
+    // now test setting qual without UnpackLeveling
     // TODO: see https://forum.dlang.org/post/hebouvswxlslqhovzaia@forum.dlang.org, once resolved (or once factory function written),
-    //  add template value param UnpackLevels.ALT
+    //  add template value param UnpackLevel.ALT
     auto rr = new VCFRecord(vw.vcfhdr, "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0.017\n"); // @suppress(dscanner.style.long_line)
     rr.qual = 3.0;
     assert(rr.qual == 3.0);

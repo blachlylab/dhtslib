@@ -126,9 +126,9 @@ enum VariantType
 
 /// Levels identifiers for unpacking the underlying variable length
 /// data in the bcf1_t. Values are inclusive 
-/// i.e UnpackLevels.AltAllele unpacks all data before and including the ALT allele
+/// i.e UnpackLevel.AltAllele unpacks all data before and including the ALT allele
 /// Replacement for htslib BCF_UN_*
-enum UnpackLevels
+enum UnpackLevel
 {
     None =              0,
     AltAllele =         BCF_UN_STR, // up to ALT inclusive
