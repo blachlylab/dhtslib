@@ -32,12 +32,6 @@ struct SAMRecord
 
     private int refct = 1;      // Postblit refcounting in case the object is passed around
 
-    private Cigar p_cigar;
-
-    private bool cigarInitialized;
-    
-    private TagValue p_tagval;
-
     this(this)
     {
         refct++;
@@ -450,9 +444,10 @@ struct SAMRecord
         }else static if(is(T==float)){
             auto err = bam_aux_update_float(b, index[0..2], value);
         }else static if(isSomeString!T){
-            auto err = bam_aux_update_str(b, index[0..2], cast(int) value.length + 1, toStringz(value));
+            auto err = bam_aux_update_str(b, index[0..2], cast(int) value.length, value.ptr);
         }
-        switch(err){
+        if(err == 0) return;
+        switch(errno){
             case EINVAL:
                 throw new Exception("The bam record's aux data is corrupt or an existing tag" ~ 
                 " with the given ID is not of an integer type (c, C, s, S, i or I).");
