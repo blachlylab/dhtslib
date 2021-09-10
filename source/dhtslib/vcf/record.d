@@ -14,7 +14,7 @@ import core.vararg;
 
 import std.conv: to, ConvException;
 import std.format: format;
-import std.range: ElementType, chunks;
+import std.range;
 import std.string: fromStringz, toStringz;
 import std.utf : toUTFz;
 import std.algorithm : map;
@@ -746,9 +746,11 @@ struct VCFRecord
     {
         int[] fids;
         foreach(f; fs) {
-            if(f == "") continue;
             const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
-            if (fid == -1) hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
+            if (fid == -1){
+                hts_log_warning(__FUNCTION__, format("ignoring filter not found in header: %s", f.empty() ? "(empty)" : f));
+                continue;
+            }
             else fids ~= fid;
         }
         if (fids.length > 0)
@@ -763,7 +765,10 @@ struct VCFRecord
         
         if(f == "") hts_log_warning(__FUNCTION__, "filter was empty");
         const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
-        if (fid == -1) hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
+        if (fid == -1){
+            hts_log_warning(__FUNCTION__, format("ignoring filter not found in header: %s", f.empty() ? "(empty)" : f));
+            return -1;
+        }
 
         return bcf_add_filter(this.vcfheader.hdr, this.line, fid);
     }
@@ -771,6 +776,10 @@ struct VCFRecord
     int removeFilter(string f)
     {
         const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
+        if (fid == -1){
+            hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
+            return -1;
+        }
         return removeFilter(fid);
     }
     /// Remove a filter by numeric id
