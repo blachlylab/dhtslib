@@ -27,26 +27,35 @@ struct Cigar
     /// Since we are reference counting and Cigar doesn't usually own its data
     /// we have to do some special things.
 
-    private int refct = 1;      // Postblit refcounting in case the object is passed around
+    private int * refct;      // Postblit refcounting in case the object is passed around
 
     this(this)
     {
-        refct++;
+        if(refct)
+            (*refct)++;
     }
 
     invariant(){
-        assert(refct >= 0);
+        assert(this.refct == null || (*refct) >= 0);
     }
 
     ~this(){
-        if(--refct == 0)
-            destroy(ops);
+        if(refct)
+            (*refct)--;
+    }
+
+    /// Construct Cigar from SAMRecord
+    this(uint* cigar, uint length, int * refct)
+    {
+        this.refct = refct;
+        (*this.refct)++;
+        this(cigar, length);
     }
 
     /// Construct Cigar from raw data
     this(uint* cigar, uint length)
     {
-        ops = (cast(CigarOp*) cigar)[0 .. length];
+        this((cast(CigarOp*) cigar)[0 .. length]);
     }
 
     /// Construct Cigar from an array of CIGAR ops
@@ -65,12 +74,6 @@ struct Cigar
     string toString()
     {
         return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
-    }
-
-    /// get number of references to Cigar
-    int references()
-    {
-        return this.refct;
     }
 
     /// get length of cigar

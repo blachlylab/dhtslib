@@ -62,9 +62,25 @@ Usage: auto t = TagValue(b, 'XX') where b is bam1_t* BAM record and XX is tag
 */
 struct TagValue
 {
-    private int refct = 1;      // Postblit refcounting in case the object is passed around
 
     private ubyte* data;
+
+    private int * refct;      // Postblit refcounting in case the object is passed around
+
+    this(this)
+    {
+        if(refct)
+            (*refct)++;
+    }
+
+    invariant(){
+        assert(this.refct == null || (*refct) >= 0);
+    }
+
+    ~this(){
+        if(refct)
+            (*refct)--;
+    }
 
     /** Constructor
 
@@ -75,22 +91,11 @@ struct TagValue
         data = bam_aux_get(b, tag);
     }
 
-    this(this)
+    this(bam1_t* b, char[2] tag, int * refct)
     {
-        refct++;
-    }
-
-    ~this()
-    {
-        --refct;
-    }
-
-    invariant(){
-        assert(refct >= 0);
-    }
-
-    auto references(){
-        return refct;
+        this.refct = refct;
+        (*this.refct)++;
+        this(b, tag);
     }
 
     /// check if empty/exists/null
@@ -301,7 +306,7 @@ debug (dhtslib_unittest) unittest
     auto readrange = bam.allRecords(); // @suppress(dscanner.suspicious.unmodified)
     assert(readrange.empty == false);
     auto read = readrange.front;
-    assert(read["RG"].references == 2);
+    assert(read.references == 1);
 
     hts_log_info(__FUNCTION__, "Testing string");
     assert(read["RG"].to!string == "ID");

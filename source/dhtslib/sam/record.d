@@ -2,7 +2,7 @@ module dhtslib.sam.record;
 
 import core.stdc.stdlib : calloc, free, realloc;
 import core.stdc.string : memset;
-import core.stdc.errno : EINVAL, EOVERFLOW, ENOMEM, ERANGE;
+import core.stdc.errno : EINVAL, EOVERFLOW, ENOMEM, ERANGE, errno;
 import std.string : fromStringz, toStringz;
 import std.algorithm : filter;
 import std.range.interfaces : InputRange, inputRangeObject;
@@ -70,10 +70,20 @@ struct SAMRecord
 
     ~this()
     {
-        if(refct > 0) refct--;
-        // remove only if no references to this or underlying bam1_t data
-        if (refct == 0 && p_cigar.references <= 1 && p_tagval.references <= 1)
+        if(refct > 0) {
+            refct--;
+        }
+        // remove only if no references to this
+        if (refct == 0){
             bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
+        }
+    }
+
+
+    /// just a function for checking reference count
+    /// debugging purposes
+    debug int references(){
+        return this.refct;
     }
 
 
@@ -382,11 +392,7 @@ struct SAMRecord
     pragma(inline, true)
     @property Cigar cigar()
     {
-        // see if cigar is already initialized
-        if(!cigarInitialized) 
-            p_cigar = Cigar(bam_get_cigar(b), (*b).core.n_cigar);
-            this.cigarInitialized = true;
-        return p_cigar;
+        return Cigar(bam_get_cigar(b), (*b).core.n_cigar, &this.refct);
     }
 
     /// Assign a cigar string
@@ -427,14 +433,12 @@ struct SAMRecord
         //reset data length, seq length
         b.l_data = cast(uint) (uint.sizeof * cigar.length) + l_prev + (b.l_data - start_rest);
         b.core.n_cigar = cast(uint) (cigar.length);
-        p_cigar = Cigar(bam_get_cigar(b), (*b).core.n_cigar);
     }
 
     /// Get aux tag from bam1_t record and return a TagValue
     TagValue opIndex(string val)
     {
-        p_tagval = TagValue(b, val[0..2]);
-        return p_tagval;
+        return TagValue(b, val[0..2], &this.refct);
     }
 
     /// Assign a tag key value pair
