@@ -18,6 +18,7 @@ void main()
     auto sam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
     /// group by contig, then convert groups to arrays
     /// print info from groups
+    writeln("1");
     auto range = sam.allRecords.chunkBy!((a, b) => a.tid == b.tid).map!(x=> x.array);
     foreach(recs; range){
         foreach(rec; recs){
@@ -34,6 +35,7 @@ void main()
 
     /// group by contig, then convert groups to arrays
     /// print info from groups
+    writeln("2");
     auto range2 = sam.allRecords.chunkBy!((a, b) => a.tid == b.tid);//.map!(x=> x.array);
     foreach(group; range2){
         auto recs = group.array;
@@ -50,6 +52,7 @@ void main()
     }
     /// group by contig, then convert groups to arrays
     /// print info from groups
+    writeln("3");
     auto range3 = sam.allRecords.chunkBy!((a, b) => a.tid == b.tid);//.map!(x=> x.array);
     foreach(group; range3){
         SAMRecord[] recs;
@@ -71,6 +74,7 @@ void main()
     /// group by contig, DON'T convert groups to arrays
     /// print info from groups
     /// Only this one is correct
+    writeln("4");
     auto range4 = sam.allRecords.chunkBy!((a, b) => a.tid == b.tid);//.map!(x=> x.array);
     foreach(recs; range4){
         foreach(rec; recs){
