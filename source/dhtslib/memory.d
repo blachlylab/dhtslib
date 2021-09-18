@@ -10,11 +10,14 @@ if(!isPointer!T && isSomeFunction!destroy)
 {
     /// data pointer
     T * ptr;
+
     /// reference count pointer
     private size_t * refct;
 
+    /// ability to use this as the ptr directly
     alias ptr this;
 
+    /// ptr ctor
     this(T * ptr)
     {
         this.ptr = ptr;
@@ -22,6 +25,7 @@ if(!isPointer!T && isSomeFunction!destroy)
         *this.refct = 1;
     }
 
+    /// struct ctor
     this(T data)
     {
         *this.ptr = data;
@@ -29,26 +33,38 @@ if(!isPointer!T && isSomeFunction!destroy)
         *this.refct = 1;
     }
 
+    /// postblit inc refct
     this(this) @safe pure nothrow @nogc
     {
         if (refct is null) return;
         ++(*this.refct);
     }
 
+    /// dtor dec refct
+    /// or destroy
     ~this()
     {
         if (this.refct is null) return;
         assert(*this.refct > 0);
         if (--(*this.refct))
             return;
+
+        /// if destroy function return is void 
+        /// just destroy
+        /// else if int
+        /// destroy then check return value 
+        /// else don't compile
         static if(is(ReturnType!destroy == void))
             destroy(this.ptr);
         else static if(is(ReturnType!destroy == int))
         {
             auto success = destroy(this.ptr);
             if(!success) hts_log_error(__FUNCTION__,"Couldn't destroy "~T.stringof~" data using function "~destroy.stringof);
+        }else{
+            static assert(0, "HtslibMemory doesn't recognize destroy function return type");
         }
-
+        
+        /// free refct
         free(this.refct);
     }
 }
