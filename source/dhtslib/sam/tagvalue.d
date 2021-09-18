@@ -13,6 +13,7 @@ import htslib.hts_log;
 import std.conv : to;
 import std.exception : enforce, assertThrown;
 import std.math : approxEqual;
+import dhtslib.memory;
 
 alias Types = AliasSeq!(byte, ubyte, short, ushort, int, uint, float, string, char);
 enum TypeIndex(T) = staticIndexOf!(T, Types);
@@ -65,37 +66,16 @@ struct TagValue
 
     private ubyte* data;
 
-    private int * refct;      // Postblit refcounting in case the object is passed around
-
-    this(this)
-    {
-        if(refct)
-            (*refct)++;
-    }
-
-    invariant(){
-        assert(this.refct == null || (*refct) >= 0);
-    }
-
-    ~this(){
-        if(refct)
-            (*refct)--;
-    }
+    private Bam1tPtr b;
 
     /** Constructor
 
     Usage: auto t = TagValue(b, 'XX') where b is bam1_t* BAM record and XX is tag
     */
-    this(bam1_t* b, char[2] tag)
+    this(Bam1tPtr b, char[2] tag)
     {
+        this.b = b;
         data = bam_aux_get(b, tag);
-    }
-
-    this(bam1_t* b, char[2] tag, int * refct)
-    {
-        this.refct = refct;
-        (*this.refct)++;
-        this(b, tag);
     }
 
     /// check if empty/exists/null
@@ -306,7 +286,6 @@ debug (dhtslib_unittest) unittest
     auto readrange = bam.allRecords(); // @suppress(dscanner.suspicious.unmodified)
     assert(readrange.empty == false);
     auto read = readrange.front;
-    assert(read.references == 1);
 
     hts_log_info(__FUNCTION__, "Testing string");
     assert(read["RG"].to!string == "ID");
