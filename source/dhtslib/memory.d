@@ -1,71 +1,62 @@
 module dhtslib.memory;
 
-import std.meta : AliasSeq, staticIndexOf;
 import std.traits : isPointer, isSomeFunction, ReturnType;
-import core.stdc.stdlib;
+import core.lifetime : move;
+import std.typecons : RefCounted, RefCountedAutoInitialize;
 import htslib;
 
 struct HtslibMemory(T, alias destroy)
 if(!isPointer!T && isSomeFunction!destroy)
 {
-    /// data pointer
-    T * ptr;
-
-    /// reference count pointer
-    private size_t * refct;
-
-    /// ability to use this as the ptr directly
-    alias ptr this;
-
-    /// ptr ctor
-    this(T * ptr)
+    /// Pointer Wrapper
+    struct HtslibPtr
     {
-        this.ptr = ptr;
-        this.refct = cast(size_t*)malloc(size_t.sizeof);
-        *this.refct = 1;
-    }
+        /// data pointer
+        T * ptr;
 
-    /// struct ctor
-    this(T data)
-    {
-        *this.ptr = data;
-        this.refct = cast(size_t*)malloc(size_t.sizeof);
-        *this.refct = 1;
-    }
+        /// no copying this as that could result
+        /// in premature destruction
+        @disable this(this);
 
-    /// postblit inc refct
-    this(this) @safe pure nothrow @nogc
-    {
-        if (refct is null) return;
-        ++(*this.refct);
-    }
-
-    /// dtor dec refct
-    /// or destroy
-    ~this()
-    {
-        if (this.refct is null) return;
-        assert(*this.refct > 0);
-        if (--(*this.refct))
-            return;
-
-        /// if destroy function return is void 
-        /// just destroy
-        /// else if int
-        /// destroy then check return value 
-        /// else don't compile
-        static if(is(ReturnType!destroy == void))
-            destroy(this.ptr);
-        else static if(is(ReturnType!destroy == int))
+        /// destroy 
+        ~this()
         {
-            auto success = destroy(this.ptr);
-            if(!success) hts_log_error(__FUNCTION__,"Couldn't destroy "~T.stringof~" data using function "~destroy.stringof);
-        }else{
-            static assert(0, "HtslibMemory doesn't recognize destroy function return type");
+            /// if destroy function return is void 
+            /// just destroy
+            /// else if int
+            /// destroy then check return value 
+            /// else don't compile
+            static if(is(ReturnType!destroy == void))
+                destroy(this.ptr);
+            else static if(is(ReturnType!destroy == int))
+            {
+                auto success = destroy(this.ptr);
+                if(!success) hts_log_error(__FUNCTION__,"Couldn't destroy "~T.stringof~" data using function "~destroy.stringof);
+            }else{
+                static assert(0, "HtslibMemory doesn't recognize destroy function return type");
+            }
         }
-        
-        /// free refct
-        free(this.refct);
+    }
+
+    /// reference counted HtslibPtr
+    RefCounted!(HtslibPtr, RefCountedAutoInitialize.yes) rcPtr;
+
+    /// get underlying data pointer
+    @property nothrow @safe pure @nogc
+    ref inout(T*) truePtr() inout return
+    {
+        return rcPtr.refCountedPayload.ptr;
+    }
+
+    /// allow HtslibMemory to be used as 
+    /// underlying ptr type
+    alias truePtr this;
+
+    /// ctor from raw pointer
+    this(T * rawPtr)
+    {
+        auto wrapped = HtslibPtr(rawPtr);
+        move(wrapped,this.rcPtr.refCountedPayload);
     }
 }
 
