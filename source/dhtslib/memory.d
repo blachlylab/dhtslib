@@ -6,6 +6,8 @@ import std.typecons : RefCounted, RefCountedAutoInitialize;
 import htslib.sam : bam1_t, bam_hdr_t, bam_destroy1, bam_hdr_destroy;
 import htslib.vcf : bcf1_t,bcf_hdr_t, bcf_destroy, bcf_hdr_destroy;
 import htslib.hts : htsFile, hts_close;
+import htslib.bgzf : BGZF, bgzf_close;
+import htslib.tbx : tbx_t, tbx_destroy;
 import htslib.hts_log;
 
 /// Template struct that performs reference
@@ -37,8 +39,9 @@ if(!isPointer!T && isSomeFunction!destroy)
                     destroy(this.ptr);
                 else static if(is(ReturnType!destroy == int))
                 {
-                    auto success = destroy(this.ptr);
-                    if(!success) hts_log_error(__FUNCTION__,"Couldn't destroy/close "~T.stringof~" * data using function "~__traits(identifier, destroy));
+                    auto err = destroy(this.ptr);
+                    if(err != 0) 
+                        hts_log_error(__FUNCTION__,"Couldn't destroy/close "~T.stringof~" * data using function "~__traits(identifier, destroy));
                 }else{
                     static assert(0, "HtslibMemory doesn't recognize destroy function return type");
                 }
@@ -78,6 +81,12 @@ alias Bcf_hdr_t = HtslibMemory!(bcf_hdr_t, bcf_hdr_destroy);
 
 alias HtsFile = HtslibMemory!(htsFile, hts_close);
 alias VcfFile = HtsFile;
+
+alias Tbx_t = HtslibMemory!(tbx_t, tbx_destroy);
+
+alias BgzfPtr = HtslibMemory!(BGZF, bgzf_close);
+
+
 
 unittest
 {
