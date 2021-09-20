@@ -15,6 +15,8 @@ import std.string : fromStringz, toStringz;
 import std.range : inputRangeObject, InputRangeObject;
 import std.traits : ReturnType;
 
+import dhtslib.memory;
+
 import htslib.bgzf;
 import htslib.hfile: hseek, off_t;
 import htslib.kstring;
@@ -29,22 +31,8 @@ struct BGZFile {
     private const(char)* fn;
 
     /// htslib data structure representing the BGZF compressed file/stream fp
-    private BGZF* bgzf;
+    private BgzfPtr bgzf;
 
-    // ref counting to prevent closing file multiple times
-    // (free is instead now in popFront instead of dtor)
-    private int rc = 1;
-
-    // postblit ref counting
-    this(this)
-    {
-        debug(dhtslib_debug) { writeln("BGZFile postblit"); }
-        this.rc++;
-    }
-    
-    invariant(){
-        assert(rc >= 0);
-    }
 
     /// Open filename `fn` for reading
     this(string fn)
@@ -53,7 +41,7 @@ struct BGZFile {
 
         // open file
         this.fn = toStringz(fn);
-        this.bgzf = bgzf_open(this.fn, "r");
+        this.bgzf = BgzfPtr(bgzf_open(this.fn, "r"));
 
         // enable multi-threading
         // (only effective if library was compiled with -DBGZF_MT)
@@ -67,28 +55,14 @@ struct BGZFile {
             }
         }
     }
-    ~this()
-    {
-        debug(dhtslib_debug) { writefln("BGZFile dtor | rc=%d", this.rc); }
-
-        if(!--rc) {
-            debug(dhtslib_debug) { 
-                writefln("BGZFile closing file (rc=%d)", rc);
-            }
-            // free(this.line.s) not necessary as should be taken care of in popFront
-            // (or front() if using pre-primed range and fetching each row in popFront)
-            // on top of this, it should never have been malloc'd in this refcount=0 copy
-            if (bgzf_close(this.bgzf) != 0) writefln("hts_close returned non-zero status: %s\n", fromStringz(this.fn));
-        }
-    }
 
     
     auto byLine(){
         struct BGZFRange
         {
-            private BGZF* bgzf;
+            private BgzfPtr bgzf;
             private kstring_t line;
-            this(BGZF * bgzf){
+            this(BgzfPtr bgzf){
                 this.bgzf = bgzf;
                 popFront;
             }
@@ -121,9 +95,9 @@ struct BGZFile {
     auto byLineCopy(){
         struct BGZFRange
         {
-            private BGZF* bgzf;
+            private BgzfPtr bgzf;
             private kstring_t line;
-            this(BGZF * bgzf){
+            this(BgzfPtr bgzf){
                 this.bgzf = bgzf;
                 popFront;
             }

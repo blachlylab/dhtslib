@@ -18,6 +18,7 @@ import htslib.hts;
 import htslib.kstring;
 import htslib.tbx;
 import dhtslib.coordinates;
+import dhtslib.memory;
 //import htslib.regidx;
 
 /** Encapsulates a position-sorted record-oriented NGS flat file,
@@ -27,10 +28,8 @@ import dhtslib.coordinates;
  */
 struct TabixIndexedFile {
 
-    htsFile *fp;    /// pointer to htsFile struct
-    tbx_t   *tbx;   /// pointer to tabix handle
-
-    private int refct = 1;
+    HtsFile fp;    /// rc wrapper around htsFile ptr
+    Tbx_t   tbx;   /// rc wrapper around tabix ptr
 
     string header;  /// NGS flat file's header (if any; e.g. BED may not have one)
 
@@ -39,39 +38,20 @@ struct TabixIndexedFile {
     this(const(char)[] fn, const(char)[] fntbi = "")
     {
         debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
-        this.fp = hts_open( toStringz(fn), "r");
+        this.fp = HtsFile(hts_open( toStringz(fn), "r"));
         if ( !this.fp ) {
             writefln("Could not read %s\n", fn);
             throw new Exception("Couldn't read file");
         }
         //enum htsExactFormat format = hts_get_format(fp)->format;
-        if(fntbi!="") this.tbx = tbx_index_load2( toStringz(fn), toStringz(fntbi) );
-        else this.tbx = tbx_index_load( toStringz(fn) );
+        if(fntbi!="") this.tbx = Tbx_t(tbx_index_load2( toStringz(fn), toStringz(fntbi) ));
+        else this.tbx = Tbx_t(tbx_index_load( toStringz(fn) ));
         if (!this.tbx) { 
             writefln("Could not load .tbi index of %s\n", fn );
             throw new Exception("Couldn't load tabix index file");
         }
 
         loadHeader();
-    }
-    
-    this(this)
-    {
-        refct++;
-    }
-    
-    ~this()
-    {
-        if(--refct == 0){
-            debug(dhtslib_debug) { writeln("TabixIndexedFile dtor"); }
-            tbx_destroy(this.tbx);
-
-            if ( hts_close(this.fp) ) writefln("hts_close returned non-zero status: %s\n", fromStringz(this.fp.fn));
-        }
-    }
-
-    invariant(){
-        assert(refct >= 0);
     }
 
     private void loadHeader()
