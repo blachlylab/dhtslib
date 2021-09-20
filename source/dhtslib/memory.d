@@ -3,11 +3,12 @@ module dhtslib.memory;
 import std.traits : isPointer, isSomeFunction, ReturnType;
 import core.lifetime : move;
 import std.typecons : RefCounted, RefCountedAutoInitialize;
-import htslib;
+import htslib.sam;
 
 struct HtslibMemory(T, alias destroy)
 if(!isPointer!T && isSomeFunction!destroy)
 {
+    @safe:
     /// Pointer Wrapper
     struct HtslibPtr
     {
@@ -19,7 +20,7 @@ if(!isPointer!T && isSomeFunction!destroy)
         @disable this(this);
 
         /// destroy 
-        ~this()
+        ~this() @trusted
         {
             /// if destroy function return is void 
             /// just destroy
@@ -42,7 +43,7 @@ if(!isPointer!T && isSomeFunction!destroy)
     RefCounted!(HtslibPtr, RefCountedAutoInitialize.yes) rcPtr;
 
     /// get underlying data pointer
-    @property nothrow @safe pure @nogc
+    @property nothrow pure @nogc
     ref inout(T*) truePtr() inout return
     {
         return rcPtr.refCountedPayload.ptr;
@@ -53,7 +54,7 @@ if(!isPointer!T && isSomeFunction!destroy)
     alias truePtr this;
 
     /// ctor from raw pointer
-    this(T * rawPtr)
+    this(T * rawPtr) @trusted
     {
         auto wrapped = HtslibPtr(rawPtr);
         move(wrapped,this.rcPtr.refCountedPayload);
@@ -64,8 +65,6 @@ alias Bam1tPtr = HtslibMemory!(bam1_t, bam_destroy1);
 
 unittest
 {
-    // A pair of an `int` and a `size_t` - the latter being the
-    // reference count - will be dynamically allocated
     auto rc1 = Bam1tPtr(bam_init1);
     assert(rc1.core.pos == 0);
     // No more allocation, add just one extra reference count
@@ -73,5 +72,4 @@ unittest
     // Reference semantics
     rc2.core.pos = 42;
     assert(rc1.core.pos == 42);
-    // the pair will be freed when rc1 and rc2 go out of scope
 }
