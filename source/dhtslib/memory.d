@@ -71,19 +71,36 @@ if(!isPointer!T && isSomeFunction!destroy)
     }
 }
 
+/// reference counted bam1_t wrapper
+/// can be used directly as a bam1_t *
 alias Bam1_t = HtslibMemory!(bam1_t, bam_destroy1);
 
+/// reference counted bam_hdr_t wrapper
+/// can be used directly as a bam_hdr_t *
 alias Bam_hdr_t = HtslibMemory!(bam_hdr_t, bam_hdr_destroy);
 
+/// reference counted bcf1_t wrapper
+/// can be used directly as a bcf1_t *
 alias Bcf1_t = HtslibMemory!(bcf1_t, bcf_destroy);
 
+/// reference counted bcf_hdr_t wrapper
+/// can be used directly as a bcf_hdr_t *
 alias Bcf_hdr_t = HtslibMemory!(bcf_hdr_t, bcf_hdr_destroy);
 
+/// reference counted htsFile wrapper
+/// can be used directly as a htsFile *
 alias HtsFile = HtslibMemory!(htsFile, hts_close);
+
+/// reference counted htsFile wrapper
+/// can be used directly as a htsFile *
 alias VcfFile = HtsFile;
 
+/// reference counted tbx_t wrapper
+/// can be used directly as a tbx_t *
 alias Tbx_t = HtslibMemory!(tbx_t, tbx_destroy);
 
+/// reference counted BGZF wrapper
+/// can be used directly as a BGZF *
 alias BgzfPtr = HtslibMemory!(BGZF, bgzf_close);
 
 
