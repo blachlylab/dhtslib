@@ -5,6 +5,8 @@ import core.lifetime : move;
 import std.typecons : RefCounted, RefCountedAutoInitialize;
 import htslib.sam;
 
+/// Template struct that performs reference
+/// counting on htslib pointers and destroys with specified function
 struct HtslibMemory(T, alias destroy)
 if(!isPointer!T && isSomeFunction!destroy)
 {
@@ -32,7 +34,7 @@ if(!isPointer!T && isSomeFunction!destroy)
             else static if(is(ReturnType!destroy == int))
             {
                 auto success = destroy(this.ptr);
-                if(!success) hts_log_error(__FUNCTION__,"Couldn't destroy "~T.stringof~" data using function "~destroy.stringof);
+                if(!success) hts_log_error(__FUNCTION__,"Couldn't destroy "~T.stringof~" * data using function "~destroy.stringof);
             }else{
                 static assert(0, "HtslibMemory doesn't recognize destroy function return type");
             }
