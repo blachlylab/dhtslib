@@ -26,7 +26,7 @@ and the htslib helper functions for speed.
 struct SAMRecord
 {
     /// Backing SAM/BAM row record
-    Bam1tPtr b;
+    Bam1_t b;
 
     /// Corresponding SAM/BAM header data
     SAMHeader h;

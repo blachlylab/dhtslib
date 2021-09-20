@@ -63,11 +63,11 @@ if(!isPointer!T && isSomeFunction!destroy)
     }
 }
 
-alias Bam1tPtr = HtslibMemory!(bam1_t, bam_destroy1);
+alias Bam1_t = HtslibMemory!(bam1_t, bam_destroy1);
 
 unittest
 {
-    auto rc1 = Bam1tPtr(bam_init1);
+    auto rc1 = Bam1_t(bam_init1);
     assert(rc1.core.pos == 0);
     // No more allocation, add just one extra reference count
     auto rc2 = rc1;

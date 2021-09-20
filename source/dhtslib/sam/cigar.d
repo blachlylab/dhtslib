@@ -25,9 +25,9 @@ struct Cigar
     /// array of distinct CIGAR ops 
     /// private now to force fixing some reference issues
     private CigarOp[] ops;
-    private Bam1tPtr b;
+    private Bam1_t b;
     /// Construct Cigar from SAMRecord
-    this(Bam1tPtr b)
+    this(Bam1_t b)
     {
         this.b = b;
         auto cigar = bam_get_cigar(this.b);
