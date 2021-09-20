@@ -2,6 +2,7 @@ module dhtslib.vcf.header;
 
 import std.string: fromStringz, toStringz;
 
+import dhtslib.memory;
 import htslib.vcf;
 
 /** Wrapper around bcf_hdr_t
@@ -19,20 +20,12 @@ import htslib.vcf;
 struct VCFHeader
 {
     /// Pointer to htslib BCF/VCF header struct; will be freed from VCFHeader dtor 
-    bcf_hdr_t *hdr;
+    Bcf_hdr_t hdr;
 
-    // Copies have to be disabled to avoid double free()
-    @disable this(this);
-
-    ~this()
+    /// pointer ctor
+    this(bcf_hdr_t * h)
     {
-        // Deallocate header
-        if (this.hdr != null) bcf_hdr_destroy(this.hdr);
-    }
-
-    invariant
-    {
-        assert(this.hdr != null);
+        this.hdr = Bcf_hdr_t(h);
     }
 
     /// List of contigs in the header

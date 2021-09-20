@@ -8,6 +8,7 @@ import dhtslib.vcf.header;
 import dhtslib.vcf.record;
 import dhtslib.tabix;
 import dhtslib.coordinates;
+import dhtslib.memory;
 import htslib.vcf;
 import htslib.hts_log;
 import htslib.kstring;
@@ -28,18 +29,11 @@ auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!
 struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
 {
     // htslib data structures
-    vcfFile     *fp;    /// htsFile
-    //bcf_hdr_t   *hdr;   /// header
-    VCFHeader   *vcfhdr;    /// header wrapper -- no copies
-    bcf1_t* b;          /// record for use in iterator, will be recycled
+    VcfFile     fp;    /// rc htsFile wrapper
+    VCFHeader   vcfhdr;    /// rc header wrapper
+    Bcf1_t b;          /// rc bcf1_t wrapper, record for use in iterator, will be recycled
     int MAX_UNPACK;     /// see htslib.vcf
 
-    private static int refct;
-
-    this(this)
-    {
-        this.refct++;
-    }
     @disable this();
     static if(isTabixFile){
 
@@ -55,9 +49,9 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
             /// read the header from TabixIndexedFile
             bcf_hdr_t * hdrPtr = bcf_hdr_init(toUTFz!(char *)("r"));
             auto err = bcf_hdr_parse(hdrPtr, toUTFz!(char *)(this.tbx.header));
-            this.vcfhdr = new VCFHeader(hdrPtr);
+            this.vcfhdr = VCFHeader(hdrPtr);
             
-            this.b = bcf_init1();
+            this.b = Bcf1_t(bcf_init1());
             this.b.max_unpack = MAX_UNPACK;
             this.MAX_UNPACK = MAX_UNPACK;
         }
@@ -76,45 +70,25 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
 
             assert(!isTabixFile);
             if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
-            this.fp = vcf_open(toStringz(fn), "r"c.ptr);
+            this.fp = VcfFile(vcf_open(toStringz(fn), "r"c.ptr));
             if (!this.fp) throw new Exception("Could not hts_open file");
             
             hts_set_threads(this.fp, 1);    // extra decoding thread
 
-            this.vcfhdr = new VCFHeader( bcf_hdr_read(this.fp));
+            this.vcfhdr = VCFHeader(bcf_hdr_read(this.fp));
 
-            this.b = bcf_init1();
+            this.b = Bcf1_t(bcf_init1());
             this.b.max_unpack = MAX_UNPACK;
             this.MAX_UNPACK = MAX_UNPACK;
         }
     }
 
-    /// dtor
-    ~this()
-    {
-        this.refct--;
-
-        // block file close and bcf1_t free() with reference counting
-        // to allow VCFReader to implement Range interface
-        if(!this.refct) {
-            static if(!isTabixFile){
-                const ret = vcf_close(this.fp);
-                if (ret != 0) hts_log_error(__FUNCTION__, "couldn't close VCF after reading");
-            }
-
-            // Deallocate header
-            //bcf_hdr_destroy(this.hdr);
-            // 2018-09-15: Do not deallocate header; will be free'd by VCFHeader dtor
-
-            bcf_destroy1(this.b);
-        }
-    }
     invariant
     {
-        assert(this.vcfhdr != null);
+        assert(this.vcfhdr.hdr != null);
     }
 
-    VCFHeader* getHeader()
+    VCFHeader getHeader()
     {
         return this.vcfhdr;
     }

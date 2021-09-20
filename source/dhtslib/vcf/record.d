@@ -19,6 +19,7 @@ import std.string: fromStringz, toStringz;
 import std.traits;
 
 import dhtslib.coordinates;
+import dhtslib.memory;
 import dhtslib.vcf.header;
 import htslib.hts_log;
 import htslib.kstring;
@@ -62,12 +63,9 @@ BCF_UN_SHR: all shared information (BCF_UN_STR|BCF_UN_FLT|BCF_UN_INFO)
 */
 struct VCFRecord
 {
-    bcf1_t* line;   /// htslib structured record TODO: change to 'b' for better internal consistency? (vcf.h/c actually use line quite a bit in fn params)
+    Bcf1_t line;   /// htslib structured record TODO: change to 'b' for better internal consistency? (vcf.h/c actually use line quite a bit in fn params)
 
-    VCFHeader *vcfheader;   /// corresponding header (required);
-                            /// is ptr to avoid copying struct containing ptr to bcf_hdr_t (leads to double free())
-    
-    private int refct = 1;      // Postblit refcounting in case the object is passed around
+    VCFHeader vcfheader;   /// corresponding header (required);
 
     /** VCFRecord
 
@@ -80,25 +78,25 @@ struct VCFRecord
         as it will not unpack all fields, only up to those requested (see htslib.vcf)
         For example, BCF_UN_STR is up to ALT inclusive, and BCF_UN_STR is up to FILTER
     */
-    this(T)(T *h, bcf1_t *b, int MAX_UNPACK = BCF_UN_ALL)
-    if(is(T == VCFHeader) || is(T == bcf_hdr_t))
+    this(T)(T h, bcf1_t *b, int MAX_UNPACK = BCF_UN_ALL)
+    if(is(T == VCFHeader) || is(T == bcf_hdr_t *))
     {
         static if (is(T == VCFHeader)) this.vcfheader = h;
-        //else static if (is(T == bcf_hdr_t)) this.vcfheader = new VCFHeader(h); // double free() bug if we don't own bcf_hdr_t h
+        else static if (is(T == bcf_hdr_t)) this.vcfheader = VCFHeader(Bcf_hdr_t(h)); // double free() bug if we don't own bcf_hdr_t h
         else static if (is(T == bcf_hdr_t)) assert(0);  // ferret out situations that will lead to free() crashes
         else assert(0);
 
-        this.line = b;
+        this.line = Bcf1_t(b);
 
         // Now it must be unpacked
         // Protip: specifying alternate MAX_UNPACK can speed it tremendously
         immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
     }
     /// ditto
-    this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
+    this(SS)(VCFHeader vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
     if (isSomeString!SS || is(SS == string[]))
     {
-        this.line = bcf_init1();
+        this.line = Bcf1_t(bcf_init1());
         this.vcfheader = vcfhdr;
         
         this.chrom = chrom;
@@ -111,7 +109,7 @@ struct VCFRecord
         this.filter = filter;
     }
     /// ditto
-    this(VCFHeader *vcfhdr, string line, int MAX_UNPACK = BCF_UN_ALL)
+    this(VCFHeader vcfhdr, string line, int MAX_UNPACK = BCF_UN_ALL)
     {
         this.vcfheader = vcfhdr;
 
@@ -122,7 +120,7 @@ struct VCFRecord
         kline.m = dupline.length;
         kline.s = dupline.ptr;
 
-        this.line = bcf_init1();
+        this.line = Bcf1_t(bcf_init1());
         this.line.max_unpack = MAX_UNPACK;
 
         auto ret = vcf_parse(&kline, this.vcfheader.hdr, this.line);
@@ -131,22 +129,6 @@ struct VCFRecord
         } else {
             ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
         }
-    }
-
-    // post-blit reference counting
-    this(this)
-    {
-        refct++;
-    }
-
-    invariant(){
-        assert(refct >= 0);
-    }
-
-    /// dtor
-    ~this(){
-        if(--refct == 0 && this.line)
-            bcf_destroy1(this.line);
     }
 
     //----- FIXED FIELDS -----//

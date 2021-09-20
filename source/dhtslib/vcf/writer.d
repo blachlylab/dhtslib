@@ -8,6 +8,7 @@ import std.format: format;
 
 import dhtslib.vcf.header;
 import dhtslib.vcf.record;
+import dhtslib.memory;
 import htslib.vcf;
 import htslib.hts_log;
 
@@ -17,10 +18,9 @@ alias BCFWriter = VCFWriter;
 struct VCFWriter
 {
     // htslib data structures
-    vcfFile     *fp;    /// htsFile
-    //bcf_hdr_t   *hdr;   /// header
-    VCFHeader   *vcfhdr;    /// header wrapper -- no copies
-    bcf1_t*[]    rows;   /// individual records
+    VcfFile     fp;    /// rc htsFile wrapper
+    VCFHeader   vcfhdr;    /// header wrapper
+    Bcf1_t[]    rows;   /// individual records
 
     @disable this();
     /// open file or network resources for writing
@@ -31,10 +31,10 @@ struct VCFWriter
     this(string fn)
     {
         if (fn == "") throw new Exception("Empty filename passed to VCFWriter constructor");
-        this.fp = vcf_open(toStringz(fn), toStringz("w"c));
+        this.fp = VcfFile(vcf_open(toStringz(fn), toStringz("w"c)));
         if (!this.fp) throw new Exception("Could not hts_open file");
 
-        this.vcfhdr = new VCFHeader( bcf_hdr_init("w\0"c.ptr));
+        this.vcfhdr = VCFHeader( bcf_hdr_init("w\0"c.ptr));
         addFiledate();
         bcf_hdr_sync(this.vcfhdr.hdr);
 
@@ -62,22 +62,13 @@ struct VCFWriter
         static if(is(T == VCFHeader*)) { this.vcfhdr      = new VCFHeader( bcf_hdr_dup(other.hdr) ); }
         else static if(is(T == bcf_hdr_t*)) { this.vcfhdr = new VCFHeader( bcf_hdr_dup(other) ); }
     }
-    /// dtor
-    ~this()
-    {
-        const ret = vcf_close(this.fp);
-        if (ret != 0) hts_log_error(__FUNCTION__, "couldn't close VCF after writing");
 
-        // Deallocate header
-        //bcf_hdr_destroy(this.hdr);
-        // 2018-09-15: Do not deallocate header; will be free'd by VCFHeader dtor
-    }
     invariant
     {
-        assert(this.vcfhdr != null);
+        assert(this.vcfhdr.hdr != null);
     }
 
-    VCFHeader* getHeader()
+    VCFHeader getHeader()
     {
         return this.vcfhdr;
     }
@@ -86,7 +77,7 @@ struct VCFWriter
     /// copy header lines from a template without overwiting existing lines
     void copyHeaderLines(bcf_hdr_t *other)
     {
-        assert(this.vcfhdr != null);
+        assert(this.vcfhdr.hdr != null);
         assert(0);
         //    bcf_hdr_t *bcf_hdr_merge(bcf_hdr_t *dst, const(bcf_hdr_t) *src);
     }
@@ -97,7 +88,7 @@ struct VCFWriter
     in { assert(name != ""); }
     do
     {
-        assert(this.vcfhdr != null);
+        assert(this.vcfhdr.hdr != null);
 
         bcf_hdr_add_sample(this.vcfhdr.hdr, toStringz(name));
 
@@ -119,7 +110,7 @@ struct VCFWriter
     /// Add a new header line -- must be formatted ##key=value
     int addHeaderLineRaw(string line)
     {
-        assert(this.vcfhdr != null);
+        assert(this.vcfhdr.hdr != null);
         //    int bcf_hdr_append(bcf_hdr_t *h, const(char) *line);
         const auto ret = bcf_hdr_append(this.vcfhdr.hdr, toStringz(line));
         bcf_hdr_sync(this.vcfhdr.hdr);
@@ -259,7 +250,7 @@ struct VCFWriter
     int addRecord(S, N)(S contig, int pos, S id, S alleles, N qual, S[] filters)
     if ( (isSomeString!S || is(S == char*) ) && isNumeric!N)
     {        
-        bcf1_t *line = new bcf1_t;
+        Bcf1_t line = Bcf1_t(bcf_init1());
 
         line.rid = bcf_hdr_name2id(this.vcfhdr.hdr, toStringz(contig));
         if (line.rid == -1) hts_log_error(__FUNCTION__, "contig not found");
