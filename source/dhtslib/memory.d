@@ -8,6 +8,7 @@ import htslib.vcf : bcf1_t,bcf_hdr_t, bcf_destroy, bcf_hdr_destroy;
 import htslib.hts : htsFile, hts_close;
 import htslib.bgzf : BGZF, bgzf_close;
 import htslib.tbx : tbx_t, tbx_destroy;
+import htslib.faidx : faidx_t, fai_destroy;
 import htslib.hts_log;
 
 /// Template struct that performs reference
@@ -103,6 +104,9 @@ alias Tbx_t = HtslibMemory!(tbx_t, tbx_destroy);
 /// can be used directly as a BGZF *
 alias BgzfPtr = HtslibMemory!(BGZF, bgzf_close);
 
+/// reference counted faidx_t wrapper
+/// can be used directly as a faidx_t *
+alias Faidx_t = HtslibMemory!(faidx_t, fai_destroy);
 
 
 unittest
