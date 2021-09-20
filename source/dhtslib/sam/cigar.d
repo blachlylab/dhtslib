@@ -16,7 +16,7 @@ import htslib.hts_log;
 import dhtslib.sam.record : SAMRecord;
 import dhtslib.coordinates;
 import dhtslib.memory;
-import htslib : bam_get_cigar;
+import htslib.sam : bam_get_cigar;
 
 /// Represents a CIGAR string
 /// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
