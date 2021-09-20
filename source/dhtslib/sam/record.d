@@ -181,7 +181,7 @@ struct SAMRecord
     /// is read reversed?
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
     pragma(inline, true)
-    @nogc @safe nothrow
+    @nogc @trusted nothrow
     @property bool isReversed()
     {
         return bam_is_rev(this.b);
@@ -190,7 +190,7 @@ struct SAMRecord
     /// is mate reversed?
     /// bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
     pragma(inline, true)
-    @nogc @safe nothrow
+    @nogc @trusted nothrow
     @property bool mateReversed()
     {
         return bam_is_mrev(this.b);
