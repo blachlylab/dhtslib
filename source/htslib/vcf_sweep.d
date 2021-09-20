@@ -26,6 +26,10 @@ module htslib.vcf_sweep;
 
 import htslib.vcf;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 struct bcf_sweep_t;

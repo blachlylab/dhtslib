@@ -25,6 +25,10 @@
 */
 module htslib.kstring;
 
+@system:
+nothrow:
+@nogc:
+
 import core.stdc.config : c_long;
 import core.stdc.stdarg;
 import core.stdc.stdio : EOF;

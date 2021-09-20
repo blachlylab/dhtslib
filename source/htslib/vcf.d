@@ -43,9 +43,9 @@ import htslib.hts_endian;
 import htslib.kstring : kstring_t;
 import htslib.bgzf : BGZF;
 
-
-
+@system:
 extern (C):
+@nogc nothrow {
 
 /* Included only for backwards compatibility with e.g. bcftools 1.10 */
 
@@ -923,6 +923,9 @@ auto bcf_update_info_int64( const(bcf_hdr_t) *hdr, bcf1_t *line,
  *
  *  Returns 0 on success or negative value on error.
  */
+
+}/// closing @nogc nothrow
+
 pragma(inline, true) {
     auto bcf_update_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(int) *values, int n) // @suppress(dscanner.style.undocumented_declaration)
         { return bcf_update_format(hdr, line, key, values, n, BCF_HT_INT); }
@@ -934,6 +937,8 @@ pragma(inline, true) {
         { return bcf_update_format(hdr, line, toStringz("GT"c), gts, n, BCF_HT_INT); 
     }
 }
+
+@nogc nothrow {
 
 int bcf_update_format_string (
     const(bcf_hdr_t)* hdr,
@@ -1126,6 +1131,9 @@ auto bcf_get_info_int64(const(bcf_hdr_t) *hdr, bcf1_t *line,
  *      free(gt_arr);
  *
  */
+
+}/// closing @nogc nothrow from line 928
+
 pragma(inline, true) {
     auto bcf_get_format_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *tag, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration) // @suppress(dscanner.style.long_line)
         { return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_INT); }
@@ -1136,6 +1144,8 @@ pragma(inline, true) {
     auto bcf_get_genotypes(const(bcf_hdr_t) *hdr, bcf1_t *line, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration) // @suppress(dscanner.style.long_line)
         { return bcf_get_format_values(hdr, line, toStringz("GT"c), cast(void**) dst, ndst, BCF_HT_INT); }
 }
+
+@nogc nothrow {
 
 int bcf_get_format_string(
     const(bcf_hdr_t)* hdr,
@@ -1272,6 +1282,8 @@ int bcf_enc_vfloat(kstring_t* s, int n, float* a);
 
 alias bcf_itr_destroy = hts_itr_destroy;
 
+} /// closing @nogc nothrow from line 1136
+
 pragma(inline, true) {
     /// Generate an iterator for an integer-based range query
     auto bcf_itr_queryi(const(hts_idx_t) *idx, int tid, int beg, int end)
@@ -1293,6 +1305,9 @@ pragma(inline, true) {
         errno = EINVAL;
         return -2;
     }
+
+@nogc nothrow:
+
 /// Load a BCF index
 /** @param fn   BCF file name
     @return The index, or NULL if an error occurred.

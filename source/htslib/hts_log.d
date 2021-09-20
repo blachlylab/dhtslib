@@ -29,6 +29,9 @@ module htslib.hts_log;
 
 import std.string: toStringz;
 
+@system:
+nothrow:
+
 extern (C):
 
 /// Log levels.

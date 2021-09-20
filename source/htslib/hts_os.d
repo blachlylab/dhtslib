@@ -26,6 +26,10 @@ module htslib.hts_os;
 
 import core.stdc.config;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 /* This is srand48_deterministic() on platforms that provide it, or srand48()

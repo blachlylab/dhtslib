@@ -35,7 +35,9 @@ import htslib.hts_log;
 import htslib.bgzf : BGZF;
 import htslib.kstring : kstring_t, ssize_t;
 
+@system:
 extern (C):
+@nogc nothrow {
 
 /// Highest SAM format version supported by this library
 enum SAM_FORMAT_VERSION = "1.6";
@@ -1447,6 +1449,8 @@ hts_itr_t* sam_itr_regarray(
     char** regarray,
     uint regcount);
 
+} /// closing @nogc
+
 /// Get the next read from a SAM/BAM/CRAM iterator
 /** @param htsfp       Htsfile pointer for the input file
     @param itr         Iterator
@@ -1469,6 +1473,8 @@ int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r) {
     else
         return hts_itr_next(htsfp.is_bgzf ? htsfp.fp.bgzf : null, itr, r, htsfp);
 }
+
+@nogc nothrow:
 
 /// Get the next read from a BAM/CRAM multi-iterator
 /** @param htsfp       Htsfile pointer for the input file

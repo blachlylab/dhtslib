@@ -26,6 +26,9 @@ module htslib.hts_endian;
 
 import core.stdc.config;
 
+@system:
+@nogc:
+
 /*
  * Compile-time endianness tests.
  *

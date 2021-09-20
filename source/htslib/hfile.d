@@ -29,6 +29,10 @@ import core.stdc.string : memcpy, strlen;
 
 import htslib.kstring : kstring_t;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 //#include <sys/types.h>

@@ -28,6 +28,10 @@ module htslib.knetfile;
 import core.sys.posix.fcntl;
 import core.sys.posix.sys.types;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 // alias netread = read;

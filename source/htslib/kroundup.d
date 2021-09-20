@@ -24,6 +24,10 @@
 */
 module htslib.kroundup;
 
+@system:
+nothrow:
+@nogc:
+
 /// round 32 or 64 bit (u)int x to power of 2 that is equal or greater (JSB)
 pragma(inline, true)
 extern (D)
