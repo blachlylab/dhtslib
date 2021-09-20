@@ -46,14 +46,14 @@ if(!isPointer!T && isSomeFunction!destroy)
 
     /// get underlying data pointer
     @property nothrow pure @nogc
-    ref inout(T*) truePtr() inout return
+    ref inout(T*) getPtr() inout return
     {
         return rcPtr.refCountedPayload.ptr;
     }
 
     /// allow HtslibMemory to be used as 
     /// underlying ptr type
-    alias truePtr this;
+    alias getPtr this;
 
     /// ctor from raw pointer
     this(T * rawPtr) @trusted
