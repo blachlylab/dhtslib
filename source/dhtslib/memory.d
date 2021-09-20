@@ -3,7 +3,10 @@ module dhtslib.memory;
 import std.traits : isPointer, isSomeFunction, ReturnType;
 import core.lifetime : move;
 import std.typecons : RefCounted, RefCountedAutoInitialize;
-import htslib.sam;
+import htslib.sam : bam1_t, bam_hdr_t, bam_destroy1, bam_hdr_destroy;
+import htslib.vcf : bcf1_t,bcf_hdr_t, bcf_destroy, bcf_hdr_destroy;
+import htslib.hts : htsFile, hts_close;
+import htslib.hts_log;
 
 /// Template struct that performs reference
 /// counting on htslib pointers and destroys with specified function
@@ -29,14 +32,16 @@ if(!isPointer!T && isSomeFunction!destroy)
             /// else if int
             /// destroy then check return value 
             /// else don't compile
-            static if(is(ReturnType!destroy == void))
-                destroy(this.ptr);
-            else static if(is(ReturnType!destroy == int))
-            {
-                auto success = destroy(this.ptr);
-                if(!success) hts_log_error(__FUNCTION__,"Couldn't destroy "~T.stringof~" * data using function "~destroy.stringof);
-            }else{
-                static assert(0, "HtslibMemory doesn't recognize destroy function return type");
+            if(this.ptr){
+                static if(is(ReturnType!destroy == void))
+                    destroy(this.ptr);
+                else static if(is(ReturnType!destroy == int))
+                {
+                    auto success = destroy(this.ptr);
+                    if(!success) hts_log_error(__FUNCTION__,"Couldn't destroy/close "~T.stringof~" * data using function "~__traits(identifier, destroy));
+                }else{
+                    static assert(0, "HtslibMemory doesn't recognize destroy function return type");
+                }
             }
         }
     }
@@ -67,8 +72,16 @@ alias Bam1_t = HtslibMemory!(bam1_t, bam_destroy1);
 
 alias Bam_hdr_t = HtslibMemory!(bam_hdr_t, bam_hdr_destroy);
 
+alias Bcf1_t = HtslibMemory!(bcf1_t, bcf_destroy);
+
+alias Bcf_hdr_t = HtslibMemory!(bcf_hdr_t, bcf_hdr_destroy);
+
+alias HtsFile = HtslibMemory!(htsFile, hts_close);
+alias VcfFile = HtsFile;
+
 unittest
 {
+    import htslib.sam : bam_init1;
     auto rc1 = Bam1_t(bam_init1);
     assert(rc1.core.pos == 0);
     // No more allocation, add just one extra reference count
