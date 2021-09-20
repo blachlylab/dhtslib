@@ -65,6 +65,8 @@ if(!isPointer!T && isSomeFunction!destroy)
 
 alias Bam1_t = HtslibMemory!(bam1_t, bam_destroy1);
 
+alias Bam_hdr_t = HtslibMemory!(bam_hdr_t, bam_hdr_destroy);
+
 unittest
 {
     auto rc1 = Bam1_t(bam_init1);
