@@ -10,6 +10,7 @@ module dhtslib.sam.header;
 
 import htslib.sam;
 import htslib.kstring;
+import dhtslib.memory;
 
 import core.stdc.stdlib : free;
 import core.stdc.string : memcpy;
@@ -35,27 +36,12 @@ enum RecordType : immutable(char)[2]
 */
 struct SAMHeader
 {
-    sam_hdr_t* h;
-
-    private int refct;      // Postblit refcounting in case the object is passed around
+    Bam_hdr_t h;
 
     /// Construct from existing pointer
-    this(sam_hdr_t* h)
+    this(Bam_hdr_t h)
     {
         this.h = h;
-        refct = 1;
-    }
-
-    /// ref counting
-    this(this)
-    {
-        refct++;
-    }
-    
-    /// ref counting
-    ~this(){
-        if(--refct == 0)
-            sam_hdr_destroy(this.h);
     }
 
     bool isNull(){
@@ -64,7 +50,7 @@ struct SAMHeader
 
     /// Copy a SAMHeader
     auto dup(){
-        return SAMHeader(sam_hdr_dup(this.h));
+        return SAMHeader(Bam_hdr_t(sam_hdr_dup(this.h)));
     }
 
     /* contig info */
@@ -270,7 +256,7 @@ debug (dhtslib_unittest) unittest
     import std;
 
     auto h = sam_hdr_init();
-    auto hdr = SAMHeader(h);
+    auto hdr = SAMHeader(Bam_hdr_t(h));
 
     assert(!(RecordType.RG in hdr));
 

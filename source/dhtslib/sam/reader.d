@@ -19,6 +19,7 @@ import dhtslib.sam.record;
 import dhtslib.coordinates;
 import dhtslib.sam.header;
 import dhtslib.sam : cmpInterval, cmpRegList;
+import dhtslib.memory;
 
 alias SAMFile = SAMReader;
 /**
@@ -113,7 +114,7 @@ struct SAMReader
         }
 
         // read header
-        this.header = SAMHeader(sam_hdr_read(this.fp));
+        this.header = SAMHeader(Bam_hdr_t(sam_hdr_read(this.fp)));
 
         // collect header offset just in case it is a sam file
         // we would like to iterate
