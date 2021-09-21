@@ -18,7 +18,7 @@ if(!isPointer!T && isSomeFunction!destroy)
 {
     @safe:
     /// Pointer Wrapper
-    struct HtslibPtr
+    static struct HtslibPtr
     {
         /// data pointer
         T * ptr;
