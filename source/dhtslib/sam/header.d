@@ -36,12 +36,12 @@ enum RecordType : immutable(char)[2]
 */
 struct SAMHeader
 {
-    Bam_hdr_t h;
+    Bam_hdr_t h; /// rc bam_hdr_t * wrapper
 
     /// Construct from existing pointer
-    this(Bam_hdr_t h)
+    this(bam_hdr_t * h)
     {
-        this.h = h;
+        this.h = Bam_hdr_t(h);
     }
 
     bool isNull(){
@@ -50,7 +50,7 @@ struct SAMHeader
 
     /// Copy a SAMHeader
     auto dup(){
-        return SAMHeader(Bam_hdr_t(sam_hdr_dup(this.h)));
+        return SAMHeader(sam_hdr_dup(this.h));
     }
 
     /* contig info */
@@ -256,7 +256,7 @@ debug (dhtslib_unittest) unittest
     import std;
 
     auto h = sam_hdr_init();
-    auto hdr = SAMHeader(Bam_hdr_t(h));
+    auto hdr = SAMHeader(h);
 
     assert(!(RecordType.RG in hdr));
 
