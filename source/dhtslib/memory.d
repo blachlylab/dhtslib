@@ -4,8 +4,8 @@ import std.traits : isPointer, isSomeFunction, ReturnType;
 import core.lifetime : move;
 import std.typecons : RefCounted, RefCountedAutoInitialize;
 import htslib.sam : bam1_t, bam_hdr_t, bam_destroy1, bam_hdr_destroy;
-import htslib.vcf : bcf1_t,bcf_hdr_t, bcf_destroy, bcf_hdr_destroy;
-import htslib.hts : htsFile, hts_close;
+import htslib.vcf : bcf1_t, bcf_hdr_t, bcf_destroy, bcf_hdr_destroy;
+import htslib.hts : htsFile, hts_idx_t, hts_itr_t, hts_close, hts_idx_destroy, hts_itr_destroy;
 import htslib.bgzf : BGZF, bgzf_close;
 import htslib.tbx : tbx_t, tbx_destroy;
 import htslib.faidx : faidx_t, fai_destroy;
@@ -91,6 +91,14 @@ alias Bcf_hdr_t = HtslibMemory!(bcf_hdr_t, bcf_hdr_destroy);
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
 alias HtsFile = HtslibMemory!(htsFile, hts_close);
+
+/// reference counted htsFile wrapper
+/// can be used directly as a htsFile *
+alias Hts_idx_t = HtslibMemory!(hts_idx_t, hts_idx_destroy);
+
+/// reference counted htsFile wrapper
+/// can be used directly as a htsFile *
+alias Hts_itr_t = HtslibMemory!(hts_itr_t, hts_itr_destroy);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
