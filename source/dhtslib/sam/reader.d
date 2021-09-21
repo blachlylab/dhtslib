@@ -37,7 +37,7 @@ struct SAMReader
     private const(char)* fn;
 
     /// htsFile
-    private htsFile* fp;
+    private HtsFile fp;
 
     /// hFILE if required
     private hFILE* f;
@@ -48,14 +48,9 @@ struct SAMReader
     private off_t header_offset;
 
     /// SAM/BAM/CRAM index 
-    private hts_idx_t* idx;
+    private Hts_idx_t idx;
 
     private kstring_t line;
-
-    private AllRecordsRange allRecordsRange;
-
-    /// disallow copying
-    @disable this(this);
 
     /** Create a representation of SAM/BAM/CRAM file from given filename or File
 
@@ -76,14 +71,14 @@ struct SAMReader
         {
             this.filename = f;
             this.fn = toStringz(f);
-            this.fp = hts_open(this.fn, cast(immutable(char)*) "r");
+            this.fp = HtsFile(hts_open(this.fn, cast(immutable(char)*) "r"));
         }
         else static if (is(T == File))
         {
             this.filename = f.name();
             this.fn = toStringz(f.name);
             this.f = hdopen(f.fileno, cast(immutable(char)*) "r");
-            this.fp = hts_hopen(this.f, this.fn, cast(immutable(char)*) "r");
+            this.fp = HtsFile(hts_hopen(this.f, this.fn, cast(immutable(char)*) "r"));
         }
         else assert(0);
 
@@ -114,31 +109,14 @@ struct SAMReader
         }
 
         // read header
-        this.header = SAMHeader(Bam_hdr_t(sam_hdr_read(this.fp)));
+        this.header = SAMHeader(sam_hdr_read(this.fp));
 
         // collect header offset just in case it is a sam file
         // we would like to iterate
         if(this.fp.is_bgzf) this.header_offset = bgzf_tell(this.fp.fp.bgzf);
         else this.header_offset = htell(this.fp.fp.hfile);
-    }
 
-    ~this()
-    {
-        debug (dhtslib_debug)
-        {
-            writeln("SAMFile dtor");
-        }
-        
-        // SAMHeader now takes care of this
-        // bam_hdr_destroy(this.header);
-
-        if(this.allRecordsRange.references <= 1){
-            if(this.idx !is null)
-                hts_idx_destroy(this.idx);
-            const auto ret = hts_close(fp);
-            if (ret < 0)
-                writefln("There was an error closing %s", fromStringz(this.fn));
-        }
+        this.idx = Hts_idx_t(null);
     }
 
     /// number of reference sequences; from bam_hdr_t
@@ -258,13 +236,13 @@ struct SAMReader
 
         /// load index
         if(this.idx == null)
-            this.idx = sam_index_load(this.fp, this.fn);
+            this.idx = Hts_idx_t(sam_index_load(this.fp, this.fn));
         if (this.idx == null)
         {
             hts_log_error(__FUNCTION__, "SAM index not found");
             throw new Exception("SAM index not found");
         }
-        auto itr = sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end);
+        auto itr = Hts_itr_t(sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end));
         return RecordRange(this.fp, this.header, itr);
     }
 
@@ -404,8 +382,7 @@ struct SAMReader
     /// Return an InputRange representing all records in the SAM/BAM/CRAM
     auto allRecords()
     {
-        this.allRecordsRange = AllRecordsRange(this.fp, this.header, this.header_offset);
-        return this.allRecordsRange;
+        return AllRecordsRange(this.fp, this.header, this.header_offset);
     }
 
     deprecated("Avoid snake_case names")
@@ -415,51 +392,26 @@ struct SAMReader
     /// Iterate through all records in the SAM
     struct AllRecordsRange
     {
-        private htsFile*    fp;     // belongs to parent; shared
+        private HtsFile    fp;     // belongs to parent; shared
         private SAMHeader  header; // belongs to parent; shared
         private off_t header_offset;
-        private bam1_t*     b;
+        private Bam1_t     b;
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
-        private int refct = 1;      // Postblit refcounting in case the object is passed around
-
-        this(htsFile* fp, SAMHeader header, off_t header_offset)
+        this(HtsFile fp, SAMHeader header, off_t header_offset)
         {
             this.fp = fp;
             this.header_offset = header_offset;
             assert(this.fp.format.format == htsExactFormat.sam || this.fp.format.format == htsExactFormat.bam);
             this.header = header;
-            this.b = bam_init1();
+            this.b = Bam1_t(bam_init1());
 
             // Need to seek past header offset
             if (this.fp.format.format == htsExactFormat.sam)
                 hseek(fp.fp.hfile, this.header_offset, SEEK_SET);
             else
                 bgzf_seek(fp.fp.bgzf, this.header_offset, SEEK_SET);
-        }
-        
-        this(this)
-        {
-            refct++;
-        }
-
-        invariant(){
-            assert(refct >= 0);
-        }
-
-        auto references()
-        {
-            return this.refct;
-        }
-
-        ~this()
-        {
-            if(refct > 0) refct--;
-            // remove only if no references to this or underlying bam1_t data
-            if (refct == 0){
-                bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
-            }
         }
 
         /// InputRange interface
@@ -498,51 +450,24 @@ struct SAMReader
     /// TODO destroy the itr with dtor
     struct RecordRange
     {
-        private htsFile* fp;
+        private HtsFile fp;
         private SAMHeader h;
-        private hts_itr_t* itr;
-        private bam1_t* b;
+        private Hts_itr_t itr;
+        private Bam1_t b;
 
         private int r;  // sam_itr_next: >= 0 on success; -1 when there is no more data; < -1 on error
         
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
-        private int refct = 1;      // Postblit refcounting in case the object is passed around
-
         /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
-        this(htsFile* fp, SAMHeader header, hts_itr_t* itr)
+        this(HtsFile fp, SAMHeader header, Hts_itr_t itr)
         {
             this.fp = fp;
             this.h = header;
             this.itr = itr;
             this.b = bam_init1();
-            assert(itr !is null, "itr was null");
- 
-        }
-
-        this(this)
-        {
-            refct++;
-        }
-
-        invariant(){
-            assert(refct >= 0);
-        }
-
-        auto references()
-        {
-            return this.refct;
-        }
-
-        ~this()
-        {
-            if(refct > 0) refct--;
-            // remove only if no references to this or underlying bam1_t data
-            if (refct == 0){
-                bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
-                hts_itr_destroy(this.itr);
-            }
+            assert(itr !is null, "itr was null"); 
         }
 
         /// InputRange interface
@@ -581,20 +506,20 @@ struct SAMReader
     /// Iterate over records falling within queried regions using a RegionList
     struct RecordRangeMulti
     {
-        private htsFile* fp;
+        private HtsFile fp;
         private SAMHeader h;
         private hts_itr_multi_t* itr;
-        private bam1_t* b;
+        private Bam1_t b;
         private hts_reglist_t[] rlist;
         private int r;
 
         ///
-        this(htsFile* fp, hts_idx_t* idx, SAMHeader header, SAMFile* sam, string[] regions)
+        this(HtsFile fp, Hts_idx_t idx, SAMHeader header, SAMFile* sam, string[] regions)
         {
             rlist = RegionList(sam, regions).getRegList();
             this.fp = fp;
             this.h = header;
-            b = bam_init1();
+            b = Bam1_t(bam_init1());
             itr = sam_itr_regions(idx, this.h.h, rlist.ptr, cast(uint) rlist.length);
             //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
             hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int) itr == 0));
@@ -730,7 +655,7 @@ debug(dhtslib_unittest) unittest
     assert(readrange.empty == false);
     auto read = readrange.front();
     
-    writeln(read.sequence);
+    // writeln(read.sequence);
     assert(read.sequence=="GCTAGCTCAG");
     assert(sam.allRecords.array.length == 2);
     sam2.write(read);
