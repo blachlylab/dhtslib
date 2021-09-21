@@ -34,7 +34,7 @@ struct SAMRecord
     /// ditto
     this(SAMHeader h)
     {
-        this.b = bam_init1();
+        this.b = Bam1_t(bam_init1);
         this.h = h;
     }
  
@@ -42,13 +42,13 @@ struct SAMRecord
     deprecated("Construct with sam_hdr_t* for mapped contig (tid) name support")
     this(bam1_t* b)
     {
-        this.b = b;
+        this.b = Bam1_t(b);
     }
 
     /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
     this(bam1_t* b, SAMHeader h)
     {
-        this.b = b;
+        this.b = Bam1_t(b);
         this.h = h;
     }
 
