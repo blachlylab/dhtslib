@@ -6,8 +6,7 @@ import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoi
 import std.conv: to, ConvException;
 import std.format: format;
 
-import dhtslib.vcf.header;
-import dhtslib.vcf.record;
+import dhtslib.vcf;
 import htslib.vcf;
 import htslib.hts_log;
 
@@ -82,54 +81,36 @@ struct VCFWriter
         return this.vcfhdr;
     }
 
-    // TODO
-    /// copy header lines from a template without overwiting existing lines
-    void copyHeaderLines(bcf_hdr_t *other)
-    {
-        assert(this.vcfhdr != null);
-        assert(0);
-        //    bcf_hdr_t *bcf_hdr_merge(bcf_hdr_t *dst, const(bcf_hdr_t) *src);
-    }
-
     /// Add sample to this VCF
     /// * int bcf_hdr_add_sample(bcf_hdr_t *hdr, const(char) *sample);
+    deprecated("use VCFHeader methods instead")
     int addSample(string name)
     in { assert(name != ""); }
     do
     {
-        assert(this.vcfhdr != null);
-
-        bcf_hdr_add_sample(this.vcfhdr.hdr, toStringz(name));
-
-        // AARRRRGGGHHHH
-        // https://github.com/samtools/htslib/issues/767
-        bcf_hdr_sync(this.vcfhdr.hdr);
-
-        return 0;
+        return this.vcfhdr.addSample(name);
     }
 
+    deprecated("use VCFHeader methods instead")
     /// Add a new header line
     int addHeaderLineKV(string key, string value)
     {
-        // TODO check that key is not INFO, FILTER, FORMAT (or contig?)
-        string line = format("##%s=%s", key, value);
-
-        return bcf_hdr_append(this.vcfhdr.hdr, toStringz(line));
+        return this.vcfhdr.addHeaderLineKV(key, value);
     }
+
+    deprecated("use VCFHeader methods instead")
     /// Add a new header line -- must be formatted ##key=value
     int addHeaderLineRaw(string line)
     {
-        assert(this.vcfhdr != null);
-        //    int bcf_hdr_append(bcf_hdr_t *h, const(char) *line);
-        const auto ret = bcf_hdr_append(this.vcfhdr.hdr, toStringz(line));
-        bcf_hdr_sync(this.vcfhdr.hdr);
-        return ret;
+        return this.vcfhdr.addHeaderLineRaw(line);
     }
+
+    deprecated("use VCFHeader methods instead")
     /// Add a filedate= headerline, which is not called out specifically in  the spec,
     /// but appears in the spec's example files. We could consider allowing a param here.
     int addFiledate()
     {
-        return addHeaderLineKV("filedate", (cast(Date) Clock.currTime()).toISOString );
+        return this.vcfhdr.addFiledate;
     }
     
     /** Add INFO (§1.2.2) or FORMAT (§1.2.4) tag
@@ -149,105 +130,42 @@ struct VCFWriter
     *   source:      Annotation source  (eg dbSNP)
     *   version:     Annotation version (eg 142)
     */
-    void addTag(string tagType, T)( string id,
-                                    T number,
-                                    string type,
+    deprecated("use VCFHeader methods instead")
+    void addTag(HeaderRecordType tagType)( string id,
+                                    HeaderLengths number,
+                                    HeaderTypes type,
                                     string description,
                                     string source="",
                                     string _version="")
-    if((tagType == "INFO" || tagType == "FORMAT") && (isIntegral!T || isSomeString!T))
+    if(tagType == HeaderRecordType.Info || tagType == HeaderRecordType.Format)
     {
-        string line;    //  we'll suffix with \0, don't worry
-
-        // check ID
-        if (id == "") {
-            hts_log_error(__FUNCTION__, "no ID");
-            return;
-        }
-
-        // check Number is either a special code {A,R,G,.} or an integer
-        static if(isSomeString!T) {
-        if (number != "A" &&
-            number != "R" &&
-            number != "G" &&
-            number != ".") {
-                // not a special ; check if integer
-                try {
-                    number.to!int;  // don't need to store result, will use format/%s
-                }
-                catch (ConvException e) {
-                    hts_log_error(__FUNCTION__, "Number not A/R/G/. nor an integer");
-                    return;
-                }
-        }
-        }
-
-        // check Type
-        if (type != "Integer" &&
-            type != "Float" &&
-            type != "Flag" &&
-            type != "Character" &&
-            type != "String") {
-                hts_log_error(__FUNCTION__, "unrecognized type");
-                return;
-        }
-
-        // check Description
-        if (description == "") hts_log_error(__FUNCTION__, "no description");
-
-        // check Source and Version
-        if (source == "" && _version != "") hts_log_error(__FUNCTION__, "version wo source");
-
-        // Format params
-        if (source != "" && _version != "")
-            line = format("##%s=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\",Version=\"%s\">\0",
-                            tagType, id, number, type, description, source, _version);
-        else if (source != "" && _version == "")
-            line = format("##%s=<ID=%s,Number=%s,Type=%s,Description=\"%s\",Source=\"%s\">\0",
-                            tagType, id, number, type, description, source);
-        else
-            line = format("##%s=<ID=%s,Number=%s,Type=%s,Description=\"%s\">\0",
-                            tagType, id, number, type, description);
-
-        bcf_hdr_append(this.vcfhdr.hdr, line.ptr);
+        this.vcfhdr.addHeaderLine!(tagType)(id, number, type, description, source, _version);
     }
 
     /** Add FILTER tag (§1.2.3) */
-    void addTag(string tagType)(string id, string description)
-    if(tagType == "FILTER")
+    deprecated("use VCFHeader methods instead")
+    void addTag(HeaderRecordType tagType)(string id, string description)
+    if(tagType == HeaderRecordType.Filter)
     {
-        // check ID
-        if (id == "") {
-            hts_log_error(__FUNCTION__, "no ID");
-            return;
-        }
-        // check Description
-        if (description == "") hts_log_error(__FUNCTION__, "no description");
-
-        string line = format("##FILTER=<ID=%s,Description=\"%s\">\0", id, description);
-        bcf_hdr_append(this.vcfhdr.hdr, line.ptr);
+        this.vcfhdr.addHeaderLine!(tagType)(id, description);
     }
 
     /** Add FILTER tag (§1.2.3) */
-    deprecated void addFilterTag(string id, string description)
+    deprecated("use VCFHeader methods instead")
+    void addFilterTag(string id, string description)
     {
-        string filter = format("##FILTER=<ID=%s,Description=\"%s\">\0", id, description);
-        bcf_hdr_append(this.vcfhdr.hdr, filter.ptr);
+        this.vcfhdr.addFilter(id, description);
     }
 
     /** Add contig definition (§1.2.7) to header meta-info 
     
         other: "url=...,md5=...,etc."
     */
-    auto addTag(string tagType)(const(char)[] id, const int length = 0, string other = "")
-    if(tagType == "contig" || tagType == "CONTIG")
+    deprecated("use VCFHeader methods instead")
+    auto addTag(HeaderRecordType tagType)(const(char)[] id, const int length = 0, string other = "")
+    if(tagType == HeaderRecordType.Contig)
     {
-        const(char)[] contig = "##contig=<ID=" ~ id ~
-            (length > 0  ? ",length=" ~ length.to!string : "") ~
-            (other != "" ? "," ~ other : "") ~
-            ">\0";
-        
-        return bcf_hdr_append(this.vcfhdr.hdr, contig.ptr);
+        return this.vcfhdr.addTag!(tagType)(id, length, other);
     }
     
     /**
@@ -344,4 +262,28 @@ struct VCFWriter
         if (ret != 0) hts_log_error(__FUNCTION__, "bcf_write error");
         return ret;
     }
+}
+
+///
+debug(dhtslib_unittest)
+unittest
+{
+    import std.exception: assertThrown;
+    import std.stdio: writeln, writefln;
+    import dhtslib.vcf.writer;
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+
+
+    auto vw = VCFWriter("/dev/null");
+
+    vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
+    vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
+    // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
+    vw.addTag!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
+    vw.addTag!(HeaderRecordType.Filter)("filt","test");
+    vw.addFilterTag("filt2","test2");
+
+    assert(vw.getHeader.getHeaderRecord(HeaderRecordType.Filter, "filt2").getDescription == "\"test2\"");
+    vw.writeHeader();
 }
