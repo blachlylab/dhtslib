@@ -53,22 +53,31 @@ if(!isPointer!T && isSomeFunction!destroy)
     /// reference counted HtslibPtr
     RefCounted!(HtslibPtr, RefCountedAutoInitialize.yes) rcPtr;
 
-    /// get underlying data pointer
-    @property nothrow pure @nogc
-    ref inout(T*) getPtr() inout return
-    {
-        return rcPtr.refCountedPayload.ptr;
-    }
-
-    /// allow HtslibMemory to be used as 
-    /// underlying ptr type
-    alias getPtr this;
-
     /// ctor from raw pointer
     this(T * rawPtr) @trusted
     {
         auto wrapped = HtslibPtr(rawPtr);
         move(wrapped,this.rcPtr.refCountedPayload);
+    }
+
+    /// allow HtslibMemory to be used as 
+    /// underlying ptr type
+    alias getRef this;
+
+    /// get underlying data pointer
+    @property nothrow pure @nogc
+    ref inout(T*) getRef() inout return
+    {
+        return rcPtr.refCountedPayload.ptr;
+    }
+
+    /// take ownership of underlying data pointer
+    @property nothrow pure @nogc
+    T* moveRef()
+    {
+        T * ptr;
+        move(this.getRef, ptr);
+        return ptr;
     }
 }
 
