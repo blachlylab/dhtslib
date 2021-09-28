@@ -5,7 +5,15 @@
     "homepage": "https://github.com/blachlylab/dhtslib",
     "license": "MIT",
     "dependencies": {
+        "dhtslib:coordinates": "*"
     },
+    "subPackages": [
+        "./coordinates/"
+    ],
+    "sourcePaths": [
+        "./source/",
+        "./coordinates"
+    ],
     "configurations": [
         {
             "name": "source",
