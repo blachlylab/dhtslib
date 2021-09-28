@@ -143,3 +143,24 @@ unittest
     rc2.core.pos = 42;
     assert(rc1.core.pos == 42);
 }
+
+debug(dhtslib_unittest) unittest 
+{
+    auto testfun(bool noScope = false)()
+    {
+        import htslib.sam : bam_init1, bam1_t;
+        scope rc1 = Bam1_t(bam_init1);
+        assert(rc1.core.pos == 0);
+        // No more allocation, add just one extra reference count
+        static if(noScope)
+            auto rc2 = rc1;
+        else
+            scope rc2 = rc1;
+        // Reference semantics
+        rc2.core.pos = 42;
+        assert(rc1.core.pos == 42);
+        return rc2.getRef;
+    }
+    static assert(__traits(compiles,testfun!true));
+    static assert(!__traits(compiles,testfun!false));
+}

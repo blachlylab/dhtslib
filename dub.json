@@ -15,7 +15,8 @@
         {
             "name": "unittest",
             "debugVersions": ["dhtslib_unittest"],
-            "libs": ["hts"]
+            "libs": ["hts"],
+            "dflags": ["-dip1000"]
         },
         {
             "name": "tabix_test",

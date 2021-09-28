@@ -175,7 +175,8 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         // * unpacking and
         // * destroying
         // its copy
-        return VCFRecord(this.vcfhdr, bcf_dup(this.b), this.MAX_UNPACK);
+        auto copiedBcf_1t = bcf_dup(this.b);
+        return VCFRecord(this.vcfhdr, copiedBcf_1t, this.MAX_UNPACK);
     }
 }
 
