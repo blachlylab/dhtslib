@@ -68,7 +68,7 @@ extern __gshared int hts_verbose;
 * \param context       Context where the event occurred. Typically set to "__func__".
 * \param format        Format string with placeholders, like printf.
 */
-void hts_log(
+@nogc void hts_log(
     htsLogLevel severity,
     const(char)* context,
     const(char)* format,

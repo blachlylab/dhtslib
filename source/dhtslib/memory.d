@@ -1,89 +1,66 @@
 module dhtslib.memory;
 
-import std.traits : isPointer, isSomeFunction, ReturnType;
+import std.traits : isPointer, isSomeFunction, ReturnType, isSafe;
+import core.stdc.stdlib : calloc, malloc, free;
 import core.lifetime : move;
 import std.typecons : RefCounted, RefCountedAutoInitialize;
-import htslib.sam : bam1_t, bam_hdr_t, bam_destroy1, bam_hdr_destroy;
-import htslib.vcf : bcf1_t, bcf_hdr_t, bcf_destroy, bcf_hdr_destroy;
-import htslib.hts : htsFile, hts_idx_t, hts_itr_t, hts_close, hts_idx_destroy, hts_itr_destroy;
-import htslib.bgzf : BGZF, bgzf_close;
-import htslib.tbx : tbx_t, tbx_destroy;
-import htslib.faidx : faidx_t, fai_destroy;
-import htslib.hts_log;
+import core.atomic : atomicOp;
+import htslib;
 
-mixin template copyCtor(T)
+/// can we use @live for scope checking? 
+enum dip1000Enabled = isSafe!((int x) => *&x);
+
+static if(dip1000Enabled)
+    pragma(msg, "Using -dip1000 for scope checking and safety");
+
+pragma(inline, true):
+/**! Logs an event with severity HTS_LOG_ERROR and compile-time context. */
+private void hts_log_errorNoGC(const(char)[] ctx)( string msg) @trusted @nogc nothrow
 {
+    string open_error_color = "\x1b[0;31m";
+    string close_color      = "\x1b[0m";
+    static newCtx = ctx ~ '\0';
+    hts_log(htsLogLevel.HTS_LOG_ERROR, newCtx.ptr, "%.*s%.*s%.*s",
+            cast(int)open_error_color.length, open_error_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
+}
 
-    @disable this(this);
+/// Template struct that wraps an htslib
+/// pointer and reference counts it and then
+/// destroys with destroyFun when it goes 
+/// truly out of scope
+struct SafeHtslibPtr(T, alias destroyFun)
+if(!isPointer!T && isSomeFunction!destroyFun)
+{
+    static if(dip1000Enabled){
+        @live @safe @nogc nothrow:
+    }else {
+        @safe @nogc nothrow:
+    }
+    /// data pointer
+    T * ptr;
+    /// reference counting
+    int* refct;
+    /// initialized?
+    bool initialized;
+
+    /// ctor that respects scope
+    this(T * rawPtr) @trusted return scope
+    {
+        this.ptr = rawPtr;
+        this.refct = cast(int *) calloc(int.sizeof,1);
+        (*this.refct) = 1;
+        this.initialized = true;
+    }
     
-    this(ref return scope inout typeof(this) src)
-        inout @safe pure nothrow @nogc
+    /// postblit that respects scope
+    this(this) @trusted return scope
     {
-        import std.traits : FieldNameTuple;
-        static foreach (m; FieldNameTuple!T)
-        {
-            pragma(msg, m~" = src."~m~";");
-            mixin(m~" = src."~m~";");
-        }
-    }
-}
-
-mixin template destroyMixin(T, alias destroyFun)
-if(!isPointer!T && isSomeFunction!destroyFun)
-{
-    extern (C) ReturnType!destroyFun function(T*) nothrow @nogc @system d = &destroyFun;
-}
-
-/// Template struct that performs reference
-/// counting on htslib pointers and destroys with specified function
-struct HtslibMemory(T, alias destroyFun)
-if(!isPointer!T && isSomeFunction!destroyFun)
-{
-    @safe:
-    /// Pointer Wrapper
-    static struct HtslibPtr
-    {
-        /// data pointer
-        T * ptr;
-        mixin destroyMixin!(T, destroyFun);
-        /// no copying this as that could result
-        /// in premature destruction
-        @disable this(this);
-
-        /// destroy 
-        ~this() @trusted
-        {
-            /// if destroy function return is void 
-            /// just destroy
-            /// else if int
-            /// destroy then check return value 
-            /// else don't compile
-            if(this.ptr){
-                static if(is(ReturnType!destroyFun == void))
-                    d(this.ptr);
-                else static if(is(ReturnType!destroyFun == int))
-                {
-                    auto err = d(this.ptr);
-                    if(err != 0) 
-                        hts_log_error(__FUNCTION__,"Couldn't destroy/close "~T.stringof~" * data using function "~__traits(identifier, destroyFun));
-                }else{
-                    static assert(0, "HtslibMemory doesn't recognize destroy function return type");
-                }
-            }
-        }
+        if(initialized)(*this.refct)++;
     }
 
-    /// reference counted HtslibPtr
-    RefCounted!(HtslibPtr, RefCountedAutoInitialize.yes) rcPtr;
-
-    /// ctor from raw pointer
-    this(T * rawPtr) @trusted
-    {
-        auto wrapped = HtslibPtr(rawPtr);
-        move(wrapped,this.rcPtr.refCountedPayload);
-    }
-
-    /// allow HtslibMemory to be used as 
+    /// allow SafeHtslibPtr to be used as 
     /// underlying ptr type
     alias getRef this;
 
@@ -91,7 +68,7 @@ if(!isPointer!T && isSomeFunction!destroyFun)
     @property nothrow pure @nogc
     ref inout(T*) getRef() inout return
     {
-        return rcPtr.refCountedPayload.ptr;
+        return ptr;
     }
 
     /// take ownership of underlying data pointer
@@ -102,35 +79,61 @@ if(!isPointer!T && isSomeFunction!destroyFun)
         move(this.getRef, ptr);
         return ptr;
     }
+
+    /// dtor that respects scope
+    ~this() @trusted return scope
+    {
+        
+        if(!this.initialized) return;
+        if(--(*this.refct)) return;
+        if(this.ptr){
+            free(this.refct);
+            /// if destroy function return is void 
+            /// just destroy
+            /// else if return is int
+            /// destroy then check return value 
+            /// else don't compile
+            static if(is(ReturnType!destroyFun == void))
+                destroyFun(this.ptr);
+            else static if(is(ReturnType!destroyFun == int))
+            {
+                auto err = destroyFun(this.ptr);
+                if(err != 0) 
+                    hts_log_errorNoGC!__FUNCTION__("Couldn't destroy/close "~T.stringof~" * data using function "~__traits(identifier, destroyFun));
+            }else{
+                static assert(0, "HtslibPtr doesn't recognize destroy function return type");
+            }
+        }
+    }
 }
 
 /// reference counted bam1_t wrapper
 /// can be used directly as a bam1_t *
-alias Bam1_t = HtslibMemory!(bam1_t, bam_destroy1);
+alias Bam1_t = SafeHtslibPtr!(bam1_t, bam_destroy1);
 
 /// reference counted bam_hdr_t wrapper
 /// can be used directly as a bam_hdr_t *
-alias Bam_hdr_t = HtslibMemory!(bam_hdr_t, bam_hdr_destroy);
+alias Bam_hdr_t = SafeHtslibPtr!(bam_hdr_t, bam_hdr_destroy);
 
 /// reference counted bcf1_t wrapper
 /// can be used directly as a bcf1_t *
-alias Bcf1_t = HtslibMemory!(bcf1_t, bcf_destroy);
+alias Bcf1_t = SafeHtslibPtr!(bcf1_t, bcf_destroy);
 
 /// reference counted bcf_hdr_t wrapper
 /// can be used directly as a bcf_hdr_t *
-alias Bcf_hdr_t = HtslibMemory!(bcf_hdr_t, bcf_hdr_destroy);
+alias Bcf_hdr_t = SafeHtslibPtr!(bcf_hdr_t, bcf_hdr_destroy);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
-alias HtsFile = HtslibMemory!(htsFile, hts_close);
+alias HtsFile = SafeHtslibPtr!(htsFile, hts_close);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
-alias Hts_idx_t = HtslibMemory!(hts_idx_t, hts_idx_destroy);
+alias Hts_idx_t = SafeHtslibPtr!(hts_idx_t, hts_idx_destroy);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
-alias Hts_itr_t = HtslibMemory!(hts_itr_t, hts_itr_destroy);
+alias Hts_itr_t = SafeHtslibPtr!(hts_itr_t, hts_itr_destroy);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
@@ -138,21 +141,26 @@ alias VcfFile = HtsFile;
 
 /// reference counted tbx_t wrapper
 /// can be used directly as a tbx_t *
-alias Tbx_t = HtslibMemory!(tbx_t, tbx_destroy);
+alias Tbx_t = SafeHtslibPtr!(tbx_t, tbx_destroy);
 
 /// reference counted BGZF wrapper
 /// can be used directly as a BGZF *
-alias BgzfPtr = HtslibMemory!(BGZF, bgzf_close);
+alias BgzfPtr = SafeHtslibPtr!(BGZF, bgzf_close);
 
 /// reference counted faidx_t wrapper
 /// can be used directly as a faidx_t *
-alias Faidx_t = HtslibMemory!(faidx_t, fai_destroy);
+alias Faidx_t = SafeHtslibPtr!(faidx_t, fai_destroy);
 
-
-debug(dhtslib_unittest) unittest
+/// just for testing
+/// need to be trusted
+private bam1_t * bam_init() @trusted @nogc nothrow 
 {
-    import htslib.sam : bam_init1;
-    auto rc1 = Bam1_t(bam_init1);
+    return bam_init1;
+}
+
+debug(dhtslib_unittest) @safe @nogc unittest 
+{
+    auto rc1 = Bam1_t(bam_init);
     assert(rc1.core.pos == 0);
     // No more allocation, add just one extra reference count
     auto rc2 = rc1;
@@ -161,23 +169,88 @@ debug(dhtslib_unittest) unittest
     assert(rc1.core.pos == 42);
 }
 
-debug(dhtslib_unittest) unittest 
-{
-    auto testfun(bool noScope = false)()
+static if(dip1000Enabled){
+    debug(dhtslib_unittest) @live @safe nothrow @nogc unittest
     {
-        import htslib.sam : bam_init1, bam1_t;
-        scope rc1 = Bam1_t(bam_init1);
+        auto rc1 = Bam1_t(bam_init);
         assert(rc1.core.pos == 0);
         // No more allocation, add just one extra reference count
-        static if(noScope)
-            auto rc2 = rc1;
-        else
-            scope rc2 = rc1;
+        auto rc2 = rc1;
         // Reference semantics
         rc2.core.pos = 42;
         assert(rc1.core.pos == 42);
-        return rc2.getRef;
     }
-    static assert(__traits(compiles,testfun!true));
-    static assert(!__traits(compiles,testfun!false));
+
+    debug(dhtslib_unittest) @live @safe @nogc nothrow unittest 
+    {
+        auto testfun(bool noScope = false)() @safe
+        {
+            import htslib.sam : bam_init1, bam1_t;
+            // auto rc = Bam1_t(bam_init);
+            auto rc1 = Bam1_t(bam_init);
+            assert(rc1.core.pos == 0);
+            // No more allocation, add just one extra reference count
+            static if(noScope)
+                auto rc2 = rc1;
+            else
+                scope rc2 = rc1;
+            // Reference semantics
+            rc2.core.pos = 42;
+            assert(rc1.core.pos == 42);
+            return rc2.getRef;
+        }
+        static assert(!__traits(compiles,testfun!true));
+        static assert(!__traits(compiles,testfun!false));
+    }
+
+    debug(dhtslib_unittest) @live @safe @nogc nothrow unittest 
+    {
+        auto testfun(bool noScope = false)() @safe
+        {
+            struct T
+            {
+                Bam1_t rc1;
+            }
+            T test;
+            test.rc1 = Bam1_t(bam_init);
+
+            assert(test.rc1.core.pos == 0);
+            // No more allocation, add just one extra reference count
+            static if(noScope)
+                auto rc2 = test.rc1;
+            else
+                scope rc2 = rc1;
+            // Reference semantics
+            rc2.core.pos = 42;
+            assert(test.rc1.core.pos == 42);
+            return rc2.getRef;
+        }
+        static assert(!__traits(compiles,testfun!true));
+        static assert(!__traits(compiles,testfun!false));
+    }
+
+    debug(dhtslib_unittest) @live @safe unittest 
+    {
+        import dhtslib.sam.record;
+        bam1_t * bam_init() @trusted
+        {
+            return bam_init1;
+        }
+
+        auto testfun(bool noScope = false)() @safe
+        {
+            SAMRecord rec = SAMRecord(bam_init);
+            return rec.cigar;
+        }
+
+        auto testfun2(bool noScope = false)() @safe
+        {
+            SAMRecord rec = SAMRecord(bam_init);
+            rec.qual = 2;
+            return rec.b.getRef;
+        }
+
+        assert(testfun!true()[] == []);
+        assert(testfun2!true().core.qual == 2);
+    }
 }
