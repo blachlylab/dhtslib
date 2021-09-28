@@ -11,6 +11,23 @@ import htslib.tbx : tbx_t, tbx_destroy;
 import htslib.faidx : faidx_t, fai_destroy;
 import htslib.hts_log;
 
+mixin template copyCtor(T)
+{
+
+    @disable this(this);
+    
+    this(ref return scope inout typeof(this) src)
+        inout @safe pure nothrow @nogc
+    {
+        import std.traits : FieldNameTuple;
+        static foreach (m; FieldNameTuple!T)
+        {
+            pragma(msg, m~" = src."~m~";");
+            mixin(m~" = src."~m~";");
+        }
+    }
+}
+
 mixin template destroyMixin(T, alias destroy)
 if(!isPointer!T && isSomeFunction!destroy)
 {
@@ -132,7 +149,7 @@ alias BgzfPtr = HtslibMemory!(BGZF, bgzf_close);
 alias Faidx_t = HtslibMemory!(faidx_t, fai_destroy);
 
 
-unittest
+debug(dhtslib_unittest) unittest
 {
     import htslib.sam : bam_init1;
     auto rc1 = Bam1_t(bam_init1);
