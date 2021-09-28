@@ -11,6 +11,12 @@ import htslib.tbx : tbx_t, tbx_destroy;
 import htslib.faidx : faidx_t, fai_destroy;
 import htslib.hts_log;
 
+mixin template destroyMixin(T, alias destroy)
+if(!isPointer!T && isSomeFunction!destroy)
+{
+    extern (C) ReturnType!destroy function(T*) d = &destroy;
+}
+
 /// Template struct that performs reference
 /// counting on htslib pointers and destroys with specified function
 struct HtslibMemory(T, alias destroy)
@@ -22,7 +28,7 @@ if(!isPointer!T && isSomeFunction!destroy)
     {
         /// data pointer
         T * ptr;
-
+        mixin destroyMixin!(T, destroy);
         /// no copying this as that could result
         /// in premature destruction
         @disable this(this);
@@ -37,10 +43,10 @@ if(!isPointer!T && isSomeFunction!destroy)
             /// else don't compile
             if(this.ptr){
                 static if(is(ReturnType!destroy == void))
-                    destroy(this.ptr);
+                    d(this.ptr);
                 else static if(is(ReturnType!destroy == int))
                 {
-                    auto err = destroy(this.ptr);
+                    auto err = d(this.ptr);
                     if(err != 0) 
                         hts_log_error(__FUNCTION__,"Couldn't destroy/close "~T.stringof~" * data using function "~__traits(identifier, destroy));
                 }else{
