@@ -33,11 +33,8 @@ private void hts_log_errorNoGC(const(char)[] ctx)( string msg) @trusted @nogc no
 struct SafeHtslibPtr(T, alias destroyFun)
 if(!isPointer!T && isSomeFunction!destroyFun)
 {
-    static if(dip1000Enabled){
-        @live @safe @nogc nothrow:
-    }else {
-        @safe @nogc nothrow:
-    }
+    @safe @nogc nothrow:
+
     /// data pointer
     T * ptr;
     /// reference counting
@@ -227,30 +224,5 @@ static if(dip1000Enabled){
         }
         static assert(!__traits(compiles,testfun!true));
         static assert(!__traits(compiles,testfun!false));
-    }
-
-    debug(dhtslib_unittest) @live @safe unittest 
-    {
-        import dhtslib.sam.record;
-        bam1_t * bam_init() @trusted
-        {
-            return bam_init1;
-        }
-
-        auto testfun(bool noScope = false)() @safe
-        {
-            SAMRecord rec = SAMRecord(bam_init);
-            return rec.cigar;
-        }
-
-        auto testfun2(bool noScope = false)() @safe
-        {
-            SAMRecord rec = SAMRecord(bam_init);
-            rec.qual = 2;
-            return rec.b.getRef;
-        }
-
-        assert(testfun!true()[] == []);
-        assert(testfun2!true().core.qual == 2);
     }
 }
