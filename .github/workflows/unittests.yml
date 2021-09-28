@@ -66,5 +66,10 @@ jobs:
         env:
           LIBRARY_PATH: /usr/local/lib
 
+      - name: Run safety tests
+        run: dub -q test -c=unittest-safety
+        env:
+          LIBRARY_PATH: /usr/local/lib
+
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash)
