@@ -15,6 +15,11 @@
         {
             "name": "unittest",
             "debugVersions": ["dhtslib_unittest"],
+            "libs": ["hts"]
+        },
+        {
+            "name": "unittest-safety",
+            "debugVersions": ["dhtslib_unittest"],
             "libs": ["hts"],
             "dflags": ["-dip1000"]
         },
