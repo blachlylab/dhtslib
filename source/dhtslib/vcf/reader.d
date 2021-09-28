@@ -213,6 +213,7 @@ debug(dhtslib_unittest) unittest
 
 debug(dhtslib_unittest) unittest
 {
+    import dhtslib.util;
     import std.stdio;
     import htslib.hts_log;
     import std.algorithm : map, count;
@@ -253,6 +254,7 @@ debug(dhtslib_unittest) unittest
 
 debug(dhtslib_unittest) unittest
 {
+    import dhtslib.util;
     import std.stdio;
     import htslib.hts_log;
     import std.algorithm : map, count;
