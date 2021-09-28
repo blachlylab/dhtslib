@@ -25,6 +25,10 @@
 */
 module htslib.kfunc;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 /* Log gamma function

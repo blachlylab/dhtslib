@@ -29,6 +29,10 @@ import core.stdc.limits;
 import core.stdc.stdlib;
 import core.stdc.string;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 /* Example of using kbitset_t, which represents a subset of {0,..., N-1},

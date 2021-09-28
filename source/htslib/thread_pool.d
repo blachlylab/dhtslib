@@ -45,6 +45,10 @@ DEALINGS IN THE SOFTWARE.  */
  */
 module htslib.thread_pool;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 /*-----------------------------------------------------------------------------

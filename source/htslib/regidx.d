@@ -64,6 +64,10 @@ module htslib.regidx;
 
 import htslib.hts: hts_pos_t;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 // maximum regidx position (0-based).  Used to represent the end point of

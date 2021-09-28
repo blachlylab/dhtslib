@@ -35,6 +35,10 @@ import core.sys.posix.sys.types;
 import htslib.hfile : hFILE;
 import htslib.kstring;
 
+@system:
+nothrow:
+@nogc:
+
 // ssize_t doesn't exist in core.sys.posix.sys.types for windows builds
 version(Windows){
     version(Win32){

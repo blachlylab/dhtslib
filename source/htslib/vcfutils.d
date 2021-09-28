@@ -26,6 +26,10 @@ module htslib.vcfutils;
 
 import htslib.vcf;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 struct kbitset_t;

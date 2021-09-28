@@ -25,6 +25,10 @@ module htslib.hts_expr;
 
 import htslib.kstring: kstring_t;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 /// Holds a filter variable.  This is also used to return the results.
