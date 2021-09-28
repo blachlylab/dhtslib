@@ -148,16 +148,10 @@ alias BgzfPtr = SafeHtslibPtr!(BGZF, bgzf_close);
 /// can be used directly as a faidx_t *
 alias Faidx_t = SafeHtslibPtr!(faidx_t, fai_destroy);
 
-/// just for testing
-/// need to be trusted
-private bam1_t * bam_init() @trusted @nogc nothrow 
-{
-    return bam_init1;
-}
 
-debug(dhtslib_unittest) @safe @nogc unittest 
+debug(dhtslib_unittest) unittest 
 {
-    auto rc1 = Bam1_t(bam_init);
+    auto rc1 = Bam1_t(bam_init1);
     assert(rc1.core.pos == 0);
     // No more allocation, add just one extra reference count
     auto rc2 = rc1;
@@ -167,9 +161,9 @@ debug(dhtslib_unittest) @safe @nogc unittest
 }
 
 static if(dip1000Enabled){
-    debug(dhtslib_unittest) @safe nothrow @nogc unittest
+    debug(dhtslib_unittest) unittest
     {
-        auto rc1 = Bam1_t(bam_init);
+        auto rc1 = Bam1_t(bam_init1);
         assert(rc1.core.pos == 0);
         // No more allocation, add just one extra reference count
         auto rc2 = rc1;
@@ -178,13 +172,12 @@ static if(dip1000Enabled){
         assert(rc1.core.pos == 42);
     }
 
-    debug(dhtslib_unittest) @safe @nogc nothrow unittest 
+    debug(dhtslib_unittest) unittest 
     {
-        auto testfun(bool noScope = false)() @safe
+        auto testfun(bool noScope = false)()
         {
-            import htslib.sam : bam_init1, bam1_t;
             // auto rc = Bam1_t(bam_init);
-            auto rc1 = Bam1_t(bam_init);
+            auto rc1 = Bam1_t(bam_init1);
             assert(rc1.core.pos == 0);
             // No more allocation, add just one extra reference count
             static if(noScope)
@@ -200,16 +193,16 @@ static if(dip1000Enabled){
         static assert(!__traits(compiles,testfun!false));
     }
 
-    debug(dhtslib_unittest) @safe @nogc nothrow unittest 
+    debug(dhtslib_unittest) unittest 
     {
-        auto testfun(bool noScope = false)() @safe
+        auto testfun(bool noScope = false)()
         {
             struct T
             {
                 Bam1_t rc1;
             }
             T test;
-            test.rc1 = Bam1_t(bam_init);
+            test.rc1 = Bam1_t(bam_init1);
 
             assert(test.rc1.core.pos == 0);
             // No more allocation, add just one extra reference count
