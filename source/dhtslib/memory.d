@@ -28,16 +28,16 @@ mixin template copyCtor(T)
     }
 }
 
-mixin template destroyMixin(T, alias destroy)
-if(!isPointer!T && isSomeFunction!destroy)
+mixin template destroyMixin(T, alias destroyFun)
+if(!isPointer!T && isSomeFunction!destroyFun)
 {
-    extern (C) ReturnType!destroy function(T*) nothrow @nogc @system d = &destroy;
+    extern (C) ReturnType!destroyFun function(T*) nothrow @nogc @system d = &destroyFun;
 }
 
 /// Template struct that performs reference
 /// counting on htslib pointers and destroys with specified function
-struct HtslibMemory(T, alias destroy)
-if(!isPointer!T && isSomeFunction!destroy)
+struct HtslibMemory(T, alias destroyFun)
+if(!isPointer!T && isSomeFunction!destroyFun)
 {
     @safe:
     /// Pointer Wrapper
@@ -45,7 +45,7 @@ if(!isPointer!T && isSomeFunction!destroy)
     {
         /// data pointer
         T * ptr;
-        mixin destroyMixin!(T, destroy);
+        mixin destroyMixin!(T, destroyFun);
         /// no copying this as that could result
         /// in premature destruction
         @disable this(this);
@@ -59,13 +59,13 @@ if(!isPointer!T && isSomeFunction!destroy)
             /// destroy then check return value 
             /// else don't compile
             if(this.ptr){
-                static if(is(ReturnType!destroy == void))
+                static if(is(ReturnType!destroyFun == void))
                     d(this.ptr);
-                else static if(is(ReturnType!destroy == int))
+                else static if(is(ReturnType!destroyFun == int))
                 {
                     auto err = d(this.ptr);
                     if(err != 0) 
-                        hts_log_error(__FUNCTION__,"Couldn't destroy/close "~T.stringof~" * data using function "~__traits(identifier, destroy));
+                        hts_log_error(__FUNCTION__,"Couldn't destroy/close "~T.stringof~" * data using function "~__traits(identifier, destroyFun));
                 }else{
                     static assert(0, "HtslibMemory doesn't recognize destroy function return type");
                 }
