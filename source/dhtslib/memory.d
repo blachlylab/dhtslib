@@ -167,7 +167,7 @@ debug(dhtslib_unittest) @safe @nogc unittest
 }
 
 static if(dip1000Enabled){
-    debug(dhtslib_unittest) @live @safe nothrow @nogc unittest
+    debug(dhtslib_unittest) @safe nothrow @nogc unittest
     {
         auto rc1 = Bam1_t(bam_init);
         assert(rc1.core.pos == 0);
@@ -178,7 +178,7 @@ static if(dip1000Enabled){
         assert(rc1.core.pos == 42);
     }
 
-    debug(dhtslib_unittest) @live @safe @nogc nothrow unittest 
+    debug(dhtslib_unittest) @safe @nogc nothrow unittest 
     {
         auto testfun(bool noScope = false)() @safe
         {
@@ -200,7 +200,7 @@ static if(dip1000Enabled){
         static assert(!__traits(compiles,testfun!false));
     }
 
-    debug(dhtslib_unittest) @live @safe @nogc nothrow unittest 
+    debug(dhtslib_unittest) @safe @nogc nothrow unittest 
     {
         auto testfun(bool noScope = false)() @safe
         {
