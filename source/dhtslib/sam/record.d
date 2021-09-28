@@ -120,6 +120,7 @@ struct SAMRecord
 
     /// is read paired?
     pragma(inline, true)
+    @nogc @safe nothrow
     @property bool isPaired()
     {
         return cast(bool)(b.core.flag & BAM_FPAIRED);
@@ -152,7 +153,7 @@ struct SAMRecord
     /// is read reversed?
     /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
     pragma(inline, true)
-    @nogc @safe nothrow
+    @nogc @trusted nothrow
     @property bool isReversed()
     {
         return bam_is_rev(this.b);
@@ -161,7 +162,7 @@ struct SAMRecord
     /// is mate reversed?
     /// bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
     pragma(inline, true)
-    @nogc @safe nothrow
+    @nogc @trusted nothrow
     @property bool mateReversed()
     {
         return bam_is_mrev(this.b);
@@ -225,6 +226,7 @@ struct SAMRecord
     /// if you keep this around you should copy it
     /// -- wraps bam_get_qname(bam1_t *b)
     pragma(inline, true)
+    @nogc @trusted nothrow
     @property const(char)[] queryName()
     {
         // auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
@@ -233,6 +235,7 @@ struct SAMRecord
     
     /// Set query name (read name)
     pragma(inline, true)
+    @trusted nothrow
     @property void queryName(string qname)
     {
         auto ret = bam_set_qname(this.b, toStringz(qname));
@@ -250,6 +253,8 @@ struct SAMRecord
 
     /// Return char array of the sequence
     /// see samtools/sam_view.c: get_read
+    pragma(inline, true)
+    @trusted nothrow
     @property const(char)[] sequence()
     {
         // calloc fills with \0; +1 len for Cstring
@@ -269,6 +274,7 @@ struct SAMRecord
 
     /// Assigns sequence and resets quality score
     pragma(inline, true)
+    @trusted nothrow
     @property void sequence(const(char)[] seq)
     {
         /// There is no bam_seq_seq
@@ -321,7 +327,7 @@ struct SAMRecord
     /// see samtools/sam_view.c: get_quality
     /// TODO: Discussion -- should we return const(ubyte[]) or const(ubyte)[] instead?
     pragma(inline, true)
-    @nogc
+    @nogc @trusted nothrow
     @property const(ubyte)[] qscores()
     {
         auto slice = bam_get_qual(this.b)[0 .. this.b.core.l_qseq];
@@ -330,6 +336,7 @@ struct SAMRecord
 
     /// Set quality scores from raw ubyte quality score array given that it is the same length as the bam sequence
     pragma(inline, true)
+    @trusted nothrow
     @property void qscores(const(ubyte)[] seq)
     {
         /// There is no bam_seq_qual
@@ -346,6 +353,7 @@ struct SAMRecord
 
     /// get phred-scaled base qualities as char array
     pragma(inline, true)
+    @trusted nothrow
     const(char)[] qscoresPhredScaled()
     {
         auto bqs = this.qscores.dup;
@@ -362,6 +370,7 @@ struct SAMRecord
 
     /// Assign a cigar string
     pragma(inline, true)
+    @trusted
     @property void cigar(Cigar cigar)
     {
         // no bam_set_cigar

@@ -14,18 +14,298 @@ import core.vararg;
 
 import std.conv: to, ConvException;
 import std.format: format;
-import std.range: ElementType;
+import std.range;
 import std.string: fromStringz, toStringz;
+import std.utf : toUTFz;
+import std.algorithm : map;
+import std.array : array;
 import std.traits;
+import std.meta : staticIndexOf;
 
+import dhtslib.vcf;
 import dhtslib.coordinates;
 import dhtslib.memory;
-import dhtslib.vcf.header;
 import htslib.hts_log;
 import htslib.kstring;
 import htslib.vcf;
 
 alias BCFRecord = VCFRecord;
+
+/// Struct to aid in conversion of VCF info data
+/// into D types
+struct InfoField
+{
+    /// String identifier of info field
+    string key;
+    /// BCF TYPE indicator
+    RecordType type;
+    /// number of data elements
+    int len;
+    /// reference of info field data
+    ubyte[] data;
+
+    /// VCFRecord refct
+    Bcf1_t line;
+
+    /// ctor from VCFRecord
+    this(string key, bcf_info_t * info, Bcf1_t line)
+    {
+        this.line = line;
+        this(key, info);
+    }
+
+    /// string, info field ctor
+    this(string key, bcf_info_t * info)
+    {
+        /// get type
+        this.type = cast(RecordType)(info.type & 0b1111);
+        /// get len
+        this.len = info.len;
+        /// copy data
+        this.data = info.vptr[0.. info.vptr_len];
+        /// double check our lengths
+        debug{
+            final switch(this.type){
+                case RecordType.Int8:
+                    assert(data.length == this.len * byte.sizeof);
+                    break;
+                case RecordType.Int16:
+                    assert(data.length == this.len * short.sizeof);
+                    break;
+                case RecordType.Int32:
+                    assert(data.length == this.len * int.sizeof);
+                    break;
+                case RecordType.Int64:
+                    assert(data.length == this.len * long.sizeof);
+                    break;
+                case RecordType.Float:
+                    assert(data.length == this.len * float.sizeof);
+                    break;
+                case RecordType.Char:
+                    assert(data.length == this.len * char.sizeof);
+                    break;
+                case RecordType.Null:
+                    assert(data.length == 0);
+            }
+        }
+    }
+
+    /// convert to a D type array if int, float, or bool type array
+    T[] to(T: T[])()
+    if(isIntegral!T || is(T == float) || isBoolean!T)
+    {
+        static if(isIntegral!T){
+            /// if we select the correct type just slice and return
+            if(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType))
+                return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+            /// if we select type that is too small log error and return
+            if(RecordTypeSizes[this.type] > T.sizeof)
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return [];
+            }
+            T[] ret;
+            /// if we select type that is bigger slice, convert and return
+            switch(this.type){
+                case RecordType.Int8:
+                    ret = ((cast(byte *)this.data.ptr)[0 .. this.len]).to!(T[]);
+                    break;
+                case RecordType.Int16:
+                    ret = ((cast(short *)this.data.ptr)[0 .. short.sizeof * this.len]).to!(T[]);
+                    break;
+                case RecordType.Int32:
+                    ret = ((cast(int *)this.data.ptr)[0 .. int.sizeof * this.len]).to!(T[]);
+                    break;
+                case RecordType.Int64:
+                    ret = ((cast(long *)this.data.ptr)[0 .. long.sizeof * this.len]).to!(T[]);
+                    break;
+                default:
+                    hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(this.type, T.stringof));
+                    return [];
+            }
+            return ret;
+        }else{
+            /// if we select type the wrong type error and return
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return [];
+            }
+            return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+        }
+    }
+
+    /// convert to a D type if int, float, or bool type
+    T to(T)()
+    if(isIntegral!T || is(T == float) || isBoolean!T)
+    {
+        /// if bool return true
+        static if(isBoolean!T)
+            return true;
+        else{
+            /// if info field has > 1 element error and return
+            if(this.len != 1){
+                hts_log_error(__FUNCTION__, "This info field has a length of %d not 1".format(this.len));
+                return T.init;
+            }
+            static if(isIntegral!T){
+                /// if we select type that is too small log error and return
+                if(RecordTypeSizes[this.type] > T.sizeof)
+                {
+                    hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                    return T.init;
+                }
+                /// just gonna use the array impl and grab index 0
+                return this.to!(T[])[0];
+            }else{
+                /// if we select type the wrong type error and return
+                if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+                {
+                    hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                    return T.init;
+                }
+                /// just gonna use the array impl and grab index 0
+                return this.to!(T[])[0];
+            }
+        }   
+    }
+
+    /// convert to a string
+    T to(T)()
+    if(isSomeString!T)
+    {
+        /// if we select type the wrong type error and return
+        if(!(this.type == RecordType.Char))
+        {
+            hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+            return T.init;
+        }
+        /// otherwise slice and dup
+        return cast(T)(cast(char *)this.data.ptr)[0 .. this.len].dup;
+    }
+}
+
+/// Struct to aid in conversion of VCF format data
+/// into D types
+struct FormatField
+{
+    /// String identifier of info field
+    string key;
+    /// BCF TYPE indicator
+    RecordType type;
+    /// number of samples
+    int nSamples;
+    /// number of data elements per sample
+    int n;
+    /// number of bytes per sample
+    int size;
+    /// reference of info field data
+    ubyte[] data;
+
+    /// VCFRecord refct
+    Bcf1_t line;
+
+    /// ctor from VCFRecord
+    this(string key, bcf_fmt_t * fmt, Bcf1_t line)
+    {
+        this.line = line;
+        this(key, fmt);
+    }
+
+    /// string and format ctor
+    this(string key, bcf_fmt_t * fmt)
+    {
+        /// set all our data
+        this.key = key;
+        this.type = cast(RecordType)(fmt.type & 0b1111);
+        this.n = fmt.n;
+        this.nSamples = fmt.p_len / fmt.size;
+        this.data = fmt.p[0 .. fmt.p_len].dup;
+        this.size = fmt.size;
+        /// double check our work
+        debug{
+            final switch(this.type){
+                case RecordType.Int8:
+                    assert(data.length == this.nSamples * this.n * byte.sizeof);
+                    break;
+                case RecordType.Int16:
+                    assert(data.length == this.nSamples * this.n * short.sizeof);
+                    break;
+                case RecordType.Int32:
+                    assert(data.length == this.nSamples * this.n * int.sizeof);
+                    break;
+                case RecordType.Int64:
+                    assert(data.length == this.nSamples * this.n * long.sizeof);
+                    break;
+                case RecordType.Float:
+                    assert(data.length == this.nSamples * this.n * float.sizeof);
+                    break;
+                case RecordType.Char:
+                    assert(data.length == this.nSamples * this.n * char.sizeof);
+                    break;
+                case RecordType.Null:
+                    assert(data.length == 0);
+            }
+        }
+    }
+
+    /// convert to a D type array if int, float, bool, or string type array
+    /// very similar to InfoField.to 
+    /// This returns chunks as we separated FORMAT values by sample
+    auto to(T)()
+    if(isIntegral!T || is(T == float) || isBoolean!T || isSomeString!T)
+    {
+        T[] ret;
+        static if(isIntegral!T){
+            if(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)){
+                ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
+                return ret.chunks(this.n);
+            }
+            if(RecordTypeSizes[this.type] > T.sizeof)
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return ret.chunks(this.n);
+            }
+            switch(this.type){
+                case RecordType.Int8:
+                    ret = ((cast(byte *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
+                    break;
+                case RecordType.Int16:
+                    ret = ((cast(short *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
+                    break;
+                case RecordType.Int32:
+                    ret = ((cast(int *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
+                    break;
+                case RecordType.Int64:
+                    ret = ((cast(long *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
+                    break;
+                default:
+                    hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(this.type, T.stringof));
+                    return ret.chunks(this.n);
+            }
+        }else static if(isSomeString!T){
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return ret.chunks(this.n);
+            }
+            auto ptr = this.data.ptr;
+            for(auto i=0; i < nSamples; i++)
+            {
+                ret ~= (cast(char *)ptr)[i*size .. (i+1) * size].idup;
+            }
+        }else{
+            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+            {
+                hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
+                return ret.chunks(this.n);
+            }
+            ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
+        }
+        return ret.chunks(this.n);
+
+    }
+}
 
 
 
@@ -47,16 +327,16 @@ alias BCFRecord = VCFRecord;
 
     2019-01-23 WIP: getters for chrom, pos, id, ref, alt are complete (untested)
 
-After parsing a BCF or VCF line, bcf1_t must be unpacked. (not applicable when building bcf1_t from scratch)
+After parsing a BCF or VCF line, bcf1_t must be UnpackLeveled. (not applicable when building bcf1_t from scratch)
 Depending on information needed, this can be done to various levels with performance tradeoff.
 Unpacking symbols:
-BCF_UN_ALL: all
-BCF_UN_SHR: all shared information (BCF_UN_STR|BCF_UN_FLT|BCF_UN_INFO)
+UNPACK.ALL: all
+UNPACK.SHR: all shared information (UNPACK.ALT|UNPACK.FILT|UNPACK.INFO)
 
-                        BCF_UN_STR
-                       /               BCF_UN_FLT
-                      |               /      BCF_UN_INFO
-                      |              |      /       ____________________________ BCF_UN_FMT
+                        UnpackLevel.ALT
+                       /               UnpackLevel.FILT
+                      |               /      UnpackLevel.INFO
+                      |              |      /       ____________________________ UnpackLevel.FMT
                       V              V     V       /       |       |       |
 #CHROM  POS ID  REF ALT QUAL    FILTER  INFO    FORMAT  NA00001 NA00002 NA00003 ...
 
@@ -75,20 +355,20 @@ struct VCFRecord
     appropriate INFO, CONTIG, and FILTER lines.
 
     Protip: specifying alternate MAX_UNPACK can speed it tremendously
-        as it will not unpack all fields, only up to those requested (see htslib.vcf)
-        For example, BCF_UN_STR is up to ALT inclusive, and BCF_UN_STR is up to FILTER
+        as it will not UnpackLevel all fields, only up to those requested (see htslib.vcf)
+        For example, UnpackLevel.ALT is up to ALT inclusive, and UnpackLevel.ALT is up to FILTER
     */
-    this(T)(T h, bcf1_t *b, int MAX_UNPACK = BCF_UN_ALL)
+    this(T)(T h, bcf1_t *b, UnpackLevel MAX_UNPACK = UnpackLevel.None)
     if(is(T == VCFHeader) || is(T == bcf_hdr_t *))
     {
         static if (is(T == VCFHeader)) this.vcfheader = h;
-        else static if (is(T == bcf_hdr_t)) this.vcfheader = VCFHeader(Bcf_hdr_t(h)); // double free() bug if we don't own bcf_hdr_t h
+        else static if (is(T == bcf_hdr_t *)) this.vcfheader = VCFHeader(Bcf_hdr_t(h)); // double free() bug if we don't own bcf_hdr_t h
         else static if (is(T == bcf_hdr_t)) assert(0);  // ferret out situations that will lead to free() crashes
         else assert(0);
 
         this.line = Bcf1_t(b);
 
-        // Now it must be unpacked
+        // Now it must be UNPACKed
         // Protip: specifying alternate MAX_UNPACK can speed it tremendously
         immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
     }
@@ -109,7 +389,7 @@ struct VCFRecord
         this.filter = filter;
     }
     /// ditto
-    this(VCFHeader vcfhdr, string line, int MAX_UNPACK = BCF_UN_ALL)
+    this(VCFHeader vcfhdr, string line, UnpackLevel MAX_UNPACK = UnpackLevel.None)
     {
         this.vcfheader = vcfhdr;
 
@@ -131,16 +411,20 @@ struct VCFRecord
         }
     }
 
+    /// ensure that vcf variable length data is unpacked to at least desired level
+    pragma(inline, true)
+    void unpack(UnpackLevel unpackLevel)
+    {
+        if (this.line.max_unpack < unpackLevel) bcf_unpack(this.line, unpackLevel);
+    }
+
     //----- FIXED FIELDS -----//
     
     /* CHROM */
     /// Get chromosome (CHROM)
     @property
     string chrom()
-    {
-        if (!this.line.unpacked)
-            bcf_unpack(this.line, BCF_UN_STR);
-        
+    {   
         return fromStringz(bcf_hdr_id2name(this.vcfheader.hdr, this.line.rid)).idup;
     }
     /// Set chromosome (CHROM)
@@ -166,7 +450,6 @@ struct VCFRecord
     out(coord) { assert(coord >= 0); }
     do
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
         return ZB(this.line.pos);
     }
     /// Set position (POS, column 2)
@@ -185,7 +468,7 @@ struct VCFRecord
     /// Get ID string
     @property string id()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        this.unpack(UnpackLevel.AltAllele);
         return fromStringz(this.line.d.id).idup;
     }
     /// Sets new ID string; comma-separated list allowed but no dup checking performed
@@ -236,6 +519,7 @@ struct VCFRecord
     /// All alleles getter (array)
     @property string[] allelesAsArray()
     {
+        this.unpack(UnpackLevel.AltAllele);
         string[] ret;
         ret.length = this.line.n_allele;        // n=0, no reference; n=1, ref but no alt
         foreach(int i; 0 .. this.line.n_allele) // ref allele is index 0
@@ -247,20 +531,20 @@ struct VCFRecord
     /// Reference allele getter
     @property string refAllele()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        this.unpack(UnpackLevel.AltAllele);
         if (this.line.n_allele < 1) return ""; // a valid record could have no ref (or alt) alleles
         else return fromStringz(this.line.d.als).idup;
     }
     // NB WIP: there could be zero, or multiple alt alleles
     /+@property string altAlleles()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        if (!this.line.unpacked) bcf_unpack(this.line, UnpackLevel.ALT);
         return fromStringz(this.line.d.als)
     }+/
     /// Alternate alleles getter version 1: ["A", "ACTG", ...]
     @property string[] altAllelesAsArray()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        this.unpack(UnpackLevel.AltAllele);
 
         string[] ret;
         if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
@@ -269,7 +553,7 @@ struct VCFRecord
     /// Alternate alleles getter version 2: "A,ACTG,..."
     @property string altAllelesAsString()
     {
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        this.unpack(UnpackLevel.AltAllele);
 
         string ret;
         if (this.line.n_allele < 2) return ret; // n=0, no reference; n=1, ref but no alt
@@ -300,6 +584,7 @@ struct VCFRecord
     /// Set alleles; comma-separated list
     @property void alleles(string a)
     {
+        this.unpack(UnpackLevel.AltAllele);
         if (a == "") {
             this.line.n_allele = 0;
             if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
@@ -310,6 +595,7 @@ struct VCFRecord
     /// Set alleles; array
     @property void alleles(string[] a)
     {
+        this.unpack(UnpackLevel.AltAllele);
         if (a.length == 0) {
             this.line.n_allele = 0;
             if (this.line.d.m_allele) this.line.d.als[0] = '\0';    // if storage allocated, zero out the REF
@@ -328,30 +614,22 @@ struct VCFRecord
             bcf_update_alleles(this.vcfheader.hdr, this.line, &allelesp[0], cast(int)a.length);
         }
     }
+
     /// Set REF allele only
-    /// param r is \0-term Cstring
-    /// TODO: UNTESTED
-    void setRefAllele(const(char)* r)
+    void setRefAllele(string r)
     {
         // first, get REF
-        if (!this.line.unpacked) bcf_unpack(this.line, BCF_UN_STR);
+        this.unpack(UnpackLevel.AltAllele);
         // a valid record could have no ref (or alt) alleles
+        auto alleles = [toUTFz!(char *)(r)];
         if (this.line.n_allele < 2) // if none or 1 (=REF only), just add the REF we receieved
-            bcf_update_alleles(this.vcfheader.hdr, this.line, &r, 1);
+            bcf_update_alleles(this.vcfheader.hdr, this.line, alleles.ptr, 1);
         else {
             // length of REF allele is allele[1] - allele[0], (minus one more for \0)
             // TODO ** TODO ** : there is a property line.refLen already
             const auto reflen = (this.line.d.allele[1] - this.line.d.allele[0]) - 1;
-            if (strlen(r) <= reflen) {
-                memcpy(this.line.d.allele[0], r, reflen + 1);   // +1 -> copy a trailing \0 in case original REF was longer than new 
-                // TODO: do we need to call _sync ?
-            } else {
-                // slower way: replace allele[0] with r, but keep rest of pointers poitning at existing allele block,
-                // then call bcf_update_alleles; this will make complete new copy of this.line.d.allele, so forgive the casts
-                this.line.d.allele[0] = cast(char*) r;
-                bcf_update_alleles(this.vcfheader.hdr, this.line,
-                    cast( const(char)** ) this.line.d.allele, this.line.n_allele);
-            }
+            alleles ~= this.altAllelesAsArray.map!(toUTFz!(char *)).array;
+            bcf_update_alleles(this.vcfheader.hdr, this.line, alleles.ptr, cast(int)alleles.length);
         }
     }
     /// Set alleles; alt can be comma separated
@@ -382,7 +660,6 @@ struct VCFRecord
     out(result) { assert(result >= 0); }
     do
     {
-        if (this.line.max_unpack < BCF_UN_FLT) bcf_unpack(this.line, BCF_UN_FLT);
         return this.line.qual;
     }
     /// Set variant quality (QUAL, column 6)
@@ -397,7 +674,7 @@ struct VCFRecord
     {
         const(char)[] ret;
 
-        if (this.line.max_unpack < BCF_UN_FLT) bcf_unpack(this.line, BCF_UN_FLT);
+        this.unpack(UnpackLevel.Filter);
 
         if (this.line.d.n_flt) {
             for(int i; i< this.line.d.n_flt; i++) {
@@ -427,9 +704,11 @@ struct VCFRecord
     {
         int[] fids;
         foreach(f; fs) {
-            if(f == "") continue;
             const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
-            if (fid == -1) hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
+            if (fid == -1){
+                hts_log_warning(__FUNCTION__, format("ignoring filter not found in header: %s", f.empty() ? "(empty)" : f));
+                continue;
+            }
             else fids ~= fid;
         }
         if (fids.length > 0)
@@ -441,13 +720,24 @@ struct VCFRecord
     /// "If flt_id is PASS, all existing filters are removed first. If other than PASS, existing PASS is removed."
     int addFilter(string f)
     {
-        return bcf_add_filter(this.vcfheader.hdr, this.line, 
-            bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f)));
+        
+        if(f == "") hts_log_warning(__FUNCTION__, "filter was empty");
+        const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
+        if (fid == -1){
+            hts_log_warning(__FUNCTION__, format("ignoring filter not found in header: %s", f.empty() ? "(empty)" : f));
+            return -1;
+        }
+
+        return bcf_add_filter(this.vcfheader.hdr, this.line, fid);
     }
     /// Remove a filter by name
     int removeFilter(string f)
     {
         const int fid = bcf_hdr_id2int(this.vcfheader.hdr, BCF_DT_ID, toStringz(f));
+        if (fid == -1){
+            hts_log_warning(__FUNCTION__, format("filter not found in header (ignoring): %s", f) );
+            return -1;
+        }
         return removeFilter(fid);
     }
     /// Remove a filter by numeric id
@@ -480,6 +770,7 @@ struct VCFRecord
      *  Both singletons and arrays are supported.
     */
     void addInfo(T)(string tag, T data)
+    if(isSomeString!T || ((isIntegral!T || isFloatingPoint!T || isBoolean!T) && !isArray!T))
     {
         int ret = -1;
 
@@ -505,19 +796,19 @@ struct VCFRecord
             hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
     }
     /// ditto
-    void addInfo(T)(string tag, T[] data)
-    if(!is(T==immutable(char)))             // otherwise string::immutable(char)[] will match the other template
+    void addInfo(T)(string tag, T data)
+    if(isIntegral!(ElementType!T) || isFloatingPoint!(ElementType!T))             // otherwise string::immutable(char)[] will match the other template
     {
         int ret = -1;
 
-        static if(isIntegral!T) {
-            auto integer = cast(int) data;
-            ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), &integer, data.length);
+        static if(isIntegral!(ElementType!T)) {
+            auto integer = data.to!(int[]);
+            ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), integer.ptr, cast(int)data.length);
         }
         
-        else static if(isFloatingPoint!T) {
-            auto flt = cast(float) data;    // simply passing "2.0" (or whatever) => data is a double
-            ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, data.length);
+        else static if(isFloatingPoint!(ElementType!T)) {
+            auto flt = data.to!(float[]);    // simply passing "2.0" (or whatever) => data is a double
+            ret = bcf_update_info_float(this.vcfheader.hdr, this.line, toStringz(tag), flt.ptr, cast(int)data.length);
         }
         
         if (ret == -1)
@@ -529,22 +820,24 @@ struct VCFRecord
      *  Templated on data type, calls one of bc_update_format_{int32,float,string,flag}
     */
     void addFormat(T)(string tag, T data)
-    if(!isArray!T)
+    if(!isArray!T || isSomeString!T)
     {
         int ret = -1;
 
         static if(isIntegral!T) {
-            auto integer = cast(int) data;
+            auto integer = data.to!int;
             ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), &integer, 1);
         }
         
         else static if(isFloatingPoint!T) {
-            auto flt = cast(float) data;    // simply passing "2.0" (or whatever) => data is a double
+            auto flt = data.to!float;    // simply passing "2.0" (or whatever) => data is a double
             ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag), &flt, 1);
         }
 
-        else static if(isSomeString!T)
-            ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), toStringz(data));
+        else static if(isSomeString!T){
+            auto strs = [data].map!(toUTFz!(char*)).array;
+            ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), strs.ptr, 1);
+        }
         
         else static if(isBoolean!T) {
             immutable int set = data ? 1 : 0; // if data == true, pass 1 to bcf_update_info_flag(n=); n=0 => clear flag 
@@ -555,29 +848,48 @@ struct VCFRecord
     }
     /// ditto
     void addFormat(T)(string tag, T[] data)
+    if((!isArray!T || isSomeString!T) && !is(T == immutable(char)))
     {
                 int ret = -1;
 
         static if(isIntegral!T) {
-            auto integer = cast(int[]) data;
+            auto integer = data.to!(int[]);
             ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag),
                                             integer.ptr, cast(int)data.length);
         }
         
         else static if(isFloatingPoint!T) {
-            auto flt = cast(float[]) data;    // simply passing "2.0" (or whatever) => data is a double
+            auto flt = data.to!(float[]);    // simply passing "2.0" (or whatever) => data is a double
             ret = bcf_update_format_float(this.vcfheader.hdr, this.line, toStringz(tag),
                                             flt.ptr, cast(int)data.length);
         }
-        
+
+        else static if(isSomeString!T){
+            auto strs = data.map!(toUTFz!(char*)).array;
+            ret = bcf_update_format_string(this.vcfheader.hdr, this.line, toStringz(tag), strs.ptr, cast(int)strs.length);
+        }
+
         if (ret == -1) hts_log_warning(__FUNCTION__, format("Couldn't add format (ignoring): %s", data));
 
     }
 
+    /// remove an info section
+    void removeInfo(string tag)
+    {
+        bcf_update_info(this.vcfheader.hdr,this.line, toStringz(tag),null,0,HeaderTypes.None);
+    }
+
+    /// remove a format section
+    void removeFormat(string tag)
+    {
+        bcf_update_format(this.vcfheader.hdr,this.line, toStringz(tag),null,0,HeaderTypes.None);
+    }
+
+
     /// add INFO or FORMAT key:value pairs to a record
-    /// add a single datapoint OR vector of values, OR, values to each sample (if tagType == FORMAT)
-    void add(string tagType, T)(const(char)[] tag, T data)
-    if((tagType == "INFO" || tagType == "FORMAT") &&
+    /// add a single datapoint OR vector of values, OR, values to each sample (if lineType == FORMAT)
+    void add(HeaderRecordType lineType, T)(const(char)[] tag, T data)
+    if((lineType == HeaderRecordType.Info || lineType == HeaderRecordType.Format) &&
         (isIntegral!T       || isIntegral!(ElementType!T)   ||
         isFloatingPoint!T   || isFloatingPoint!(ElementType!T) ||
         isSomeString!T      || isSomeString!(ElementType!T) ||
@@ -619,7 +931,7 @@ struct VCFRecord
         }
         else static assert(0);
 
-        static if (tagType == "INFO") {
+        static if (lineType == HeaderRecordType.Info) {
             static if (is(Unqual!T == int) || is(Unqual!(ElementType!T) == int))
                 ret = bcf_update_info_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static if (is(Unqual!T == float) || is(Unqual!(ElementType!T) == float))
@@ -630,7 +942,7 @@ struct VCFRecord
                 ret = bcf_update_info_flag(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static assert(0, "Type not recognized for INFO tag");
         }
-        else static if (tagType == "FORMAT") {
+        else static if (lineType == HeaderRecordType.Format) {
             static if (is(Unqual!T == int) || is(Unqual!(ElementType!T) == int))
                 ret = bcf_update_format_int32(this.vcfheader.hdr, this.line, toStringz(tag), ptr, len);
             else static if (is(Unqual!T == float) || is(Unqual!(ElementType!T) == float))
@@ -643,6 +955,44 @@ struct VCFRecord
 
         if (ret == -1)
             hts_log_warning(__FUNCTION__, format("Couldn't add tag (ignoring): %s with value %s", tag, data));
+    }
+
+    /// returns a hashmap of info data by field
+    InfoField[string] getInfos()
+    {
+        /// UnpackLevel
+        this.unpack(UnpackLevel.Info);
+
+        /// copy some data
+        InfoField[string] infoMap;
+        bcf_info_t[] infos = this.line.d.info[0..this.line.n_info].dup;
+
+        foreach (bcf_info_t info; infos)
+        {
+            /// if variable data is null then value is set for deletion
+            /// skip
+            if(!info.vptr) continue;
+            auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.Id][info.key].key).idup;
+            infoMap[key] = InfoField(key, &info, this.line);
+        }
+        return infoMap;
+    }
+
+    /// returns a hashmap of format data by field
+    FormatField[string] getFormats()
+    {
+        this.unpack(UnpackLevel.Format);
+        FormatField[string] fmtMap;
+        bcf_fmt_t[] fmts = this.line.d.fmt[0..this.line.n_fmt].dup;
+        foreach (bcf_fmt_t fmt; fmts)
+        {
+            /// if variable data is null then value is set for deletion
+            /// skip
+            if(!fmt.p) continue;
+            auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.Id][fmt.id].key).idup;
+            fmtMap[key] = FormatField(key, &fmt, this.line);
+        }
+        return fmtMap;
     }
 
     /// Return a string representation of the VCFRecord (i.e. as would appear in .vcf)
@@ -684,14 +1034,26 @@ unittest
     vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-    vw.addTag!"INFO"("AF", "A", "Integer", "Number of Samples With Data");
+    vw.vcfhdr.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
     vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
+    HeaderRecord hrec;
+    hrec.setHeaderRecordType(HeaderRecordType.Format);
+    hrec.setID("AF");
+    hrec.setLength(HeaderLengths.OnePerAltAllele);
+    hrec.setValueType(HeaderTypes.Float);
+    hrec.setDescription("Allele Freq");
+    vw.vcfhdr.addHeaderRecord(hrec);
+    
+    assert(vw.vcfhdr.getHeaderRecord(HeaderRecordType.Format, "ID","AF")["ID"] == "AF");
+    vw.addHeaderLineRaw("##FORMAT=<ID=CH,Number=3,Type=String,Description=\"test\">");
 
     // Exercise header
     assert(vw.vcfhdr.nsamples == 0);
     vw.addSample("NA12878");
     assert(vw.vcfhdr.nsamples == 1);
+
+    vw.writeHeader();
 
     auto r = new VCFRecord(vw.vcfhdr, bcf_init1());
     
@@ -791,13 +1153,24 @@ unittest
     assert(r.refAllele == "A");
     assert(r.altAllelesAsString == "C,T");
 
+    r.setRefAllele("G");
+    assert(r.allelesAsArray == ["G", "C", "T"]);
+    assert(r.refAllele == "G");
+    assert(r.altAllelesAsString == "C,T");
+
+    r.setRefAllele("A");
+    assert(r.allelesAsArray == ["A", "C", "T"]);
+    assert(r.refAllele == "A");
+    assert(r.altAllelesAsString == "C,T");
+
+
 
     // Test QUAL
     r.qual = 1.0;
     assert(r.qual == 1.0);
-    // now test setting qual without unpacking
+    // now test setting qual without UnpackLeveling
     // TODO: see https://forum.dlang.org/post/hebouvswxlslqhovzaia@forum.dlang.org, once resolved (or once factory function written),
-    //  add template value param BCF_UN_STR
+    //  add template value param UnpackLevel.ALT
     auto rr = new VCFRecord(vw.vcfhdr, "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0.017\n"); // @suppress(dscanner.style.long_line)
     rr.qual = 3.0;
     assert(rr.qual == 3.0);
@@ -825,10 +1198,140 @@ unittest
     assert(r.hasFilter("q10"));
     r.removeFilter("q10");
     assert(r.hasFilter("PASS"));
+    assert(r.toString == "20\t62435966\trs001;rs999\tA\tC,T\t1\t.\t.\n");
+
+    r.addFormat("AF",[0.1, 0.5]);
+    assert(r.toString == "20\t62435966\trs001;rs999\tA\tC,T\t1\t.\t.\tAF\t0.1,0.5\n");
+
+    rr.addFormat("AF",[0.1]);
+    writeln(rr.toString);
+    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0\tAF\t0.1\n");
+
+
+    assert(rr.getFormats["AF"].to!float[0][0] == 0.1f);
+
+    rr.addInfo("AF",0.5);
+    assert(rr.getInfos["AF"].to!float == 0.5f);
+    
+    rr.removeInfo("AF");
+
+    rr.removeFormat("AF");
+
+    rr.addFormat("CH", "test");
+
+    
+    writeln(rr.toString);
+    writeln(rr.getFormats["CH"].to!string);
+    assert(rr.getFormats["CH"].to!string[0][0] == "test");
+
+    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11\tCH\ttest\n");
+
+    assert(rr.coordinates == ZBHO(17329,17330));
+    vw.writeRecord(*r);
+    vw.writeRecord(vw.vcfhdr.hdr, r.line);
 
 
     // Finally, print the records:
-    writefln("VCF records via toString:\n%s%s", r, rr);
+    writefln("VCF records via toString:\n%s%s", (*r), (*rr));
 
     writeln("\ndhtslib.vcf: all tests passed\n");
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import htslib.hts_log;
+    import std.algorithm : map, count;
+    import std.array : array;
+    import std.path : buildPath, dirName;
+    import std.math : approxEqual, isNaN;
+    import dhtslib.tabix;
+    import dhtslib.vcf;
+    hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+    hts_log_info(__FUNCTION__, "Testing VCFReader");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
+    auto tbx = TabixIndexedFile(fn);
+    auto reg = getIntervalFromString("1:3000151-3062916");
+    auto vcf = VCFReader(tbx, reg.contig, reg.interval);
+    assert(!vcf.empty);
+
+    VCFRecord rec = vcf.front;
+    assert(rec.getInfos["AN"].to!int == 4);
+    rec.addInfo("AN", rec.getInfos["AN"].to!int + 1);
+    assert(rec.getInfos["AN"].to!int == 5);
+    assert(rec.getInfos["AN"].to!byte == 5);
+    assert(rec.getInfos["AN"].to!short == 5);
+    assert(rec.getInfos["AN"].to!long == 5);
+
+    assert(rec.getInfos["AN"].to!uint == 5);
+    assert(rec.getInfos["AN"].to!ubyte == 5);
+    assert(rec.getInfos["AN"].to!ushort == 5);
+    assert(rec.getInfos["AN"].to!ulong == 5);
+
+    assert(rec.getInfos["AN"].to!float.isNaN);
+
+    rec.addInfo("AN", 128);
+    assert(rec.getInfos["AN"].to!int == 128);
+    assert(rec.getInfos["AN"].to!byte == 0);
+    assert(rec.getInfos["AN"].to!short == 128);
+    assert(rec.getInfos["AN"].to!long == 128);
+
+    rec.addInfo("AN", 32768);
+    assert(rec.getInfos["AN"].to!int == 32768);
+    assert(rec.getInfos["AN"].to!byte == 0);
+    assert(rec.getInfos["AN"].to!short == 0);
+    assert(rec.getInfos["AN"].to!long == 32768);
+
+    assert(rec.getInfos["AN"].to!long == 32768);
+
+    // rec.addInfo("AN", 2147483648);
+    // assert(rec.getInfos["AN"].to!int == 0);
+    // assert(rec.getInfos["AN"].to!byte == 0);
+    // assert(rec.getInfos["AN"].to!short == 0);
+    // assert(rec.getInfos["AN"].to!long == 2147483648);
+
+    vcf.popFront;
+    rec = vcf.front;
+    assert(rec.refAllele == "GTTT");
+    assert(rec.getInfos["INDEL"].to!bool == true);
+
+    assert(rec.getInfos["DP4"].to!(int[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(byte[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(short[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(long[]) == [1, 2, 3, 4]);
+
+    assert(rec.getInfos["DP4"].to!(uint[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(ubyte[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(ushort[]) == [1, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(ulong[]) == [1, 2, 3, 4]);
+
+    assert(rec.getInfos["DP4"].to!(float[]) == []);
+    rec.addInfo("DP4", [2, 2, 3, 4]);
+    assert(rec.getInfos["DP4"].to!(int[]) == [2, 2, 3, 4]);
+
+    assert(rec.getFormats["GQ"].to!int.array == [[409], [409]]);
+
+    rec.addFormat("GQ", [32768,32768]);
+
+    assert(rec.getFormats["GQ"].to!byte.array == []);
+    assert(rec.getFormats["GQ"].to!short.array == []);
+    assert(rec.getFormats["GQ"].to!int[0][0] == 32768);
+    
+
+    assert(rec.getInfos["STR"].to!string == "test");
+
+    assert(rec.getInfos["DP4"].to!string == "");
+
+    assert(rec.getFormats["GT"].to!int.array == [[2, 4], [2, 4]]);
+    
+
+    vcf.popFront;
+    rec = vcf.front;
+
+    auto fmts = rec.getFormats;
+    auto sam = vcf.vcfhdr.getSampleId("A");
+    assert(fmts["GT"].to!int[sam] == [2, 4]);
+    sam = vcf.vcfhdr.getSampleId("B");
+    assert(fmts["GT"].to!int[sam] == [6, -127]);
 }

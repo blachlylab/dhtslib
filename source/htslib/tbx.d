@@ -28,6 +28,10 @@ module htslib.tbx;
 import htslib.hts;
 import htslib.bgzf : BGZF;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 enum TBX_MAX_SHIFT = 31;

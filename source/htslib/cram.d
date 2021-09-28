@@ -42,6 +42,10 @@ import htslib.sam;
 import htslib.hts;
 import htslib.hfile : hFILE;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 // see cram/cram_structs.h for an internal more complete copy of this enum

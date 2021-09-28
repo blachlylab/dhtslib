@@ -31,7 +31,7 @@ mixin template copyCtor(T)
 mixin template destroyMixin(T, alias destroy)
 if(!isPointer!T && isSomeFunction!destroy)
 {
-    extern (C) ReturnType!destroy function(T*) d = &destroy;
+    extern (C) ReturnType!destroy function(T*) nothrow @nogc @system d = &destroy;
 }
 
 /// Template struct that performs reference

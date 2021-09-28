@@ -30,6 +30,10 @@ module htslib.faidx;
 
 import htslib.hts : hts_pos_t;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 /** @file

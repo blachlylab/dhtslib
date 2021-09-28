@@ -38,6 +38,10 @@ import htslib.thread_pool : hts_tpool;
 import htslib.sam : sam_hdr_t;
 import htslib.kstring : kstring_t;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 // Separator used to split HTS_PATH (for plugins); REF_PATH (cram references)

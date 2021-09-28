@@ -61,6 +61,10 @@ import htslib.vcf;
 import htslib.kstring : kstring_t;
 import htslib.tbx : tbx_t;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 /*
