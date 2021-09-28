@@ -1,7 +1,5 @@
 /** Coordinates and Coordinate Systems
 
-    STATUS: Experimental
-
     Interval include `start` and `end`, but no reference sequence id (chr, contig, etc.)
 
     The `Coordinate` type is templated on `CoordSystem` enum, so that the actual coordinate
