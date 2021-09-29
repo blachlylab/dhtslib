@@ -103,7 +103,18 @@ struct Coordinate(Basis bs)
     auto offset(T)(T off)
     if(isIntegral!T)
     {
-        return Coordinatse!(bs)(cast(long)(this.pos + off));
+        return Coordinate!(bs)(cast(long)(this.pos + off));
+    }
+
+    /// opbinary + or - to use offset
+    auto opBinary(string op, T)(T off)
+    if ((op == "+" || op == "-") && isIntegral!T)
+    {
+        static if(op == "+")
+            return this.offset(off);
+        else static if(op == "-")
+            return this.offset(-off);
+        else static assert(0,"Operator "~op~" not implemented");
     }
 }
 
@@ -317,6 +328,13 @@ struct Interval(CoordSystem cs)
     }
 
     /// union of two regions
+    /// specifically computes the convex hull of the two intervals
+    /// if Intervals don't overlap returns the init Interval
+    /// 
+    /// https://en.wikipedia.org/wiki/Convex_hull
+    ///
+    /// Thanks Arne!
+    /// https://forum.dlang.org/post/duzdclxvvrifoastdztv@forum.dlang.org
     auto unionImpl(Interval!cs other) @nogc
     {
         if(!this.isOverlap(other)){
@@ -328,6 +346,8 @@ struct Interval(CoordSystem cs)
             );
     }
 
+    /// does this interval overlap
+    /// with the other interval?
     auto isOverlap(Interval!cs other) @nogc
     {
         static if(endtype == End.closed){
@@ -337,21 +357,29 @@ struct Interval(CoordSystem cs)
         }
     }
 
+    /// get minimum start value between this interval
+    /// and other interval
     auto getMinStart(Interval!cs other) @nogc
     {
         return this.start < other.start ? this.start : other.start;
     }
 
+    /// get maximum start value between this interval
+    /// and other interval
     auto getMaxStart(Interval!cs other) @nogc
     {
         return this.start > other.start ? this.start : other.start;
     }
 
+    /// get minimum end value between this interval
+    /// and other interval
     auto getMinEnd(Interval!cs other) @nogc
     {
         return this.end < other.end ? this.end : other.end;
     }
     
+    /// get maximum end value between this interval
+    /// and other interval
     auto getMaxEnd(Interval!cs other) @nogc
     {
         return this.end > other.end ? this.end : other.end;
@@ -359,9 +387,21 @@ struct Interval(CoordSystem cs)
 
     /// set operators for intersect, union, and difference
     auto opBinary(string op)(Interval!cs other) @nogc
+    if(op == "|" || op == "&")
     {
         static if(op == "|") return unionImpl(other);
         else static if(op == "&") return intersectImpl(other);
+        else static assert(0,"Operator "~op~" not implemented");
+    }
+
+    /// opbinary + or - to use offset
+    auto opBinary(string op, T)(T off) @nogc
+    if ((op == "+" || op == "-") && isIntegral!T)
+    {
+        static if(op == "+")
+            return this.offset(off);
+        else static if(op == "-")
+            return this.offset(-off);
         else static assert(0,"Operator "~op~" not implemented");
     }
 
@@ -382,7 +422,7 @@ alias ZeroBasedClosed = Interval!(CoordSystem.zbc);
 alias OneBasedClosed = Interval!(CoordSystem.obc);
 
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     auto c0 = Interval!(CoordSystem.zbho)(0, 100);
     assert(c0.size == 100);
@@ -399,7 +439,29 @@ debug(dhtslib_unittest) unittest
     // ...
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
+{
+    ZB coord = ZB(1);
+    assert(coord + 1 == ZB(2));
+    assert(coord - 1 == ZB(0));
+
+    ZBHO coords = ZBHO(1, 2);
+    assert(coords + 1 == ZBHO(2, 3));
+    assert(coords - 1 == ZBHO(0, 1));
+    // ...
+}
+
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
+{
+    ZBHO coords = ZBHO(1, 5);
+    assert((coords & ZBHO(2, 6)) == ZBHO(2, 5));
+    assert((coords | ZBHO(3, 10)) == ZBHO(1, 10));
+    assert((coords | ZBHO(6, 10)) == ZBHO(0, 0));
+    // ...
+}
+
+
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     auto c0 = Interval!(CoordSystem.zbho)(0, 100);
     assert(c0.size == 100);
@@ -415,7 +477,7 @@ debug(dhtslib_unittest) unittest
     assert(c4 == ZBHO(0, 100));
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     auto c0 = ZBHO(0, 100);
     assert(c0.size == 100);
@@ -431,7 +493,7 @@ debug(dhtslib_unittest) unittest
     assert(c4 == ZBHO(0, 100));
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     auto c0 = Interval!(CoordSystem.obho)(1, 101);
     assert(c0.size == 100);
@@ -448,7 +510,7 @@ debug(dhtslib_unittest) unittest
     // ...
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     ZBHO c0 = ZBHO(0, 100);
     assert(c0.size == 100);
