@@ -1,4 +1,14 @@
 {
 	"name": "coordinates",
-    "targetType": "library"
+    "targetType": "library",
+    "configurations": [
+        {
+            "name": "source",
+            "targetType": "library"
+        },
+        {
+            "name": "unittest",
+            "debugVersions": ["dhtslib_unittest"]
+        }
+    ]
 }
