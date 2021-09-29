@@ -60,6 +60,7 @@ enum End
 /// (zero or one-based)
 struct Coordinate(Basis bs)
 {
+    @safe @nogc nothrow pure:
     /// Coordinate value
     long pos;
     alias pos this;
@@ -191,13 +192,15 @@ enum CoordSystem
 }
 
 /// Labels for each CoordSystem Type
-static immutable CoordSystemLabels = ["zbho", "zbc", "obho", "obc"];
+enum CoordSystemLabels = __traits(allMembers, CoordSystem);
 
 /// The (start, end) coordinates within a coordinate system,
 /// where the type itself encodes the coordinate system details
 /// (zero or one-based; half-open vs. closed)
 struct Interval(CoordSystem cs)
 {
+    @safe nothrow pure:
+
     /// alias Basis and End enums for this Coordsystem type
     alias basetype = coordinateSystemToBasis!cs;
     alias endtype = coordinateSystemToEnd!cs;
@@ -208,7 +211,7 @@ struct Interval(CoordSystem cs)
     Coordinate!basetype end;
 
     /// long constructor
-    this(long start, long end)
+    this(long start, long end) @nogc
     {
         this.start.pos = start;
         this.end.pos = end;
@@ -225,7 +228,7 @@ struct Interval(CoordSystem cs)
     }
 
     /// Return the size of the interval spanned by start and end
-    long size()
+    long size() @nogc
     {
         static if (cs == CoordSystem.zbho || cs == CoordSystem.obho)
             return end - start;
@@ -236,7 +239,7 @@ struct Interval(CoordSystem cs)
     }
     
     /// Convert coordinates to another coordinate system 
-    auto to(CoordSystem tocs)()
+    auto to(CoordSystem tocs)() @nogc
     {
 
         /// alias Basis and End enums for the tocs Coordsystem type
@@ -270,39 +273,39 @@ struct Interval(CoordSystem cs)
     }
 
     /// Convert coordinate to another based system using shortcuts
-    auto to(T: ZBHO)()
+    auto to(T: ZBHO)() @nogc
     {
         return this.to!(CoordSystem.zbho);
     }
 
     /// Convert coordinate to another based system using shortcuts
-    auto to(T: OBHO)()
+    auto to(T: OBHO)() @nogc
     {
         return this.to!(CoordSystem.obho);
     }
 
     /// Convert coordinate to another based system using shortcuts
-    auto to(T: ZBC)()
+    auto to(T: ZBC)() @nogc
     {
         return this.to!(CoordSystem.zbc);
     }
     
     /// Convert coordinate to another based system using shortcuts
-    auto to(T: OBC)()
+    auto to(T: OBC)() @nogc
     {
         return this.to!(CoordSystem.obc);
     }
 
     /// make a new coordinate pair with a value of 
     /// this.start + off and this.end + off
-    auto offset(T)(T off)
+    auto offset(T)(T off) @nogc
     if(isIntegral!T)
     {
         return Interval!(cs)(cast(long)(this.start + off), cast(long)(this.end + off));
     }
 
     /// intersection of two regions
-    auto intersectImpl(Interval!cs other)
+    auto intersectImpl(Interval!cs other) @nogc
     {
         if(!this.isOverlap(other)){
             return Interval!(cs).init;
@@ -314,7 +317,7 @@ struct Interval(CoordSystem cs)
     }
 
     /// union of two regions
-    auto unionImpl(Interval!cs other)
+    auto unionImpl(Interval!cs other) @nogc
     {
         if(!this.isOverlap(other)){
             return Interval!(cs).init;
@@ -325,7 +328,7 @@ struct Interval(CoordSystem cs)
             );
     }
 
-    auto isOverlap(Interval!cs other)
+    auto isOverlap(Interval!cs other) @nogc
     {
         static if(endtype == End.closed){
             return this.getMaxStart(other) <= this.getMinEnd(other);
@@ -334,28 +337,28 @@ struct Interval(CoordSystem cs)
         }
     }
 
-    auto getMinStart(Interval!cs other)
+    auto getMinStart(Interval!cs other) @nogc
     {
         return this.start < other.start ? this.start : other.start;
     }
 
-    auto getMaxStart(Interval!cs other)
+    auto getMaxStart(Interval!cs other) @nogc
     {
         return this.start > other.start ? this.start : other.start;
     }
 
-    auto getMinEnd(Interval!cs other)
+    auto getMinEnd(Interval!cs other) @nogc
     {
         return this.end < other.end ? this.end : other.end;
     }
     
-    auto getMaxEnd(Interval!cs other)
+    auto getMaxEnd(Interval!cs other) @nogc
     {
         return this.end > other.end ? this.end : other.end;
     }
 
     /// set operators for intersect, union, and difference
-    auto opBinary(string op)(Interval!cs other)
+    auto opBinary(string op)(Interval!cs other) @nogc
     {
         static if(op == "|") return unionImpl(other);
         else static if(op == "&") return intersectImpl(other);
