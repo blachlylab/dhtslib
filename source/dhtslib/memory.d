@@ -148,6 +148,9 @@ alias Bgzf = SafeHtslibPtr!(BGZF, bgzf_close);
 /// can be used directly as a faidx_t *
 alias Faidx = SafeHtslibPtr!(faidx_t, fai_destroy);
 
+/// reference counted Kstring wrapper
+/// can be used directly as a kstring_t *
+alias Kstring = SafeHtslibPtr!(kstring_t, ks_free);
 
 debug(dhtslib_unittest) unittest 
 {

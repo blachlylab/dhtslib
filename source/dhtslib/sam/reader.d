@@ -20,6 +20,7 @@ import dhtslib.coordinates;
 import dhtslib.sam.header;
 import dhtslib.sam : cmpInterval, cmpRegList;
 import dhtslib.memory;
+import dhtslib.util;
 
 alias SAMFile = SAMReader;
 /**
@@ -394,24 +395,16 @@ struct SAMReader
     {
         private HtsFile    fp;     // belongs to parent; shared
         private SAMHeader  header; // belongs to parent; shared
-        private off_t header_offset;
         private Bam1     b;
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
-        this(HtsFile fp, SAMHeader header, off_t header_offset)
+        this(HtsFile fp, SAMHeader header, off_t offset)
         {
-            this.fp = fp;
-            this.header_offset = header_offset;
+            this.fp = copyHtsFile(fp, offset);
             assert(this.fp.format.format == htsExactFormat.sam || this.fp.format.format == htsExactFormat.bam);
-            this.header = header;
+            this.header = header.dup;
             this.b = Bam1(bam_init1());
-
-            // Need to seek past header offset
-            if (this.fp.format.format == htsExactFormat.sam)
-                hseek(fp.fp.hfile, this.header_offset, SEEK_SET);
-            else
-                bgzf_seek(fp.fp.bgzf, this.header_offset, SEEK_SET);
         }
 
         /// InputRange interface
@@ -444,6 +437,18 @@ struct SAMReader
             return SAMRecord(bam_dup1(this.b), this.header);
         }
 
+        AllRecordsRange save()
+        {
+            AllRecordsRange newRange;
+            newRange.fp = HtsFile(copyHtsFile(fp));
+            newRange.header = header.dup;
+            newRange.b = Bam1(bam_dup1(this.b));
+            newRange.initialized = this.initialized;
+            newRange.success = this.success;
+
+            return newRange;
+        }
+
     }
 
     /// Iterate over records falling within a queried region (TODO: itr_multi_query)
@@ -463,9 +468,9 @@ struct SAMReader
         /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
         this(HtsFile fp, SAMHeader header, HtsItr itr)
         {
-            this.fp = fp;
-            this.h = header;
-            this.itr = itr;
+            this.fp = copyHtsFile(fp);
+            this.itr = copyHtsItr(itr);
+            this.h = header.dup;
             this.b = bam_init1();
             assert(itr !is null, "itr was null"); 
         }
@@ -492,11 +497,18 @@ struct SAMReader
             return SAMRecord(bam_dup1(b), this.h);
         }
 
-        SAMRecord moveFront()
+        /// make a ForwardRange
+        RecordRange save()
         {
-            auto ret = SAMRecord(bam_dup1(this.b), this.h);
-            popFront;
-            return ret;
+            RecordRange newRange;
+            newRange.fp = HtsFile(copyHtsFile(fp, itr.curr_off));
+            newRange.itr = HtsItr(copyHtsItr(itr));
+            newRange.h = h.dup;
+            newRange.b = Bam1(bam_dup1(this.b));
+            newRange.initialized = this.initialized;
+            newRange.success = this.success;
+            newRange.r = this.r;
+            return newRange;
         }
     }
 
@@ -734,4 +746,85 @@ debug(dhtslib_unittest) unittest
     assert(bam["CHROMOSOME_I",$].array.length == 0);
     assert(bam[0, $].array.length == 0);
     assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
+}
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import dhtslib.sam;
+    import std.array : array;
+    import std.path : buildPath,dirName;
+    import std.range : drop;
+    hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
+    hts_log_info(__FUNCTION__, "Testing AllRecordsRange save()");
+    hts_log_info(__FUNCTION__, "Loading test file");
+
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
+    assert(bam.allRecords.array.length == 112);
+    assert(bam.allRecords.array.length == 112);
+
+    auto range = bam.allRecords;
+
+    auto range1 = range.save();
+    range = range.drop(5);
+
+    auto range2 = range.save();
+    range = range.drop(5);
+
+    auto range3 = range.save();
+    range = range.drop(5);
+
+    auto range4 = range.save();
+    range = range.drop(50);
+
+    auto range5 = range.save();
+    range.popFront;
+
+    auto range6 = range.save();
+
+    assert(range1.array.length == 112);
+    assert(range2.array.length == 107);
+    assert(range3.array.length == 102);
+    assert(range4.array.length == 97);
+    assert(range5.array.length == 47);
+    assert(range6.array.length == 46);
+}
+///
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import dhtslib.sam;
+    import std.array : array;
+    import std.path : buildPath,dirName;
+    import std.range : drop;
+    hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
+    hts_log_info(__FUNCTION__, "Testing RecordsRange save()");
+    hts_log_info(__FUNCTION__, "Loading test file");
+
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
+    
+    auto range = bam.query("CHROMOSOME_I", ZBHO(900, 2000));
+    
+    auto range1 =  range.save;
+    range = range.drop(1);
+    
+    auto range2 =  range.save;
+    range = range.drop(2);
+    
+    auto range3 =  range.save;
+    range = range.drop(3);
+    
+    auto range4 =  range.save;
+    range = range.drop(5);
+    
+    auto range5 =  range.save;
+    range.popFront;
+    
+    auto range6 = range.save;
+
+    assert(range1.array.length == 14);
+    assert(range2.array.length == 13);
+    assert(range3.array.length == 11);
+    assert(range4.array.length == 8);
+    assert(range5.array.length == 3);
+    assert(range6.array.length == 2);
 }
