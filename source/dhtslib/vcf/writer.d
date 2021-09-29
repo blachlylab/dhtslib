@@ -19,7 +19,7 @@ struct VCFWriter
     // htslib data structures
     VcfFile     fp;    /// rc htsFile wrapper
     VCFHeader   vcfhdr;    /// header wrapper
-    Bcf1_t[]    rows;   /// individual records
+    Bcf1[]    rows;   /// individual records
 
     @disable this();
     /// open file or network resources for writing
@@ -168,7 +168,7 @@ struct VCFWriter
     int addRecord(S, N)(S contig, int pos, S id, S alleles, N qual, S[] filters)
     if ( (isSomeString!S || is(S == char*) ) && isNumeric!N)
     {        
-        Bcf1_t line = Bcf1_t(bcf_init1());
+        Bcf1 line = Bcf1(bcf_init1());
 
         line.rid = bcf_hdr_name2id(this.vcfhdr.hdr, toStringz(contig));
         if (line.rid == -1) hts_log_error(__FUNCTION__, "contig not found");

@@ -45,10 +45,10 @@ struct InfoField
     ubyte[] data;
 
     /// VCFRecord refct
-    Bcf1_t line;
+    Bcf1 line;
 
     /// ctor from VCFRecord
-    this(string key, bcf_info_t * info, Bcf1_t line)
+    this(string key, bcf_info_t * info, Bcf1 line)
     {
         this.line = line;
         this(key, info);
@@ -203,10 +203,10 @@ struct FormatField
     ubyte[] data;
 
     /// VCFRecord refct
-    Bcf1_t line;
+    Bcf1 line;
 
     /// ctor from VCFRecord
-    this(string key, bcf_fmt_t * fmt, Bcf1_t line)
+    this(string key, bcf_fmt_t * fmt, Bcf1 line)
     {
         this.line = line;
         this(key, fmt);
@@ -343,7 +343,7 @@ UNPACK.SHR: all shared information (UNPACK.ALT|UNPACK.FILT|UNPACK.INFO)
 */
 struct VCFRecord
 {
-    Bcf1_t line;   /// htslib structured record TODO: change to 'b' for better internal consistency? (vcf.h/c actually use line quite a bit in fn params)
+    Bcf1 line;   /// htslib structured record TODO: change to 'b' for better internal consistency? (vcf.h/c actually use line quite a bit in fn params)
 
     VCFHeader vcfheader;   /// corresponding header (required);
 
@@ -366,7 +366,7 @@ struct VCFRecord
         else static if (is(T == bcf_hdr_t)) assert(0);  // ferret out situations that will lead to free() crashes
         else assert(0);
 
-        this.line = Bcf1_t(b);
+        this.line = Bcf1(b);
 
         // Now it must be UNPACKed
         // Protip: specifying alternate MAX_UNPACK can speed it tremendously
@@ -376,7 +376,7 @@ struct VCFRecord
     this(SS)(VCFHeader vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
     if (isSomeString!SS || is(SS == string[]))
     {
-        this.line = Bcf1_t(bcf_init1());
+        this.line = Bcf1(bcf_init1());
         this.vcfheader = vcfhdr;
         
         this.chrom = chrom;
@@ -400,7 +400,7 @@ struct VCFRecord
         kline.m = dupline.length;
         kline.s = dupline.ptr;
 
-        this.line = Bcf1_t(bcf_init1());
+        this.line = Bcf1(bcf_init1());
         this.line.max_unpack = MAX_UNPACK;
 
         auto ret = vcf_parse(&kline, this.vcfheader.hdr, this.line);

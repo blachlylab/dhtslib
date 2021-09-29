@@ -275,12 +275,12 @@ struct HeaderRecord
 struct VCFHeader
 {
     /// Pointer to htslib BCF/VCF header struct; will be freed from VCFHeader dtor 
-    Bcf_hdr_t hdr;
+    BcfHdr hdr;
 
     /// pointer ctor
     this(bcf_hdr_t * h)
     {
-        this.hdr = Bcf_hdr_t(h);
+        this.hdr = BcfHdr(h);
     }
 
     /// copy this header

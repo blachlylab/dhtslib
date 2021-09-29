@@ -26,7 +26,7 @@ and the htslib helper functions for speed.
 struct SAMRecord
 {
     /// Backing SAM/BAM row record
-    Bam1_t b;
+    Bam1 b;
 
     /// Corresponding SAM/BAM header data
     SAMHeader h;
@@ -34,7 +34,7 @@ struct SAMRecord
     /// ditto
     this(SAMHeader h)
     {
-        this.b = Bam1_t(bam_init1);
+        this.b = Bam1(bam_init1);
         this.h = h;
     }
  
@@ -42,13 +42,13 @@ struct SAMRecord
     deprecated("Construct with sam_hdr_t* for mapped contig (tid) name support")
     this(bam1_t* b)
     {
-        this.b = Bam1_t(b);
+        this.b = Bam1(b);
     }
 
     /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
     this(bam1_t* b, SAMHeader h)
     {
-        this.b = Bam1_t(b);
+        this.b = Bam1(b);
         this.h = h;
     }
 

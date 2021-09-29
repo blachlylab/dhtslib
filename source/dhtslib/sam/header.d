@@ -36,12 +36,12 @@ enum RecordType : immutable(char)[2]
 */
 struct SAMHeader
 {
-    Bam_hdr_t h; /// rc bam_hdr_t * wrapper
+    BamHdr h; /// rc bam_hdr_t * wrapper
 
     /// Construct from existing pointer
     this(bam_hdr_t * h)
     {
-        this.h = Bam_hdr_t(h);
+        this.h = BamHdr(h);
     }
 
     bool isNull(){

@@ -106,19 +106,19 @@ if(!isPointer!T && isSomeFunction!destroyFun)
 
 /// reference counted bam1_t wrapper
 /// can be used directly as a bam1_t *
-alias Bam1_t = SafeHtslibPtr!(bam1_t, bam_destroy1);
+alias Bam1 = SafeHtslibPtr!(bam1_t, bam_destroy1);
 
 /// reference counted bam_hdr_t wrapper
 /// can be used directly as a bam_hdr_t *
-alias Bam_hdr_t = SafeHtslibPtr!(bam_hdr_t, bam_hdr_destroy);
+alias BamHdr = SafeHtslibPtr!(bam_hdr_t, bam_hdr_destroy);
 
 /// reference counted bcf1_t wrapper
 /// can be used directly as a bcf1_t *
-alias Bcf1_t = SafeHtslibPtr!(bcf1_t, bcf_destroy);
+alias Bcf1 = SafeHtslibPtr!(bcf1_t, bcf_destroy);
 
 /// reference counted bcf_hdr_t wrapper
 /// can be used directly as a bcf_hdr_t *
-alias Bcf_hdr_t = SafeHtslibPtr!(bcf_hdr_t, bcf_hdr_destroy);
+alias BcfHdr = SafeHtslibPtr!(bcf_hdr_t, bcf_hdr_destroy);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
@@ -126,11 +126,11 @@ alias HtsFile = SafeHtslibPtr!(htsFile, hts_close);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
-alias Hts_idx_t = SafeHtslibPtr!(hts_idx_t, hts_idx_destroy);
+alias HtsIdx = SafeHtslibPtr!(hts_idx_t, hts_idx_destroy);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
-alias Hts_itr_t = SafeHtslibPtr!(hts_itr_t, hts_itr_destroy);
+alias HtsItr = SafeHtslibPtr!(hts_itr_t, hts_itr_destroy);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
@@ -138,20 +138,20 @@ alias VcfFile = HtsFile;
 
 /// reference counted tbx_t wrapper
 /// can be used directly as a tbx_t *
-alias Tbx_t = SafeHtslibPtr!(tbx_t, tbx_destroy);
+alias Tbx = SafeHtslibPtr!(tbx_t, tbx_destroy);
 
 /// reference counted BGZF wrapper
 /// can be used directly as a BGZF *
-alias BgzfPtr = SafeHtslibPtr!(BGZF, bgzf_close);
+alias Bgzf = SafeHtslibPtr!(BGZF, bgzf_close);
 
 /// reference counted faidx_t wrapper
 /// can be used directly as a faidx_t *
-alias Faidx_t = SafeHtslibPtr!(faidx_t, fai_destroy);
+alias Faidx = SafeHtslibPtr!(faidx_t, fai_destroy);
 
 
 debug(dhtslib_unittest) unittest 
 {
-    auto rc1 = Bam1_t(bam_init1);
+    auto rc1 = Bam1(bam_init1);
     assert(rc1.core.pos == 0);
     // No more allocation, add just one extra reference count
     auto rc2 = rc1;
@@ -163,7 +163,7 @@ debug(dhtslib_unittest) unittest
 static if(dip1000Enabled){
     debug(dhtslib_unittest) unittest
     {
-        auto rc1 = Bam1_t(bam_init1);
+        auto rc1 = Bam1(bam_init1);
         assert(rc1.core.pos == 0);
         // No more allocation, add just one extra reference count
         auto rc2 = rc1;
@@ -176,8 +176,8 @@ static if(dip1000Enabled){
     {
         auto testfun(bool noScope = false)()
         {
-            // auto rc = Bam1_t(bam_init);
-            auto rc1 = Bam1_t(bam_init1);
+            // auto rc = Bam1(bam_init);
+            auto rc1 = Bam1(bam_init1);
             assert(rc1.core.pos == 0);
             // No more allocation, add just one extra reference count
             static if(noScope)
@@ -199,10 +199,10 @@ static if(dip1000Enabled){
         {
             struct T
             {
-                Bam1_t rc1;
+                Bam1 rc1;
             }
             T test;
-            test.rc1 = Bam1_t(bam_init1);
+            test.rc1 = Bam1(bam_init1);
 
             assert(test.rc1.core.pos == 0);
             // No more allocation, add just one extra reference count

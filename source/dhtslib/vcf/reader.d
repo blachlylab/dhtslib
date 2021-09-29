@@ -30,7 +30,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     // htslib data structures
     VcfFile     fp;    /// rc htsFile wrapper
     VCFHeader   vcfhdr;    /// rc header wrapper
-    Bcf1_t b;          /// rc bcf1_t wrapper, record for use in iterator, will be recycled
+    Bcf1 b;          /// rc bcf1_t wrapper, record for use in iterator, will be recycled
     UnpackLevel MAX_UNPACK;     /// see htslib.vcf
 
 
@@ -54,7 +54,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
             auto err = bcf_hdr_parse(hdrPtr, toUTFz!(char *)(this.tbx.header));
             this.vcfhdr = VCFHeader(hdrPtr);
             
-            this.b = Bcf1_t(bcf_init1());
+            this.b = Bcf1(bcf_init1());
             this.b.max_unpack = MAX_UNPACK;
             this.MAX_UNPACK = MAX_UNPACK;
         }
@@ -80,7 +80,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
 
             this.vcfhdr = VCFHeader(bcf_hdr_read(this.fp));
 
-            this.b = Bcf1_t(bcf_init1());
+            this.b = Bcf1(bcf_init1());
             this.b.max_unpack = MAX_UNPACK;
             this.MAX_UNPACK = MAX_UNPACK;
         }

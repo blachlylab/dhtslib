@@ -48,7 +48,7 @@ struct SAMReader
     private off_t header_offset;
 
     /// SAM/BAM/CRAM index 
-    private Hts_idx_t idx;
+    private HtsIdx idx;
 
     private kstring_t line;
 
@@ -116,7 +116,7 @@ struct SAMReader
         if(this.fp.is_bgzf) this.header_offset = bgzf_tell(this.fp.fp.bgzf);
         else this.header_offset = htell(this.fp.fp.hfile);
 
-        this.idx = Hts_idx_t(null);
+        this.idx = HtsIdx(null);
     }
 
     /// number of reference sequences; from bam_hdr_t
@@ -236,13 +236,13 @@ struct SAMReader
 
         /// load index
         if(this.idx == null)
-            this.idx = Hts_idx_t(sam_index_load(this.fp, this.fn));
+            this.idx = HtsIdx(sam_index_load(this.fp, this.fn));
         if (this.idx == null)
         {
             hts_log_error(__FUNCTION__, "SAM index not found");
             throw new Exception("SAM index not found");
         }
-        auto itr = Hts_itr_t(sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end));
+        auto itr = HtsItr(sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end));
         return RecordRange(this.fp, this.header, itr);
     }
 
@@ -395,7 +395,7 @@ struct SAMReader
         private HtsFile    fp;     // belongs to parent; shared
         private SAMHeader  header; // belongs to parent; shared
         private off_t header_offset;
-        private Bam1_t     b;
+        private Bam1     b;
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
@@ -405,7 +405,7 @@ struct SAMReader
             this.header_offset = header_offset;
             assert(this.fp.format.format == htsExactFormat.sam || this.fp.format.format == htsExactFormat.bam);
             this.header = header;
-            this.b = Bam1_t(bam_init1());
+            this.b = Bam1(bam_init1());
 
             // Need to seek past header offset
             if (this.fp.format.format == htsExactFormat.sam)
@@ -452,8 +452,8 @@ struct SAMReader
     {
         private HtsFile fp;
         private SAMHeader h;
-        private Hts_itr_t itr;
-        private Bam1_t b;
+        private HtsItr itr;
+        private Bam1 b;
 
         private int r;  // sam_itr_next: >= 0 on success; -1 when there is no more data; < -1 on error
         
@@ -461,7 +461,7 @@ struct SAMReader
         private int success;        // sam_read1 return code
 
         /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
-        this(HtsFile fp, SAMHeader header, Hts_itr_t itr)
+        this(HtsFile fp, SAMHeader header, HtsItr itr)
         {
             this.fp = fp;
             this.h = header;
@@ -509,17 +509,17 @@ struct SAMReader
         private HtsFile fp;
         private SAMHeader h;
         private hts_itr_multi_t* itr;
-        private Bam1_t b;
+        private Bam1 b;
         private hts_reglist_t[] rlist;
         private int r;
 
         ///
-        this(HtsFile fp, Hts_idx_t idx, SAMHeader header, SAMFile* sam, string[] regions)
+        this(HtsFile fp, HtsIdx idx, SAMHeader header, SAMFile* sam, string[] regions)
         {
             rlist = RegionList(sam, regions).getRegList();
             this.fp = fp;
             this.h = header;
-            b = Bam1_t(bam_init1());
+            b = Bam1(bam_init1());
             itr = sam_itr_regions(idx, this.h.h, rlist.ptr, cast(uint) rlist.length);
             //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
             hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int) itr == 0));

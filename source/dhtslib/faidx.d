@@ -50,18 +50,18 @@ test for membership, and rapidly fetch sequence at offset.
 */
 struct IndexedFastaFile {
 
-    private Faidx_t faidx;
+    private Faidx faidx;
     
     /// construct from filename, optionally creating index if it does not exist
     /// throws Exception (TODO: remove) if file DNE, or if index DNE unless create->true
     this(string fn, bool create=false)
     {
         if (create) {
-            this.faidx = Faidx_t(fai_load3( toStringz(fn), null, null, fai_load_options.FAI_CREATE));
+            this.faidx = Faidx(fai_load3( toStringz(fn), null, null, fai_load_options.FAI_CREATE));
             if (this.faidx is null) throw new Exception("Unable to load or create the FASTA index.");
         }
         else {
-            this.faidx = Faidx_t(fai_load3( toStringz(fn) , null, null, 0));
+            this.faidx = Faidx(fai_load3( toStringz(fn) , null, null, 0));
             if (this.faidx is null) throw new Exception("Unable to load the FASTA index.");
         }
     }

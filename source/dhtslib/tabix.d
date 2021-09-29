@@ -29,7 +29,7 @@ import dhtslib.memory;
 struct TabixIndexedFile {
 
     HtsFile fp;    /// rc wrapper around htsFile ptr
-    Tbx_t   tbx;   /// rc wrapper around tabix ptr
+    Tbx   tbx;   /// rc wrapper around tabix ptr
 
     string header;  /// NGS flat file's header (if any; e.g. BED may not have one)
 
@@ -44,8 +44,8 @@ struct TabixIndexedFile {
             throw new Exception("Couldn't read file");
         }
         //enum htsExactFormat format = hts_get_format(fp)->format;
-        if(fntbi!="") this.tbx = Tbx_t(tbx_index_load2( toStringz(fn), toStringz(fntbi) ));
-        else this.tbx = Tbx_t(tbx_index_load( toStringz(fn) ));
+        if(fntbi!="") this.tbx = Tbx(tbx_index_load2( toStringz(fn), toStringz(fntbi) ));
+        else this.tbx = Tbx(tbx_index_load( toStringz(fn) ));
         if (!this.tbx) { 
             writefln("Could not load .tbi index of %s\n", fn );
             throw new Exception("Couldn't load tabix index file");

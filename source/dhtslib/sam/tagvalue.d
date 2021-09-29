@@ -66,13 +66,13 @@ struct TagValue
 
     private ubyte* data;
 
-    private Bam1_t b;
+    private Bam1 b;
 
     /** Constructor
 
     Usage: auto t = TagValue(b, 'XX') where b is bam1_t* BAM record and XX is tag
     */
-    this(Bam1_t b, char[2] tag)
+    this(Bam1 b, char[2] tag)
     {
         this.b = b;
         data = bam_aux_get(b, tag);

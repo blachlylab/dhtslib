@@ -31,7 +31,7 @@ struct BGZFile {
     private const(char)* fn;
 
     /// htslib data structure representing the BGZF compressed file/stream fp
-    private BgzfPtr bgzf;
+    private Bgzf bgzf;
 
 
     /// Open filename `fn` for reading
@@ -41,7 +41,7 @@ struct BGZFile {
 
         // open file
         this.fn = toStringz(fn);
-        this.bgzf = BgzfPtr(bgzf_open(this.fn, "r"));
+        this.bgzf = Bgzf(bgzf_open(this.fn, "r"));
 
         // enable multi-threading
         // (only effective if library was compiled with -DBGZF_MT)
@@ -60,9 +60,9 @@ struct BGZFile {
     auto byLine(){
         struct BGZFRange
         {
-            private BgzfPtr bgzf;
+            private Bgzf bgzf;
             private kstring_t line;
-            this(BgzfPtr bgzf){
+            this(Bgzf bgzf){
                 this.bgzf = bgzf;
                 popFront;
             }
@@ -95,9 +95,9 @@ struct BGZFile {
     auto byLineCopy(){
         struct BGZFRange
         {
-            private BgzfPtr bgzf;
+            private Bgzf bgzf;
             private kstring_t line;
-            this(BgzfPtr bgzf){
+            this(Bgzf bgzf){
                 this.bgzf = bgzf;
                 popFront;
             }
