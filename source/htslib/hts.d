@@ -1182,7 +1182,7 @@ enum HTS_PARSE_FLAGS : int
 */
 long hts_parse_decimal(const(char)* str, char** strend, HTS_PARSE_FLAGS flags);
 
-alias hts_name2id_f = int function(void*, const(char)*);
+alias hts_name2id_f = int function(void*, const(char)*) *;
 
 /// Parse a "CHR:START-END"-style region string
 /** @param str  String to be parsed

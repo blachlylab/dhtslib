@@ -7,6 +7,9 @@ import std.string : fromStringz, toStringz;
 import std.typecons : Tuple;
 import std.range.interfaces : InputRange, inputRangeObject;
 import std.range.primitives : isInputRange, ElementType;
+import std.algorithm : map;
+import std.array : array;
+import std.utf : toUTFz;
 
 import htslib.hts;
 import htslib.hfile : hdopen, hclose, hFILE, off_t, htell, hseek;
@@ -252,7 +255,17 @@ struct SAMReader
     auto query(string[] regions)
     in (!this.header.isNull)
     {
-        return RecordRangeMulti(this.fp, this.idx, this.header, &(this), regions);
+        /// load index
+        if(this.idx == null)
+            this.idx = HtsIdx(sam_index_load(this.fp, this.fn));
+        if (this.idx == null)
+        {
+            hts_log_error(__FUNCTION__, "SAM index not found");
+            throw new Exception("SAM index not found");
+        }
+        import std.stdio;
+        writeln("multi called");
+        return RecordRangeMulti(this.fp, this.idx, this.header, regions);
     }
 
     /// ditto
@@ -518,29 +531,47 @@ struct SAMReader
     /// Iterate over records falling within queried regions using a RegionList
     struct RecordRangeMulti
     {
+
         private HtsFile fp;
         private SAMHeader h;
-        private hts_itr_multi_t* itr;
+        private HtsItrMulti itr;
         private Bam1 b;
-        private hts_reglist_t[] rlist;
+
         private int r;
+        private bool initialized;
 
         ///
-        this(HtsFile fp, HtsIdx idx, SAMHeader header, SAMFile* sam, string[] regions)
+        this(HtsFile fp, HtsIdx idx, SAMHeader header, string[] regions)
         {
-            rlist = RegionList(sam, regions).getRegList();
-            this.fp = fp;
+            /// get reglist
+            auto cQueries = regions.map!(toUTFz!(char *)).array;
+            int count;
+            auto fnPtr = cast(hts_name2id_f) &sam_hdr_name2tid;
+
+            /// rlistPtr ends up being free'd by the hts_itr
+            auto rlistPtr = hts_reglist_create(cQueries.ptr, cast(int) cQueries.length, &count, cast(void *)header.h.getRef, fnPtr);
+
+
+            /// set header and fp
+            this.fp = HtsFile(copyHtsFile(fp));
             this.h = header;
+
+            /// init bam1_t
             b = Bam1(bam_init1());
-            itr = sam_itr_regions(idx, this.h.h, rlist.ptr, cast(uint) rlist.length);
-            //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
-            hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int) itr == 0));
-            popFront();
+
+            /// get the itr
+            itr = sam_itr_regions(idx, this.h.h, rlistPtr, cast(uint) count);
+
+            empty();
         }
 
         /// InputRange interface
         @property bool empty()
         {
+            if(!initialized){
+                this.initialized = true;
+                popFront;
+            }
             return (r <= 0 && itr.finished) ? true : false;
         }
         /// ditto
@@ -553,99 +584,21 @@ struct SAMReader
         {
             return SAMRecord(bam_dup1(b), this.h);
         }
-    }
-
-    /// List of regions based on sam/bam
-    struct RegionList
-    {
-        import std.algorithm.iteration : splitter;
-        import std.algorithm.sorting : sort;
-        import std.range : drop, array;
-        import std.conv : to;
-
-        private hts_reglist_t[string] rlist;
-        private SAMFile* sam;
-
-        ///
-        this(SAMFile* sam, string[] queries)
+        /// make a ForwardRange
+        RecordRangeMulti save()
         {
-            this.sam = sam;
-            foreach (q; queries)
-            {
-                addRegion(q);
-            }
-        }
-
-        /// Add a region in standard format (chr1:2000-3000) to the RegionList
-        void addRegion(string reg)
-        {
-            //chr:1-2
-            //split into chr and 1-2
-            auto split = reg.splitter(":");
-            auto chr = split.front;
-            //split 1-2 into 1 and 2
-            split = split.drop(1).front.splitter("-");
-            if (sam.header.targetId(chr) < 0)
-            {
-                hts_log_error(__FUNCTION__, "tid not present in sam/bam");
-            }
-            addRegion(sam.header.targetId(chr), split.front.to!int, split.drop(1).front.to!int);
-        }
-
-        /// Add a region by {target/contig/chr id, start coord, end coord} to the RegionList
-        void addRegion(int tid, int beg, int end)
-        {
-            if (tid > this.sam.header.nTargets || tid < 0)
-                hts_log_error(__FUNCTION__, "tid not present in sam/bam");
-
-            auto val = (this.sam.header.targetNames[tid] in this.rlist);
-            hts_pair32_t p;
-
-            if (beg < 0)
-                hts_log_error(__FUNCTION__, "first coordinate < 0");
-
-            if (beg >= this.sam.header.targetLength(tid))
-                hts_log_error(__FUNCTION__, "first coordinate larger than tid length");
-
-            if (end < 0)
-                hts_log_error(__FUNCTION__, "second coordinate < 0");
-
-            if (end >= this.sam.header.targetLength(tid))
-                hts_log_error(__FUNCTION__, "second coordinate larger than tid length");
-
-            p.beg = beg;
-            p.end = end;
-            hts_pair32_t[] plist;
-            if (val is null)
-            {
-                hts_reglist_t r;
-
-                //set tid
-                r.tid = tid;
-
-                //create intervals
-                plist = plist ~ p;
-                r.intervals = plist.ptr;
-                r.count = cast(uint) plist.length;
-                r.min_beg = p.beg;
-                r.max_end = p.end;
-                this.rlist[this.sam.header.targetNames[tid]] = r;
-            }
-            else
-            {
-                plist = (val.intervals[0 .. val.count] ~ p).sort!(cmpInterval).array;
-                val.intervals = plist.ptr;
-                val.count = cast(uint) plist.length;
-                val.min_beg = plist[0].beg;
-                val.max_end = plist[$ - 1].end;
-            }
-        }
-
-        hts_reglist_t[] getRegList()
-        {
-            return rlist.byValue.array.sort!(cmpRegList).array;
+            RecordRangeMulti newRange;
+            newRange.fp = HtsFile(copyHtsFile(fp, itr.curr_off));
+            newRange.itr = HtsItrMulti(copyHtsItr(itr));
+            newRange.h = h.dup;
+            newRange.b = Bam1(bam_dup1(this.b));
+            newRange.initialized = this.initialized;
+            newRange.r = this.r;
+            return newRange;
         }
     }
+    static assert(isInputRange!RecordRangeMulti);
+    static assert(is(ElementType!RecordRangeMulti == SAMRecord));
 }
 
 ///
@@ -708,6 +661,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map;
     import std.array : array;
     import std.path : buildPath,dirName;
+    import std.range : drop;
     hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
     hts_log_info(__FUNCTION__, "Testing SAMFile query");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -746,6 +700,19 @@ debug(dhtslib_unittest) unittest
     assert(bam["CHROMOSOME_I",$].array.length == 0);
     assert(bam[0, $].array.length == 0);
     assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
+
+    auto range = bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]];
+    auto range1 = range.save;
+    range = range.drop(5);
+    auto range2 = range.save;
+    range = range.drop(5);
+    auto range3 = range.save;
+    range = range.drop(10);
+    auto range4 = range.save;
+    assert(range1.array.length == 33);
+    assert(range2.array.length == 28);
+    assert(range3.array.length == 23);
+    assert(range4.array.length == 13);
 }
 debug(dhtslib_unittest) unittest
 {

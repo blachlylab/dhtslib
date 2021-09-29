@@ -152,6 +152,8 @@ alias Faidx = SafeHtslibPtr!(faidx_t, fai_destroy);
 /// can be used directly as a kstring_t *
 alias Kstring = SafeHtslibPtr!(kstring_t, ks_free);
 
+alias HtsItrMulti = HtsItr;
+
 debug(dhtslib_unittest) unittest 
 {
     auto rc1 = Bam1(bam_init1);

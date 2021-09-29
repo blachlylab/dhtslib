@@ -73,8 +73,19 @@ pragma(inline, true){
         *newItr = *itr;
 
         /// initialize and copy region list
-        newItr.reg_list = cast(hts_reglist_t *) malloc(itr.n_reg * hts_reglist_t.sizeof);
-        newItr.reg_list[0 .. newItr.n_reg] = itr.reg_list[0 .. itr.n_reg];
+        /// if it is not null
+        if(newItr.reg_list){
+            /// initialize the region lists
+            newItr.reg_list = cast(hts_reglist_t *) malloc(itr.n_reg * hts_reglist_t.sizeof);
+            newItr.reg_list[0 .. newItr.n_reg] = itr.reg_list[0 .. itr.n_reg];
+            /// for each list
+            for(auto i=0; i < newItr.n_reg; i++)
+            {
+                /// copy all intervals
+                newItr.reg_list[i].intervals = cast(hts_pair_pos_t *) malloc(itr.reg_list[i].count * hts_pair_pos_t.sizeof);
+                newItr.reg_list[i].intervals[0 .. newItr.reg_list[i].count] = itr.reg_list[i].intervals[0 .. itr.reg_list[i].count];
+            }
+        }
 
         /// initialize and copy bins list
         newItr.bins.a = cast(int *) malloc(itr.bins.m * int.sizeof);
