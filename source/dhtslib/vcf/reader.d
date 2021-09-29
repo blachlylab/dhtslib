@@ -8,6 +8,7 @@ import dhtslib.vcf;
 import dhtslib.tabix;
 import dhtslib.coordinates;
 import dhtslib.memory;
+import dhtslib.util;
 import htslib.vcf;
 import htslib.hts_log;
 import htslib.kstring;
@@ -57,6 +58,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
             this.b = Bcf1(bcf_init1());
             this.b.max_unpack = MAX_UNPACK;
             this.MAX_UNPACK = MAX_UNPACK;
+            this.empty;
         }
 
         /// copy the TabixIndexedFile.region range
@@ -83,6 +85,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
             this.b = Bcf1(bcf_init1());
             this.b.max_unpack = MAX_UNPACK;
             this.MAX_UNPACK = MAX_UNPACK;
+            this.empty;
         }
     }
 
@@ -147,6 +150,22 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         auto copiedBcf_1t = bcf_dup(this.b);
         return VCFRecord(this.vcfhdr, copiedBcf_1t, this.MAX_UNPACK);
     }
+
+    typeof(this) save()
+    {
+        typeof(this) newRange = this;
+        static if(isTabixFile){
+            newRange.tbx = tbx; /// For tabix use
+            newRange.tbxRange = tbxRange.save; /// For tabix use
+        }else{
+            newRange.fp = HtsFile(copyHtsFile(this.fp));
+        }
+        newRange.vcfhdr = vcfhdr.dup;
+        newRange.b = Bcf1(bcf_dup(this.b));
+        newRange.initialized = initialized;
+        newRange.success = success;
+        return newRange;
+    }
 }
 
 debug(dhtslib_unittest) unittest
@@ -164,7 +183,6 @@ debug(dhtslib_unittest) unittest
     auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
     assert(vcf.count == 14);
     vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-    vcf.empty;
     VCFRecord rec = vcf.front;
     assert(rec.chrom == "1");
     assert(rec.pos == 3000149);
@@ -184,7 +202,22 @@ debug(dhtslib_unittest) unittest
     assert(rec.allelesAsArray == ["C","T"]);
     assert(approxEqual(rec.qual,59.2));
     assert(rec.filter == "PASS");
-    // assert(rec. == ["C","T"]);
+    
+    vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
+    auto range1 = vcf.save;
+    vcf.popFront;
+    auto range2 = vcf.save;
+    vcf.popFront;
+    vcf.popFront;
+    auto range3 = vcf.save;
+    vcf.popFront;
+    vcf.popFront;
+    vcf.popFront;
+    auto range4 = vcf.save;
+    assert(range1.array.length == 14);
+    assert(range2.array.length == 13);
+    assert(range3.array.length == 11);
+    assert(range4.array.length == 8);
 }
 
 debug(dhtslib_unittest) unittest
@@ -205,7 +238,6 @@ debug(dhtslib_unittest) unittest
     auto vcf = VCFReader(tbx, reg.contig, reg.interval);
     assert(vcf.count == 3);
     vcf = VCFReader(tbx, reg.contig, reg.interval);
-    vcf.empty;
     VCFRecord rec = vcf.front;
     assert(rec.chrom == "1");
     assert(rec.pos == 3000150);
@@ -226,6 +258,19 @@ debug(dhtslib_unittest) unittest
     assert(approxEqual(rec.qual,12.9));
     assert(rec.filter == "q10");
     // assert(rec. == ["C","T"]);
+
+    vcf = VCFReader(tbx, reg.contig, reg.interval);
+    auto range1 = vcf.save;
+    vcf.popFront;
+    auto range2 = vcf.save;
+    vcf.popFront;
+    auto range3 = vcf.save;
+    vcf.popFront;
+    auto range4 = vcf.save;
+    assert(range1.array.length == 3);
+    assert(range2.array.length == 2);
+    assert(range3.array.length == 1);
+    assert(range4.array.length == 0);
 }
 
 debug(dhtslib_unittest) unittest
@@ -247,7 +292,6 @@ debug(dhtslib_unittest) unittest
     auto vcf = VCFReader(tbx, reg.contig, reg.interval);
     assert(vcf.count == 3);
     vcf = VCFReader(tbx, reg.contig, reg.interval, UnpackLevel.None);
-    vcf.empty;
     VCFRecord rec = vcf.front;
 
     assert(rec.chrom == "1");

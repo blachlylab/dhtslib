@@ -19,6 +19,7 @@ import htslib.kstring;
 import htslib.tbx;
 import dhtslib.coordinates;
 import dhtslib.memory;
+import dhtslib.util;
 //import htslib.regidx;
 
 /** Encapsulates a position-sorted record-oriented NGS flat file,
@@ -95,9 +96,10 @@ struct TabixIndexedFile {
         {
 
             /** TODO: determine how thread-(un)safe this is (i.e., using a potentially shared *fp and *tbx) */
-            private TabixIndexedFile tbx;
+            private HtsFile fp;
+            private Tbx tbx;
 
-            private hts_itr_t *itr;
+            private HtsItr itr;
             private string next;
 
             // necessary because the alternative strategy of preloading the first row
@@ -107,26 +109,14 @@ struct TabixIndexedFile {
             private bool active;
             private string chrom;
 
-            this(TabixIndexedFile tbx,  string chrom, Interval!(CoordSystem.zbho) coords)
+            this(HtsFile fp, Tbx tbx,  string chrom, Interval!(CoordSystem.zbho) coords)
             {
+                this.fp = fp;
                 this.tbx = tbx;
                 this.chrom = chrom;
-                this.itr = tbx_itr_queryi(tbx.tbx, tbx_name2id(tbx.tbx, toStringz(this.chrom)), coords.start, coords.end);
+                this.itr = HtsItr(tbx_itr_queryi(tbx, tbx_name2id(tbx, toStringz(this.chrom)), coords.start, coords.end));
+                this.empty;
                 debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
-                if (this.itr) {
-                    // Load the first record
-                    //this.popFront(); // correction, do not load the first record
-                }
-                else {
-                    // TODO handle error
-                    throw new Exception("could not allocate this.itr");
-                }
-            }
-            ~this()
-            {
-                debug(dhtslib_debug) { writeln("Region dtor // this.itr: ", this.itr); }
-                //tbx_itr_destroy(itr);
-                //free(this.kstr.s);
             }
 
             // had to remove "const" property from empty() due to manipulation of this.active
@@ -152,7 +142,7 @@ struct TabixIndexedFile {
 
                 // Get next entry
                 kstring_t kstr;
-                immutable res = tbx_itr_next(this.tbx.fp, this.tbx.tbx, this.itr, &kstr);
+                immutable res = tbx_itr_next(this.fp, this.tbx, this.itr, &kstr);
                 if (res < 0) {
                     // we are done
                     this.next = null;
@@ -162,9 +152,20 @@ struct TabixIndexedFile {
                     free(kstr.s);
                 }
             }
+            Region save()
+            {
+                Region newRange;
+                newRange.fp = HtsFile(copyHtsFile(fp));
+                newRange.itr = HtsItr(copyHtsItr(itr));
+                newRange.tbx = tbx;
+                newRange.next = next;
+                newRange.active = active;
+                newRange.chrom = chrom;
+                return newRange;
+            }
         }
 
-        return Region(this, chrom, newCoords);
+        return Region(this.fp, this.tbx, chrom, newCoords);
     }
 
 }
@@ -241,5 +242,12 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     auto empty()
     {
         return this.emptyLine || this.range.empty;
+    }
+
+    typeof(this) save()
+    {
+        typeof(this) newRange = this;
+        newRange.range = this.range.save;
+        return newRange;
     }
 }

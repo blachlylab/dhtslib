@@ -16,6 +16,7 @@ import std.range : inputRangeObject, InputRangeObject;
 import std.traits : ReturnType;
 
 import dhtslib.memory;
+import dhtslib.util;
 
 import htslib.bgzf;
 import htslib.hfile: hseek, off_t;
@@ -61,9 +62,13 @@ struct BGZFile {
         struct BGZFRange
         {
             private Bgzf bgzf;
-            private kstring_t line;
-            this(Bgzf bgzf){
-                this.bgzf = bgzf;
+            private Kstring line;
+            private const(char)* fn;
+            this(Bgzf bgzf, const(char)* fn){
+                this.bgzf = copyBgzf(bgzf, fn);
+                this.fn = fn;
+                line = initKstring;
+                ks_initialize(line);
                 popFront;
             }
             /// InputRange interface
@@ -71,14 +76,10 @@ struct BGZFile {
             void popFront()
             {
 
-                free(this.line.s);
-                // equivalent to htslib ks_release
-                this.line.l = 0;
-                this.line.m = 0;
-                this.line.s = null;
+                ks_clear(this.line);
                 
                 // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
-                immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
+                immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', this.line);
                 this.empty=(res < 0 ? true : false);
             }
             /// ditto
@@ -87,18 +88,30 @@ struct BGZFile {
                 auto ret = fromStringz(this.line.s);
                 return ret;
             }
+            BGZFRange save()
+            {
+                BGZFRange newRange;
+                newRange.fn = fn;
+                newRange.bgzf = Bgzf(copyBgzf(bgzf, fn));
+                newRange.line = Kstring(copyKstring(this.line));
+                return newRange;
+            }
         }
         hseek(bgzf.fp, cast(off_t) 0, SEEK_SET);
-        return BGZFRange(this.bgzf);
+        return BGZFRange(this.bgzf, this.fn);
     }
 
     auto byLineCopy(){
         struct BGZFRange
         {
             private Bgzf bgzf;
-            private kstring_t line;
-            this(Bgzf bgzf){
-                this.bgzf = bgzf;
+            private Kstring line;
+            private const(char)* fn;
+            this(Bgzf bgzf, const(char)* fn){
+                this.bgzf = copyBgzf(bgzf, fn);
+                this.fn = fn;
+                line = initKstring;
+                ks_initialize(line);
                 popFront;
             }
             /// InputRange interface
@@ -106,14 +119,9 @@ struct BGZFile {
             void popFront()
             {
 
-                free(this.line.s);
-                // equivalent to htslib ks_release
-                this.line.l = 0;
-                this.line.m = 0;
-                this.line.s = null;
-                
+                ks_clear(this.line);
                 // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
-                immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
+                immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', this.line);
                 this.empty=(res < 0 ? true : false);
             }
             /// ditto
@@ -122,9 +130,18 @@ struct BGZFile {
                 auto ret = fromStringz(this.line.s).idup;
                 return ret;
             }
+
+            BGZFRange save()
+            {
+                BGZFRange newRange;
+                newRange.fn = fn;
+                newRange.bgzf = Bgzf(copyBgzf(bgzf, fn));
+                newRange.line = Kstring(copyKstring(this.line));
+                return newRange;
+            }
         }
         hseek(bgzf.fp, cast(off_t) 0, SEEK_SET);
-        return BGZFRange(this.bgzf);
+        return BGZFRange(this.bgzf, this.fn);
     }
 }
 
@@ -136,6 +153,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map;
     import std.array : array;
     import std.path : buildPath,dirName;
+    import std.range : drop;
     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
     hts_log_info(__FUNCTION__, "Testing BGZFile");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -146,6 +164,29 @@ debug(dhtslib_unittest) unittest
     assert(bg.byLineCopy.array.length == 500);
     assert(bg.byLineCopy.array.length == 500);
     assert(bg.byLine.array.length == 500);
+
+    
+    auto range = bg.byLineCopy;
+    auto range1 = range.save;
+    range = range.drop(200);
+    auto range2 = range.save;
+    range = range.drop(200);
+    auto range3 = range.save;
+
+    assert(range1.array.length == 500);
+    assert(range2.array.length == 300);
+    assert(range3.array.length == 100);
+
+    auto range4 = bg.byLine;
+    auto range5 = range4.save;
+    range4 = range4.drop(200);
+    auto range6 = range4.save;
+    range4 = range4.drop(200);
+    auto range7 = range4.save;
+
+    assert(range5.array.length == 500);
+    assert(range6.array.length == 300);
+    assert(range7.array.length == 100);
     // assert(bg.array == ["122333444455555"]);
 }
 
