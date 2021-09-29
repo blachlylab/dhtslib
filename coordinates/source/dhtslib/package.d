@@ -385,7 +385,9 @@ struct Interval(CoordSystem cs)
         return this.end > other.end ? this.end : other.end;
     }
 
-    /// set operators for intersect, union, and difference
+    /// Set operators for interval intersection (|) and union (&).
+    /// If the intervals are non-overlapping, an empty interval is returned i.e ZBHO.init
+    /// union is not a true union but returns the convex hull.
     auto opBinary(string op)(Interval!cs other) @nogc
     if(op == "|" || op == "&")
     {
