@@ -24,6 +24,7 @@ import std.meta : staticIndexOf;
 
 import dhtslib.vcf;
 import dhtslib.coordinates;
+import dhtslib.memory;
 import htslib.hts_log;
 import htslib.kstring;
 import htslib.vcf;
@@ -44,25 +45,13 @@ struct InfoField
     ubyte[] data;
 
     /// VCFRecord refct
-    int * refct;
+    Bcf1 line;
 
     /// ctor from VCFRecord
-    this(string key, bcf_info_t * info, int * refct)
+    this(string key, bcf_info_t * info, Bcf1 line)
     {
-        this.refct = refct;
-        (*this.refct)++;
+        this.line = line;
         this(key, info);
-    }
-
-    /// postblit
-    this(this){
-        if(this.refct) (*this.refct)++;
-    }
-
-    /// dtor
-    ~this()
-    {
-        if(this.refct) (*this.refct)--;
     }
 
     /// string, info field ctor
@@ -214,25 +203,13 @@ struct FormatField
     ubyte[] data;
 
     /// VCFRecord refct
-    int * refct;
+    Bcf1 line;
 
     /// ctor from VCFRecord
-    this(string key, bcf_fmt_t * fmt, int * refct)
+    this(string key, bcf_fmt_t * fmt, Bcf1 line)
     {
-        this.refct = refct;
-        (*this.refct)++;
+        this.line = line;
         this(key, fmt);
-    }
-
-    /// postblit
-    this(this){
-        if(this.refct) (*this.refct)++;
-    }
-
-    /// dtor
-    ~this()
-    {
-        if(this.refct) (*this.refct)--;
     }
 
     /// string and format ctor
@@ -366,12 +343,9 @@ UNPACK.SHR: all shared information (UNPACK.ALT|UNPACK.FILT|UNPACK.INFO)
 */
 struct VCFRecord
 {
-    bcf1_t* line;   /// htslib structured record TODO: change to 'b' for better internal consistency? (vcf.h/c actually use line quite a bit in fn params)
+    Bcf1 line;   /// htslib structured record TODO: change to 'b' for better internal consistency? (vcf.h/c actually use line quite a bit in fn params)
 
-    VCFHeader *vcfheader;   /// corresponding header (required);
-                            /// is ptr to avoid copying struct containing ptr to bcf_hdr_t (leads to double free())
-    
-    private int refct = 1;      // Postblit refcounting in case the object is passed around
+    VCFHeader vcfheader;   /// corresponding header (required);
 
     /** VCFRecord
 
@@ -384,25 +358,25 @@ struct VCFRecord
         as it will not UnpackLevel all fields, only up to those requested (see htslib.vcf)
         For example, UnpackLevel.ALT is up to ALT inclusive, and UnpackLevel.ALT is up to FILTER
     */
-    this(T)(T *h, bcf1_t *b, UnpackLevel MAX_UNPACK = UnpackLevel.None)
-    if(is(T == VCFHeader) || is(T == bcf_hdr_t))
+    this(T)(T h, bcf1_t *b, UnpackLevel MAX_UNPACK = UnpackLevel.None)
+    if(is(T == VCFHeader) || is(T == bcf_hdr_t *))
     {
         static if (is(T == VCFHeader)) this.vcfheader = h;
-        //else static if (is(T == bcf_hdr_t)) this.vcfheader = new VCFHeader(h); // double free() bug if we don't own bcf_hdr_t h
+        else static if (is(T == bcf_hdr_t *)) this.vcfheader = VCFHeader(Bcf_hdr_t(h)); // double free() bug if we don't own bcf_hdr_t h
         else static if (is(T == bcf_hdr_t)) assert(0);  // ferret out situations that will lead to free() crashes
         else assert(0);
 
-        this.line = b;
+        this.line = Bcf1(b);
 
         // Now it must be UNPACKed
         // Protip: specifying alternate MAX_UNPACK can speed it tremendously
         immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
     }
     /// ditto
-    this(SS)(VCFHeader *vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
+    this(SS)(VCFHeader vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
     if (isSomeString!SS || is(SS == string[]))
     {
-        this.line = bcf_init1();
+        this.line = Bcf1(bcf_init1());
         this.vcfheader = vcfhdr;
         
         this.chrom = chrom;
@@ -415,7 +389,7 @@ struct VCFRecord
         this.filter = filter;
     }
     /// ditto
-    this(VCFHeader *vcfhdr, string line, UnpackLevel MAX_UNPACK = UnpackLevel.None)
+    this(VCFHeader vcfhdr, string line, UnpackLevel MAX_UNPACK = UnpackLevel.None)
     {
         this.vcfheader = vcfhdr;
 
@@ -426,7 +400,7 @@ struct VCFRecord
         kline.m = dupline.length;
         kline.s = dupline.ptr;
 
-        this.line = bcf_init1();
+        this.line = Bcf1(bcf_init1());
         this.line.max_unpack = MAX_UNPACK;
 
         auto ret = vcf_parse(&kline, this.vcfheader.hdr, this.line);
@@ -435,22 +409,6 @@ struct VCFRecord
         } else {
             ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
         }
-    }
-
-    // post-blit reference counting
-    this(this)
-    {
-        refct++;
-    }
-
-    invariant(){
-        assert(refct >= 0);
-    }
-
-    /// dtor
-    ~this(){
-        if(--refct == 0 && this.line)
-            bcf_destroy1(this.line);
     }
 
     /// ensure that vcf variable length data is unpacked to at least desired level
@@ -1015,7 +973,7 @@ struct VCFRecord
             /// skip
             if(!info.vptr) continue;
             auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.Id][info.key].key).idup;
-            infoMap[key] = InfoField(key, &info, &this.refct);
+            infoMap[key] = InfoField(key, &info, this.line);
         }
         return infoMap;
     }
@@ -1032,7 +990,7 @@ struct VCFRecord
             /// skip
             if(!fmt.p) continue;
             auto key = fromStringz(this.vcfheader.hdr.id[HeaderDictTypes.Id][fmt.id].key).idup;
-            fmtMap[key] = FormatField(key, &fmt, &this.refct);
+            fmtMap[key] = FormatField(key, &fmt, this.line);
         }
         return fmtMap;
     }

@@ -16,6 +16,7 @@ import dhtslib.sam.cigar;
 import dhtslib.sam.tagvalue;
 import dhtslib.sam.header;
 import dhtslib.coordinates;
+import dhtslib.memory;
 
 /**
 Encapsulates a SAM/BAM/CRAM record,
@@ -25,26 +26,15 @@ and the htslib helper functions for speed.
 struct SAMRecord
 {
     /// Backing SAM/BAM row record
-    bam1_t* b;
+    Bam1 b;
 
     /// Corresponding SAM/BAM header data
     SAMHeader h;
-
-    private int refct = 1;      // Postblit refcounting in case the object is passed around
-
-    this(this)
-    {
-        refct++;
-    }
-
-    invariant(){
-        assert(refct >= 0);
-    }
    
     /// ditto
     this(SAMHeader h)
     {
-        this.b = bam_init1();
+        this.b = Bam1(bam_init1);
         this.h = h;
     }
  
@@ -52,34 +42,15 @@ struct SAMRecord
     deprecated("Construct with sam_hdr_t* for mapped contig (tid) name support")
     this(bam1_t* b)
     {
-        this.b = b;
+        this.b = Bam1(b);
     }
 
     /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
     this(bam1_t* b, SAMHeader h)
     {
-        this.b = b;
+        this.b = Bam1(b);
         this.h = h;
     }
-
-    ~this()
-    {
-        if(refct > 0) {
-            refct--;
-        }
-        // remove only if no references to this
-        if (refct == 0){
-            bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
-        }
-    }
-
-
-    /// just a function for checking reference count
-    /// debugging purposes
-    debug int references(){
-        return this.refct;
-    }
-
 
     /* bam1_core_t fields */
 
@@ -394,7 +365,7 @@ struct SAMRecord
     pragma(inline, true)
     @property Cigar cigar()
     {
-        return Cigar(bam_get_cigar(b), (*b).core.n_cigar, &this.refct);
+        return Cigar(this.b);
     }
 
     /// Assign a cigar string
@@ -441,7 +412,7 @@ struct SAMRecord
     /// Get aux tag from bam1_t record and return a TagValue
     TagValue opIndex(string val)
     {
-        return TagValue(b, val[0..2], &this.refct);
+        return TagValue(this.b, val[0..2]);
     }
 
     /// Assign a tag key value pair

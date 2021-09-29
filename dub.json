@@ -26,6 +26,12 @@
             "libs": ["hts"]
         },
         {
+            "name": "unittest-safety",
+            "debugVersions": ["dhtslib_unittest"],
+            "libs": ["hts"],
+            "dflags": ["-dip1000"]
+        },
+        {
             "name": "tabix_test",
             "targetType": "executable",
             "targetName": "tabix_gffreader",

@@ -21,6 +21,7 @@ import std.algorithm : map;
 import std.array : array;
 import std.utf : toUTFz;
 
+import dhtslib.memory;
 import dhtslib.vcf;
 import htslib.vcf;
 import htslib.hts_log;
@@ -274,20 +275,12 @@ struct HeaderRecord
 struct VCFHeader
 {
     /// Pointer to htslib BCF/VCF header struct; will be freed from VCFHeader dtor 
-    bcf_hdr_t *hdr;
+    BcfHdr hdr;
 
-    // Copies have to be disabled to avoid double free()
-    @disable this(this);
-
-    ~this()
+    /// pointer ctor
+    this(bcf_hdr_t * h)
     {
-        // Deallocate header
-        if (this.hdr != null) bcf_hdr_destroy(this.hdr);
-    }
-
-    invariant
-    {
-        assert(this.hdr != null);
+        this.hdr = BcfHdr(h);
     }
 
     /// copy this header

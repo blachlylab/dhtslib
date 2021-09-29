@@ -10,6 +10,7 @@ module dhtslib.sam.header;
 
 import htslib.sam;
 import htslib.kstring;
+import dhtslib.memory;
 
 import core.stdc.stdlib : free;
 import core.stdc.string : memcpy;
@@ -35,27 +36,12 @@ enum RecordType : immutable(char)[2]
 */
 struct SAMHeader
 {
-    sam_hdr_t* h;
-
-    private int refct;      // Postblit refcounting in case the object is passed around
+    BamHdr h; /// rc bam_hdr_t * wrapper
 
     /// Construct from existing pointer
-    this(sam_hdr_t* h)
+    this(bam_hdr_t * h)
     {
-        this.h = h;
-        refct = 1;
-    }
-
-    /// ref counting
-    this(this)
-    {
-        refct++;
-    }
-    
-    /// ref counting
-    ~this(){
-        if(--refct == 0)
-            sam_hdr_destroy(this.h);
+        this.h = BamHdr(h);
     }
 
     bool isNull(){

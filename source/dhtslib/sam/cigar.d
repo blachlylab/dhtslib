@@ -15,6 +15,8 @@ import std.traits : isIntegral;
 import htslib.hts_log;
 import dhtslib.sam.record : SAMRecord;
 import dhtslib.coordinates;
+import dhtslib.memory;
+import htslib.sam : bam_get_cigar;
 
 /// Represents a CIGAR string
 /// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
@@ -23,33 +25,13 @@ struct Cigar
     /// array of distinct CIGAR ops 
     /// private now to force fixing some reference issues
     private CigarOp[] ops;
-
-    /// Since we are reference counting and Cigar doesn't usually own its data
-    /// we have to do some special things.
-
-    private int * refct;      // Postblit refcounting in case the object is passed around
-
-    this(this)
-    {
-        if(refct)
-            (*refct)++;
-    }
-
-    invariant(){
-        assert(this.refct == null || (*refct) >= 0);
-    }
-
-    ~this(){
-        if(refct)
-            (*refct)--;
-    }
-
+    private Bam1 b;
     /// Construct Cigar from SAMRecord
-    this(uint* cigar, uint length, int * refct)
+    this(Bam1 b)
     {
-        this.refct = refct;
-        (*this.refct)++;
-        this(cigar, length);
+        this.b = b;
+        auto cigar = bam_get_cigar(this.b);
+        this(cigar, this.b.core.n_cigar);
     }
 
     /// Construct Cigar from raw data

@@ -23,7 +23,6 @@ void main()
     foreach(recs; range){
         foreach(rec; recs){
             writeln(rec.queryName);
-            writeln(rec.references);
             writeln(rec.pos);
             writeln(rec.cigar.toString);
             writeln(rec.sequence);
@@ -41,7 +40,6 @@ void main()
         auto recs = group.array;
         foreach(rec; recs){
             writeln(rec.queryName);
-            writeln(rec.references);
             writeln(rec.pos);
             writeln(rec.cigar.toString);
             writeln(rec.sequence);
@@ -61,7 +59,6 @@ void main()
         }
         foreach(rec; recs){
             writeln(rec.queryName);
-            writeln(rec.references);
             writeln(rec.pos);
             writeln(rec.cigar.toString);
             writeln(rec.sequence);
@@ -79,7 +76,6 @@ void main()
     foreach(recs; range4){
         foreach(rec; recs){
             writeln(rec.queryName);
-            writeln(rec.references);
             writeln(rec.pos);
             writeln(rec.cigar.toString);
             writeln(rec.sequence);
