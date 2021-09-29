@@ -81,6 +81,7 @@ debug(dhtslib_unittest) unittest
 
 debug(dhtslib_unittest) unittest
 {
+    import dhtslib.util;
     import std.stdio;
     import htslib.hts_log;
     import htslib.tbx : tbx_index_build2, tbx_conf_gff;

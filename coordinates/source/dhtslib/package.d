@@ -1,7 +1,5 @@
 /** Coordinates and Coordinate Systems
 
-    STATUS: Experimental
-
     Interval include `start` and `end`, but no reference sequence id (chr, contig, etc.)
 
     The `Coordinate` type is templated on `CoordSystem` enum, so that the actual coordinate
@@ -41,12 +39,6 @@ obc  -1,0   -1,-1    0,+1    -
 module dhtslib.coordinates;
 import std.traits : isIntegral;
 import std.conv : to;
-import std.string : toStringz;
-import std.typecons : tuple;
-
-import htslib.sam : bam_name2id;
-import htslib.vcf : bcf_hdr_id2name;
-import htslib.hts : hts_parse_reg64;
 
 /// Represents 0-based vs 1-based coordinate types
 enum Basis
@@ -68,6 +60,7 @@ enum End
 /// (zero or one-based)
 struct Coordinate(Basis bs)
 {
+    @safe @nogc nothrow pure:
     /// Coordinate value
     long pos;
     alias pos this;
@@ -110,7 +103,18 @@ struct Coordinate(Basis bs)
     auto offset(T)(T off)
     if(isIntegral!T)
     {
-        return Coordinatse!(bs)(cast(long)(this.pos + off));
+        return Coordinate!(bs)(cast(long)(this.pos + off));
+    }
+
+    /// opbinary + or - to use offset
+    auto opBinary(string op, T)(T off)
+    if ((op == "+" || op == "-") && isIntegral!T)
+    {
+        static if(op == "+")
+            return this.offset(off);
+        else static if(op == "-")
+            return this.offset(-off);
+        else static assert(0,"Operator "~op~" not implemented");
     }
 }
 
@@ -199,13 +203,15 @@ enum CoordSystem
 }
 
 /// Labels for each CoordSystem Type
-static immutable CoordSystemLabels = ["zbho", "zbc", "obho", "obc"];
+enum CoordSystemLabels = __traits(allMembers, CoordSystem);
 
 /// The (start, end) coordinates within a coordinate system,
 /// where the type itself encodes the coordinate system details
 /// (zero or one-based; half-open vs. closed)
 struct Interval(CoordSystem cs)
 {
+    @safe nothrow pure:
+
     /// alias Basis and End enums for this Coordsystem type
     alias basetype = coordinateSystemToBasis!cs;
     alias endtype = coordinateSystemToEnd!cs;
@@ -216,7 +222,7 @@ struct Interval(CoordSystem cs)
     Coordinate!basetype end;
 
     /// long constructor
-    this(long start, long end)
+    this(long start, long end) @nogc
     {
         this.start.pos = start;
         this.end.pos = end;
@@ -233,7 +239,7 @@ struct Interval(CoordSystem cs)
     }
 
     /// Return the size of the interval spanned by start and end
-    long size()
+    long size() @nogc
     {
         static if (cs == CoordSystem.zbho || cs == CoordSystem.obho)
             return end - start;
@@ -244,7 +250,7 @@ struct Interval(CoordSystem cs)
     }
     
     /// Convert coordinates to another coordinate system 
-    auto to(CoordSystem tocs)()
+    auto to(CoordSystem tocs)() @nogc
     {
 
         /// alias Basis and End enums for the tocs Coordsystem type
@@ -278,39 +284,39 @@ struct Interval(CoordSystem cs)
     }
 
     /// Convert coordinate to another based system using shortcuts
-    auto to(T: ZBHO)()
+    auto to(T: ZBHO)() @nogc
     {
         return this.to!(CoordSystem.zbho);
     }
 
     /// Convert coordinate to another based system using shortcuts
-    auto to(T: OBHO)()
+    auto to(T: OBHO)() @nogc
     {
         return this.to!(CoordSystem.obho);
     }
 
     /// Convert coordinate to another based system using shortcuts
-    auto to(T: ZBC)()
+    auto to(T: ZBC)() @nogc
     {
         return this.to!(CoordSystem.zbc);
     }
     
     /// Convert coordinate to another based system using shortcuts
-    auto to(T: OBC)()
+    auto to(T: OBC)() @nogc
     {
         return this.to!(CoordSystem.obc);
     }
 
     /// make a new coordinate pair with a value of 
     /// this.start + off and this.end + off
-    auto offset(T)(T off)
+    auto offset(T)(T off) @nogc
     if(isIntegral!T)
     {
         return Interval!(cs)(cast(long)(this.start + off), cast(long)(this.end + off));
     }
 
     /// intersection of two regions
-    auto intersectImpl(Interval!cs other)
+    auto intersectImpl(Interval!cs other) @nogc
     {
         if(!this.isOverlap(other)){
             return Interval!(cs).init;
@@ -322,7 +328,14 @@ struct Interval(CoordSystem cs)
     }
 
     /// union of two regions
-    auto unionImpl(Interval!cs other)
+    /// specifically computes the convex hull of the two intervals
+    /// if Intervals don't overlap returns the init Interval
+    /// 
+    /// https://en.wikipedia.org/wiki/Convex_hull
+    ///
+    /// Thanks Arne!
+    /// https://forum.dlang.org/post/duzdclxvvrifoastdztv@forum.dlang.org
+    auto unionImpl(Interval!cs other) @nogc
     {
         if(!this.isOverlap(other)){
             return Interval!(cs).init;
@@ -333,7 +346,9 @@ struct Interval(CoordSystem cs)
             );
     }
 
-    auto isOverlap(Interval!cs other)
+    /// does this interval overlap
+    /// with the other interval?
+    auto isOverlap(Interval!cs other) @nogc
     {
         static if(endtype == End.closed){
             return this.getMaxStart(other) <= this.getMinEnd(other);
@@ -342,31 +357,53 @@ struct Interval(CoordSystem cs)
         }
     }
 
-    auto getMinStart(Interval!cs other)
+    /// get minimum start value between this interval
+    /// and other interval
+    auto getMinStart(Interval!cs other) @nogc
     {
         return this.start < other.start ? this.start : other.start;
     }
 
-    auto getMaxStart(Interval!cs other)
+    /// get maximum start value between this interval
+    /// and other interval
+    auto getMaxStart(Interval!cs other) @nogc
     {
         return this.start > other.start ? this.start : other.start;
     }
 
-    auto getMinEnd(Interval!cs other)
+    /// get minimum end value between this interval
+    /// and other interval
+    auto getMinEnd(Interval!cs other) @nogc
     {
         return this.end < other.end ? this.end : other.end;
     }
     
-    auto getMaxEnd(Interval!cs other)
+    /// get maximum end value between this interval
+    /// and other interval
+    auto getMaxEnd(Interval!cs other) @nogc
     {
         return this.end > other.end ? this.end : other.end;
     }
 
-    /// set operators for intersect, union, and difference
-    auto opBinary(string op)(Interval!cs other)
+    /// Set operators for interval intersection (|) and union (&).
+    /// If the intervals are non-overlapping, an empty interval is returned i.e ZBHO.init
+    /// union is not a true union but returns the convex hull.
+    auto opBinary(string op)(Interval!cs other) @nogc
+    if(op == "|" || op == "&")
     {
         static if(op == "|") return unionImpl(other);
         else static if(op == "&") return intersectImpl(other);
+        else static assert(0,"Operator "~op~" not implemented");
+    }
+
+    /// opbinary + or - to use offset
+    auto opBinary(string op, T)(T off) @nogc
+    if ((op == "+" || op == "-") && isIntegral!T)
+    {
+        static if(op == "+")
+            return this.offset(off);
+        else static if(op == "-")
+            return this.offset(-off);
         else static assert(0,"Operator "~op~" not implemented");
     }
 
@@ -375,41 +412,6 @@ struct Interval(CoordSystem cs)
         return "[" ~ CoordSystemLabels[cs] ~ "] " ~ this.start.pos.to!string ~ "-" ~ this.end.pos.to!string;
     }
 }
-
-
-/// Returns tuple of String and ZBHO coordinates
-/// representing input string. Supports htslib coordinate strings.
-/// i.e chr1:1-10
-auto getIntervalFromString(string region){
-    ZBHO coords;
-    auto regStr = toStringz(region);
-    auto ptr = hts_parse_reg64(regStr,&coords.start.pos,&coords.end.pos);
-    if(!ptr){
-        throw new Exception("Region string could not be parsed");
-    }
-    auto contig = region[0..ptr - regStr];
-    return tuple!("contig","interval")(contig,coords);
-}
-
-/// TODO: complete getIntervalFromString with the ability to check headers
-
-// auto getIntervalFromString(Header)(string region, Header h)
-//     if(is(Header == SAMHeader) || is(Header == VCFHeader))
-// {
-//     ZBHO coords;
-//     int tid;
-//     auto regStr = toStringz(region);
-//     auto flag =  HTS_PARSE_FLAGS.HTS_PARSE_THOUSANDS_SEP;
-//     static if(is(Header == SAMHeader)){
-//         auto ptr = hts_parse_region(regStr,&tid, &coords.start.pos, &coords.end.pos, cast(hts_name2id_f * )&bam_name2id, h.h, flag);
-//     } else static if(is(Header == VCFHeader)){
-//         auto ptr = hts_parse_region(regStr,&tid, &coords.start.pos, &coords.end.pos, &bcf_hdr_id2name, h.hdr, flag);
-//     }
-//     if(!ptr){
-//         throw new Exception("Region string could not be parsed");
-//     }
-//     return tuple!("tid","interval")(tid, coords);
-// }
 
 alias ZBHO = Interval!(CoordSystem.zbho);
 alias OBHO = Interval!(CoordSystem.obho);
@@ -422,7 +424,7 @@ alias ZeroBasedClosed = Interval!(CoordSystem.zbc);
 alias OneBasedClosed = Interval!(CoordSystem.obc);
 
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     auto c0 = Interval!(CoordSystem.zbho)(0, 100);
     assert(c0.size == 100);
@@ -439,15 +441,29 @@ debug(dhtslib_unittest) unittest
     // ...
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
-    auto reg = getIntervalFromString("chrom1:0-100");
-    assert(reg.contig == "chrom1");
-    auto c0 = reg.interval;
-    assert(c0 == Interval!(CoordSystem.zbho)(0, 100));
+    ZB coord = ZB(1);
+    assert(coord + 1 == ZB(2));
+    assert(coord - 1 == ZB(0));
+
+    ZBHO coords = ZBHO(1, 2);
+    assert(coords + 1 == ZBHO(2, 3));
+    assert(coords - 1 == ZBHO(0, 1));
+    // ...
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
+{
+    ZBHO coords = ZBHO(1, 5);
+    assert((coords & ZBHO(2, 6)) == ZBHO(2, 5));
+    assert((coords | ZBHO(3, 10)) == ZBHO(1, 10));
+    assert((coords | ZBHO(6, 10)) == ZBHO(0, 0));
+    // ...
+}
+
+
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     auto c0 = Interval!(CoordSystem.zbho)(0, 100);
     assert(c0.size == 100);
@@ -463,7 +479,7 @@ debug(dhtslib_unittest) unittest
     assert(c4 == ZBHO(0, 100));
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     auto c0 = ZBHO(0, 100);
     assert(c0.size == 100);
@@ -479,7 +495,7 @@ debug(dhtslib_unittest) unittest
     assert(c4 == ZBHO(0, 100));
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     auto c0 = Interval!(CoordSystem.obho)(1, 101);
     assert(c0.size == 100);
@@ -496,7 +512,7 @@ debug(dhtslib_unittest) unittest
     // ...
 }
 
-debug(dhtslib_unittest) unittest
+debug(dhtslib_unittest) @safe @nogc nothrow pure unittest
 {
     ZBHO c0 = ZBHO(0, 100);
     assert(c0.size == 100);
