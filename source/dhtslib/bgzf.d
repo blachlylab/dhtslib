@@ -57,7 +57,9 @@ struct BGZFile {
         }
     }
 
-    
+    /// Returns a foward range of each line
+    /// the internal buffer is reused so you must copy 
+    /// if you want it to stick around
     auto byLine(){
         struct BGZFRange
         {
@@ -101,6 +103,8 @@ struct BGZFile {
         return BGZFRange(this.bgzf, this.fn);
     }
 
+    /// Returns a foward range of each line
+    /// same as above but we copy for you
     auto byLineCopy(){
         struct BGZFRange
         {
