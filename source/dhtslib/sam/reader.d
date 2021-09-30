@@ -668,7 +668,7 @@ debug(dhtslib_unittest) unittest
     assert(read.sequence=="GCTAGCTCAG");
     assert(sam.allRecords.array.length == 2);
     sam2.write(read);
-    sam2.close;
+    destroy(sam2);
 
 
     // testing with multiple specified threads

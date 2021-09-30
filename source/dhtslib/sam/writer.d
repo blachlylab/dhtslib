@@ -15,6 +15,8 @@ import htslib.hts_log;
 import dhtslib.sam.record;
 import dhtslib.sam.header;
 import dhtslib.sam : parseSam;
+import dhtslib.memory;
+import dhtslib.util;
 
 
 /// SAM/BAM/CRAM on-disk format.
@@ -38,7 +40,7 @@ struct SAMWriter
     private const(char)* fn;
 
     /// htsFile
-    private htsFile* fp;
+    private HtsFile fp;
 
     /// hFILE if required
     private hFILE* f;
@@ -128,21 +130,6 @@ struct SAMWriter
         sam_hdr_write(this.fp,this.header.h);
     }
 
-    ~this()
-    {
-        debug (dhtslib_debug)
-        {
-            writeln("SAMWriter dtor");
-        }
-
-    }
-
-    /// close file
-    void close(){
-        const auto ret = hts_close(this.fp);
-        if (ret < 0)
-            stderr.writefln("There was an error closing %s", fromStringz(this.fn));
-    }
 
     /// Write a SAMRecord to disk
     void write(SAMRecord rec){
@@ -175,11 +162,8 @@ debug(dhtslib_unittest) unittest
     sam2.write(read);
     sam3.write(read);
     sam4.write(read);
-    sam2.close;
     destroy(sam2);
-    sam3.close;
     destroy(sam3);
-    sam4.close;
     destroy(sam4);
     auto sam5 = SAMFile("/tmp/test.bam");
     auto sam6 = SAMFile("/tmp/test2.bam");
