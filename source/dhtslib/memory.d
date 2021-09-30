@@ -38,7 +38,7 @@ if(!isPointer!T && isSomeFunction!destroyFun)
     /// data pointer
     T * ptr;
     /// reference counting
-    int* refct;
+    shared int* refct;
     /// initialized?
     bool initialized;
 
@@ -46,7 +46,7 @@ if(!isPointer!T && isSomeFunction!destroyFun)
     this(T * rawPtr) @trusted return scope
     {
         this.ptr = rawPtr;
-        this.refct = cast(int *) calloc(int.sizeof,1);
+        this.refct = cast(shared int *) calloc(int.sizeof,1);
         (*this.refct) = 1;
         this.initialized = true;
     }
@@ -54,7 +54,7 @@ if(!isPointer!T && isSomeFunction!destroyFun)
     /// postblit that respects scope
     this(this) @trusted return scope
     {
-        if(initialized)(*this.refct)++;
+        if(initialized)atomicOp!"+="(*this.refct, 1);
     }
 
     /// allow SafeHtslibPtr to be used as 
@@ -82,9 +82,9 @@ if(!isPointer!T && isSomeFunction!destroyFun)
     {
         
         if(!this.initialized) return;
-        if(--(*this.refct)) return;
+        if(atomicOp!"-="(*this.refct, 1)) return;
         if(this.ptr){
-            free(this.refct);
+            free(cast(int*)this.refct);
             /// if destroy function return is void 
             /// just destroy
             /// else if return is int
