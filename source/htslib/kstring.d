@@ -95,15 +95,15 @@ char* kstrtok(const(char)* str, const(char)* sep, ks_tokaux_t* aux);
  * or "\r\n"-terminated line from fp.  The line read is appended to the
  * kstring without its terminator and 0 is returned; EOF is returned at
  * EOF or on error (determined by querying fp, as per fgets()). */
-alias kgets_func = char* function(char*, int, void*);
-int kgetline(kstring_t* s, char* function() fgets_fn, void* fp);
+alias kgets_func = char* function(char*, int, void*)*;
+int kgetline(kstring_t* s, kgets_func fgets_fn, void* fp);
 
 /* kgetline2() uses the supplied hgetln()-like function to read a "\n"-
  * or "\r\n"-terminated line from fp.  The line read is appended to the
  * ksring without its terminator and 0 is returned; EOF is returned at
  * EOF or on error (determined by querying fp, as per fgets()). */
-alias kgets_func2 = c_long function(char*, size_t, void*);
-int kgetline2(kstring_t* s, ssize_t function() fgets_fn, void* fp);
+alias kgets_func2 = c_long function(char*, size_t, void*)*;
+int kgetline2(kstring_t* s, kgets_func2 fgets_fn, void* fp);
 
 /// kstring initializer for structure assignment
 
@@ -245,7 +245,7 @@ int kputsn_(const(void)* p, size_t l, kstring_t* s)
 // htslib 1.10 replaced this function with a higher performance
 // version using BSR/CTLZ intrinsics . this diverges from klib's
 // kstring implementation. other functions may have also changed.
-int kputuw(uint x, kstring_t* s){
+int kputuw(T)(T x, kstring_t* s){
 	version(LDC){
 		static uint[32] kputuw_num_digits = [
 			10, 10, 10,  9,  9,  9,  8,  8,
