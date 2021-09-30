@@ -268,39 +268,45 @@ struct SAMReader
         return RecordRangeMulti(this.fp, this.idx, this.header, regions);
     }
 
-    /// ditto
+    /// opIndex with a list of string regions
+    /// bam[["chr1:1-3","chr2:4-50"]]
     auto opIndex(string[] regions)
     {
         return query(regions);
     }
 
-    /// ditto
-    auto opIndex(CoordSystem cs)(string tid, Interval!cs coords)
+    /// opIndex with a string contig and an Interval
+    /// bam["chr1", ZBHO(1,3)]
+    auto opIndex(CoordSystem cs)(string contig, Interval!cs coords)
     {
-        return query(tid, coords);
+        return query(contig, coords);
     }
 
-    /// ditto
+    /// opIndex with an int tid and an Interval
+    /// bam[0, ZBHO(1,3)]
     auto opIndex(CoordSystem cs)(int tid, Interval!cs coords)
     {
         return query(tid, coords);
     }
 
-    /// ditto
-    auto opIndex(Basis bs)(string tid, Coordinate!bs pos)
+    /// opIndex with a string contig and a Coordinate
+    /// bam["chr1", ZB(1)]
+    auto opIndex(Basis bs)(string contig, Coordinate!bs pos)
     {
         auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos, pos + 1);
-        return query(tid, coords);
+        return query(contig, coords);
     }
 
-    /// ditto
+    /// opIndex with an int tid and a Coordinate
+    /// bam[0, ZB(1)]
     auto opIndex(Basis bs)(int tid, Coordinate!bs pos)
     {
         auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos, pos + 1);
         return query(tid, coords);
     }
 
-    /// ditto
+    /// opIndex with a string contig and two Coordinates
+    /// bam["chr1", ZB(1), ZB(3)]
     deprecated("use multidimensional slicing with second parameter as range ([\"chr1\", 1 .. 2])")
     auto opIndex(Basis bs)(string tid, Coordinate!bs pos1, Coordinate!bs pos2)
     {
@@ -308,7 +314,8 @@ struct SAMReader
         return query(tid, coords);
     }
 
-    /// ditto
+    /// opIndex with an int tid and two Coordinates
+    /// bam[0, ZB(1), ZB(3)]
     deprecated("use multidimensional slicing with second parameter as range ([20, 1 .. 2])")
     auto opIndex(Basis bs)(int tid, Coordinate!bs pos1, Coordinate!bs pos2)
     {
@@ -316,7 +323,8 @@ struct SAMReader
         return query(tid, coords);
     }
 
-    /// ditto
+    /// opSlice with two Coordinates
+    /// [ZB(1) .. ZB(3)]
     auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, Coordinate!bs end) if(dim == 1)
     {
         assert(end > start);
@@ -350,7 +358,8 @@ struct SAMReader
     {
         return OffsetType.init;
     }
-    /// ditto
+    /// opIndex with a string contig and an Offset
+    /// bam["chr1",$-2]
     auto opIndex(string ctg, OffsetType endoff)
     {
         auto tid = this.header.targetId(ctg);
@@ -359,7 +368,8 @@ struct SAMReader
         auto coords = Interval!(CoordSystem.zbho)(end, end + 1);
         return query(tid, coords);
     }
-    /// ditto
+    /// opIndex with an int tid and an Offset
+    /// bam[0,$-2]
     auto opIndex(int tid, OffsetType endoff)
     {
         auto end = this.header.targetLength(tid) + endoff.offset;
@@ -367,12 +377,16 @@ struct SAMReader
         auto coords = Interval!(CoordSystem.zbho)(end, end + 1);
         return query(tid, coords);
     }
-    /// ditto
+
+    /// opSlice as Coordinate and an offset
+    /// i.e [ZB(2) .. $]
     auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, OffsetType off) if(dim == 1)
     {
         return Tuple!(Coordinate!bs, OffsetType)(start, off);
     }
-    /// ditto
+
+    /// opIndex with a string contig and a Coordinate and Offset
+    /// bam["chr1",ZB(1) .. $]
     auto opIndex(Basis bs)(string ctg, Tuple!(Coordinate!bs, OffsetType) coords)
     {
         auto tid = this.header.targetId(ctg);
@@ -382,13 +396,43 @@ struct SAMReader
         auto c = Interval!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
         return query(tid, c);
     }
-    /// ditto
+
+    /// opIndex with an int tid and a Coordinate and Offset
+    /// bam[0,ZB(1) .. $]
     auto opIndex(Basis bs)(int tid, Tuple!(Coordinate!bs, OffsetType) coords)
     {
         auto end = this.header.targetLength(tid) + coords[1];
         auto endCoord = ZB(end);
         auto newEndCoord = endCoord.to!bs;
         auto c = Interval!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
+        return query(tid, c);
+    }
+
+    /// opSlice as two offset
+    /// i.e [$-2 .. $]
+    auto opSlice(size_t dim)(OffsetType start, OffsetType end) if(dim == 1)
+    {
+        return Tuple!(OffsetType, OffsetType)(start, end);
+    }
+
+    /// opIndex two Offsets
+    /// i.e fai["chrom1", $-2 .. $]
+    auto opIndex(string ctg, Tuple!(OffsetType, OffsetType) coords)
+    {
+        auto tid = this.header.targetId(ctg);
+        auto start = this.header.targetLength(tid) + coords[0];
+        auto end = this.header.targetLength(tid) + coords[1];
+        auto c = ZBHO(start, end);
+        return query(tid, c);
+    }
+
+    /// opIndex with an int tid and a Coordinate and Offset
+    /// bam[0,ZB(1) .. $]
+    auto opIndex(int tid, Tuple!(OffsetType, OffsetType) coords)
+    {
+        auto start = this.header.targetLength(tid) + coords[0];
+        auto end = this.header.targetLength(tid) + coords[1];
+        auto c = ZBHO(start, end);
         return query(tid, c);
     }
 
@@ -700,6 +744,12 @@ debug(dhtslib_unittest) unittest
     assert(bam["CHROMOSOME_I",$].array.length == 0);
     assert(bam[0, $].array.length == 0);
     assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
+
+    assert(bam["CHROMOSOME_II",$-1918 .. $].array.length == 0);
+    assert(bam["CHROMOSOME_II", ZB(3082) .. $].array.length == 0);
+    assert(bam["CHROMOSOME_II",$-1919 .. $].array.length == 1);
+    assert(bam["CHROMOSOME_II", ZB(3081) .. $].array.length == 1);
+    assert(bam["CHROMOSOME_II",$-2018 .. $].array.length == 2);
 
     auto range = bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]];
     auto range1 = range.save;
