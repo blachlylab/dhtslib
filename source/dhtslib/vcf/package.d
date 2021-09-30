@@ -97,7 +97,7 @@ enum HeaderDictTypes
 ///
 /// 
 /// Replacement for htslib BCF_BT_*
-enum RecordType
+enum BcfRecordType
 {
     Null =   0,  /// null
     Int8 =   BCF_BT_INT8,  /// int8

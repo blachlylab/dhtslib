@@ -38,7 +38,7 @@ struct InfoField
     /// String identifier of info field
     string key;
     /// BCF TYPE indicator
-    RecordType type;
+    BcfRecordType type;
     /// number of data elements
     int len;
     /// reference of info field data
@@ -58,7 +58,7 @@ struct InfoField
     this(string key, bcf_info_t * info)
     {
         /// get type
-        this.type = cast(RecordType)(info.type & 0b1111);
+        this.type = cast(BcfRecordType)(info.type & 0b1111);
         /// get len
         this.len = info.len;
         /// copy data
@@ -66,25 +66,25 @@ struct InfoField
         /// double check our lengths
         debug{
             final switch(this.type){
-                case RecordType.Int8:
+                case BcfRecordType.Int8:
                     assert(data.length == this.len * byte.sizeof);
                     break;
-                case RecordType.Int16:
+                case BcfRecordType.Int16:
                     assert(data.length == this.len * short.sizeof);
                     break;
-                case RecordType.Int32:
+                case BcfRecordType.Int32:
                     assert(data.length == this.len * int.sizeof);
                     break;
-                case RecordType.Int64:
+                case BcfRecordType.Int64:
                     assert(data.length == this.len * long.sizeof);
                     break;
-                case RecordType.Float:
+                case BcfRecordType.Float:
                     assert(data.length == this.len * float.sizeof);
                     break;
-                case RecordType.Char:
+                case BcfRecordType.Char:
                     assert(data.length == this.len * char.sizeof);
                     break;
-                case RecordType.Null:
+                case BcfRecordType.Null:
                     assert(data.length == 0);
             }
         }
@@ -96,7 +96,7 @@ struct InfoField
     {
         static if(isIntegral!T){
             /// if we select the correct type just slice and return
-            if(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType))
+            if(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType))
                 return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
             /// if we select type that is too small log error and return
             if(RecordTypeSizes[this.type] > T.sizeof)
@@ -107,16 +107,16 @@ struct InfoField
             T[] ret;
             /// if we select type that is bigger slice, convert and return
             switch(this.type){
-                case RecordType.Int8:
+                case BcfRecordType.Int8:
                     ret = ((cast(byte *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
-                case RecordType.Int16:
+                case BcfRecordType.Int16:
                     ret = ((cast(short *)this.data.ptr)[0 .. short.sizeof * this.len]).to!(T[]);
                     break;
-                case RecordType.Int32:
+                case BcfRecordType.Int32:
                     ret = ((cast(int *)this.data.ptr)[0 .. int.sizeof * this.len]).to!(T[]);
                     break;
-                case RecordType.Int64:
+                case BcfRecordType.Int64:
                     ret = ((cast(long *)this.data.ptr)[0 .. long.sizeof * this.len]).to!(T[]);
                     break;
                 default:
@@ -126,7 +126,7 @@ struct InfoField
             return ret;
         }else{
             /// if we select type the wrong type error and return
-            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+            if(!(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType)))
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return [];
@@ -159,7 +159,7 @@ struct InfoField
                 return this.to!(T[])[0];
             }else{
                 /// if we select type the wrong type error and return
-                if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+                if(!(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType)))
                 {
                     hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                     return T.init;
@@ -175,7 +175,7 @@ struct InfoField
     if(isSomeString!T)
     {
         /// if we select type the wrong type error and return
-        if(!(this.type == RecordType.Char))
+        if(!(this.type == BcfRecordType.Char))
         {
             hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
             return T.init;
@@ -192,7 +192,7 @@ struct FormatField
     /// String identifier of info field
     string key;
     /// BCF TYPE indicator
-    RecordType type;
+    BcfRecordType type;
     /// number of samples
     int nSamples;
     /// number of data elements per sample
@@ -217,7 +217,7 @@ struct FormatField
     {
         /// set all our data
         this.key = key;
-        this.type = cast(RecordType)(fmt.type & 0b1111);
+        this.type = cast(BcfRecordType)(fmt.type & 0b1111);
         this.n = fmt.n;
         this.nSamples = fmt.p_len / fmt.size;
         this.data = fmt.p[0 .. fmt.p_len].dup;
@@ -225,25 +225,25 @@ struct FormatField
         /// double check our work
         debug{
             final switch(this.type){
-                case RecordType.Int8:
+                case BcfRecordType.Int8:
                     assert(data.length == this.nSamples * this.n * byte.sizeof);
                     break;
-                case RecordType.Int16:
+                case BcfRecordType.Int16:
                     assert(data.length == this.nSamples * this.n * short.sizeof);
                     break;
-                case RecordType.Int32:
+                case BcfRecordType.Int32:
                     assert(data.length == this.nSamples * this.n * int.sizeof);
                     break;
-                case RecordType.Int64:
+                case BcfRecordType.Int64:
                     assert(data.length == this.nSamples * this.n * long.sizeof);
                     break;
-                case RecordType.Float:
+                case BcfRecordType.Float:
                     assert(data.length == this.nSamples * this.n * float.sizeof);
                     break;
-                case RecordType.Char:
+                case BcfRecordType.Char:
                     assert(data.length == this.nSamples * this.n * char.sizeof);
                     break;
-                case RecordType.Null:
+                case BcfRecordType.Null:
                     assert(data.length == 0);
             }
         }
@@ -257,7 +257,7 @@ struct FormatField
     {
         T[] ret;
         static if(isIntegral!T){
-            if(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)){
+            if(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType)){
                 ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
                 return ret.chunks(this.n);
             }
@@ -267,16 +267,16 @@ struct FormatField
                 return ret.chunks(this.n);
             }
             switch(this.type){
-                case RecordType.Int8:
+                case BcfRecordType.Int8:
                     ret = ((cast(byte *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
                     break;
-                case RecordType.Int16:
+                case BcfRecordType.Int16:
                     ret = ((cast(short *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
                     break;
-                case RecordType.Int32:
+                case BcfRecordType.Int32:
                     ret = ((cast(int *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
                     break;
-                case RecordType.Int64:
+                case BcfRecordType.Int64:
                     ret = ((cast(long *)this.data.ptr)[0 .. this.n * this.nSamples]).to!(T[]);
                     break;
                 default:
@@ -284,7 +284,7 @@ struct FormatField
                     return ret.chunks(this.n);
             }
         }else static if(isSomeString!T){
-            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+            if(!(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType)))
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return ret.chunks(this.n);
@@ -295,7 +295,7 @@ struct FormatField
                 ret ~= (cast(char *)ptr)[i*size .. (i+1) * size].idup;
             }
         }else{
-            if(!(this.type == cast(RecordType) staticIndexOf!(T, RecordTypeToDType)))
+            if(!(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType)))
             {
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return ret.chunks(this.n);
