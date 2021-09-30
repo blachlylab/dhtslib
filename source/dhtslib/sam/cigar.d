@@ -219,9 +219,13 @@ union CigarOp
         return ((raw & 0xF) >> 1) == 2; // 4 or 5
     }
 
+    deprecated("Use camelCase names instead")
     alias is_query_consuming = isQueryConsuming;
+    deprecated("Use camelCase names instead")
     alias is_reference_consuming = isReferenceConsuming;
+    deprecated("Use camelCase names instead")
     alias is_match_or_mismatch = isMatchOrMismatch;
+    deprecated("Use camelCase names instead")
     alias is_clipping = isClipping;
 
     string toString(){
