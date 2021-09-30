@@ -12,10 +12,12 @@ Sequence caching and multithreaded BGZF decompression are supported.
 module dhtslib.faidx;
 
 import std.string;
+import std.typecons : Tuple;
 import core.stdc.stdlib : malloc, free;
 
 import dhtslib.coordinates;
 import dhtslib.memory;
+import dhtslib.util;
 import htslib.faidx;
 
 /** Build index for a FASTA or bgzip-compressed FASTA file.
@@ -84,11 +86,80 @@ struct IndexedFastaFile {
         //bgzf_mt(this.faidx.bgzf, nthreads, 64);
     }
 
-    /// Fetch sequence in region by assoc array-style lookup:
-    /// `string sequence = fafile["chr2:20123-30456"]`
-    auto opIndex(CoordSystem cs)(ChromInterval!cs region)
+    private struct OffsetType
     {
-        return fetchSequence(region);
+        ptrdiff_t offset;
+        alias offset this;
+
+        // supports e.g. $ - x
+        OffsetType opBinary(string s, T)(T val)
+        {
+            mixin("return OffsetType(offset " ~ s ~ " val);");
+        }
+
+        invariant
+        {
+            assert(this.offset <= 0, "Offset from end should be zero or negative");
+        }
+    }
+    /** Array-end `$` indexing hack courtesy of Steve Schveighoffer
+        https://forum.dlang.org/post/rl7a56$nad$1@digitalmars.com
+
+        Requires in addition to opDollar returning a bespoke non-integral type
+        a series of overloads for opIndex and opSlice taking this type
+    */
+    OffsetType opDollar(size_t dim)() if(dim == 1)
+    {
+        return OffsetType.init;
+    }
+    /// opSlice as Coordinate and an offset
+    /// i.e [ZB(2) .. $]
+    auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, OffsetType off) if(dim == 1)
+    {
+        return Tuple!(Coordinate!bs, OffsetType)(start, off);
+    }
+    /// opSlice as two offset
+    /// i.e [$-2 .. $]
+    auto opSlice(size_t dim)(OffsetType start, OffsetType end) if(dim == 1)
+    {
+        return Tuple!(OffsetType, OffsetType)(start, end);
+    }
+    /// opIndex coordinate and Offset
+    /// i.e fai["chrom1", ZB(1) .. $]
+    auto opIndex(Basis bs)(string ctg, Tuple!(Coordinate!bs, OffsetType) coords)
+    {
+        auto end = this.seqLen(ctg) + coords[1];
+        auto endCoord = ZB(end);
+        auto newEndCoord = endCoord.to!bs;
+        auto c = Interval!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
+        return fetchSequence(ctg, c);
+    }
+
+    /// opIndex two Offsets
+    /// i.e fai["chrom1", $-2 .. $]
+    auto opIndex(string ctg, Tuple!(OffsetType, OffsetType) coords)
+    {
+        auto start = this.seqLen(ctg) + coords[0];
+        auto end = this.seqLen(ctg) + coords[1];
+        auto c = ZBHO(start, end);
+        return fetchSequence(ctg, c);
+    }
+    /// opIndex one offset
+    /// i.e fai["chrom1", $-1]
+    auto opIndex(string ctg, OffsetType endoff)
+    {
+        auto end = this.seqLen(ctg) + endoff.offset;
+        auto coords = Interval!(CoordSystem.zbho)(end, end + 1);
+        return fetchSequence(ctg, coords);
+    }
+
+    /// Fetch sequence in region by assoc array-style lookup:
+    /// Uses htslib string region parsing
+    /// `string sequence = fafile["chr2:20123-30456"]`
+    auto opIndex(string region)
+    {
+        auto coords = getIntervalFromString(region);
+        return fetchSequence(coords.contig, coords.interval);
     }
 
     /// Fetch sequence in region by multidimensional slicing:
@@ -213,4 +284,31 @@ debug(dhtslib_unittest) unittest
     assert(!fai.hasSeq("CHROMOSOME_"));
 
     assert(fai.seqName(0) == "CHROMOSOME_I");
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import dhtslib.sam;
+    import htslib.hts_log;
+    import std.path : buildPath, dirName;
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+    hts_log_info(__FUNCTION__, "Testing IndexedFastaFile");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto fai = IndexedFastaFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","ce.fa"));
+
+    fai.setCacheSize(4000000);
+
+    assert(fai.fetchSequence("CHROMOSOME_II",ZBHO(0, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    assert(fai.fetchSequence("CHROMOSOME_II",OBHO(1, 30)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    assert(fai.fetchSequence("CHROMOSOME_II",ZBC(0, 28)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    assert(fai.fetchSequence("CHROMOSOME_II",OBC(1, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    assert(fai["CHROMOSOME_II:1-29"] == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    // "GTCAACACAGACCGTTAATTTTGGGAAGTTGAGAAATTCGCTAGTTTCTG"
+    import std.stdio;
+    assert(fai["CHROMOSOME_II",$-50 .. $] == "GTCAACACAGACCGTTAATTTTGGGAAGTTGAGAAATTCGCTAGTTTCTG");
+    
+    assert(fai["CHROMOSOME_II",OB(4951) .. $] == "GTCAACACAGACCGTTAATTTTGGGAAGTTGAGAAATTCGCTAGTTTCTG");
+    assert(fai["CHROMOSOME_II",ZB(4950) .. $] == "GTCAACACAGACCGTTAATTTTGGGAAGTTGAGAAATTCGCTAGTTTCTG");
+    assert(fai["CHROMOSOME_II",$-1] == "G");
 }
