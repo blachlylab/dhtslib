@@ -247,7 +247,7 @@ struct SAMReader
             throw new Exception("SAM index not found");
         }
         auto itr = HtsItr(sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end));
-        return RecordRange(this.fp, this.header, itr);
+        return RecordRange(this.fp, this.header, itr, this.header_offset);
     }
 
 
@@ -263,8 +263,6 @@ struct SAMReader
             hts_log_error(__FUNCTION__, "SAM index not found");
             throw new Exception("SAM index not found");
         }
-        import std.stdio;
-        writeln("multi called");
         return RecordRangeMulti(this.fp, this.idx, this.header, regions);
     }
 
@@ -460,8 +458,9 @@ struct SAMReader
         {
             this.fp = copyHtsFile(fp, offset);
             assert(this.fp.format.format == htsExactFormat.sam || this.fp.format.format == htsExactFormat.bam);
-            this.header = header.dup;
+            this.header = header;
             this.b = Bam1(bam_init1());
+            this.empty;
         }
 
         /// InputRange interface
@@ -508,8 +507,7 @@ struct SAMReader
 
     }
 
-    /// Iterate over records falling within a queried region (TODO: itr_multi_query)
-    /// TODO destroy the itr with dtor
+    /// Iterate over records falling within a queried region
     struct RecordRange
     {
         private HtsFile fp;
@@ -523,12 +521,13 @@ struct SAMReader
         private int success;        // sam_read1 return code
 
         /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
-        this(HtsFile fp, SAMHeader header, HtsItr itr)
+        this(HtsFile fp, SAMHeader header, HtsItr itr, off_t offset)
         {
-            this.fp = copyHtsFile(fp);
-            this.itr = copyHtsItr(itr);
-            this.h = header.dup;
-            this.b = bam_init1();
+            this.fp = HtsFile(copyHtsFile(fp, offset));
+            this.itr = HtsItr(copyHtsItr(itr));
+            this.h = header;
+            this.b = Bam1(bam_init1);
+            this.empty;
             assert(itr !is null, "itr was null"); 
         }
 
@@ -817,9 +816,10 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing RecordsRange save()");
     hts_log_info(__FUNCTION__, "Loading test file");
 
-    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
+    auto bam = SAMReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 4);
     
     auto range = bam.query("CHROMOSOME_I", ZBHO(900, 2000));
+    assert(bam.query("CHROMOSOME_I", ZBHO(900, 2000)).array.length == 14);
     
     auto range1 =  range.save;
     range = range.drop(1);
