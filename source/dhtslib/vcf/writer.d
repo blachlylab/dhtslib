@@ -52,14 +52,14 @@ struct VCFWriter
     }
     /// setup and copy a header from another BCF/VCF as template
     this(T)(string fn, T other)
-    if(is(T == VCFHeader*) || is(T == bcf_hdr_t*))
+    if(is(T == VCFHeader) || is(T == bcf_hdr_t*))
     {
         if (fn == "") throw new Exception("Empty filename passed to VCFWriter constructor");
         this.fp = vcf_open(toStringz(fn), toStringz("w"c));
         if (!this.fp) throw new Exception("Could not hts_open file");
 
-        static if(is(T == VCFHeader*)) { this.vcfhdr      = new VCFHeader( bcf_hdr_dup(other.hdr) ); }
-        else static if(is(T == bcf_hdr_t*)) { this.vcfhdr = new VCFHeader( bcf_hdr_dup(other) ); }
+        static if(is(T == VCFHeader*)) { this.vcfhdr      = VCFHeader( bcf_hdr_dup(other.hdr) ); }
+        else static if(is(T == bcf_hdr_t*)) { this.vcfhdr = VCFHeader( bcf_hdr_dup(other) ); }
     }
 
     invariant
