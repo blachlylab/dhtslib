@@ -18,7 +18,8 @@ public import dhtslib.gff.record;
 public import dhtslib.gff.reader;
 public import dhtslib.gff.writer;
 
-unittest{
+debug(dhtslib_unittest) unittest
+{
     import dhtslib.coordinates;
     auto rec    = GTFRecord("chr1\tHAVANA\tgene\t11869\t14409\t.\t+\t.\tID \"ENSG00000223972.5\" ; gene_id ENSG00000223972.5 ; gene_id ENSG00000223972.5 ; gene_type transcribed_unprocessed_pseudogene ; gene_name DDX11L1 ; level 2 ; havana_gene OTTHUMG00000000961.2"); // @suppress(dscanner.style.long_line)
     auto rec_neg= GTFRecord("chr1\tHAVANA\tgene\t11869\t14409\t.\t-\t.\tID \"ENSG00000223972.5\" ; gene_id ENSG00000223972.5 ; gene_id ENSG00000223972.5 ; gene_type transcribed_unprocessed_pseudogene ; gene_name DDX11L1 ; level 2 ; havana_gene OTTHUMG00000000961.2"); // @suppress(dscanner.style.long_line)
@@ -95,7 +96,8 @@ unittest{
     assert(rec.isValid);
 }
 
-unittest{
+debug(dhtslib_unittest) unittest
+{
     import dhtslib.coordinates;
     auto rec    = GFF3Record("chr1\tHAVANA\tgene\t11869\t14409\t.\t+\t.\tID=ENSG00000223972.5;gene_id=ENSG00000223972.5;gene_id=ENSG00000223972.5;gene_type=transcribed_unprocessed_pseudogene;gene_name=DDX11L1;level=2;havana_gene=OTTHUMG00000000961.2"); // @suppress(dscanner.style.long_line)
     auto rec_neg= GFF3Record("chr1\tHAVANA\tgene\t11869\t14409\t.\t-\t.\tID=ENSG00000223972.5;gene_id=ENSG00000223972.5;gene_id=ENSG00000223972.5;gene_type=transcribed_unprocessed_pseudogene;gene_name=DDX11L1;level=2;havana_gene=OTTHUMG00000000961.2"); // @suppress(dscanner.style.long_line)
