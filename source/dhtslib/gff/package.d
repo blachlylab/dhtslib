@@ -41,11 +41,11 @@ debug(dhtslib_unittest) unittest
 
     assert(rec.length == 2541);
     assert(rec.relativeStart == 1);
-    assert(rec.relativeEnd == 2541);
+    assert(rec.relativeEnd == 2540);
 
     // Test forward and backward offsets
-    assert(rec.coordinateAtOffset(2) == 11_870);
-    assert(rec_neg.coordinateAtOffset(2) == 14_408);
+    assert(rec.coordinateAtOffset(2) == 11_871);
+    assert(rec_neg.coordinateAtOffset(2) == 14_407);
 
     assert(rec.coordinateAtBegin == 11_869);
     assert(rec.coordinateAtEnd   == 14_409);
@@ -84,10 +84,10 @@ debug(dhtslib_unittest) unittest
 
     assert(rec.length == 2541);
     assert(rec.relativeStart == 1);
-    assert(rec.relativeEnd == 2541);
+    assert(rec.relativeEnd == 2540);
 
     // Test forward and backward offsets
-    assert(rec.coordinateAtOffset(2) == 14_409);
+    assert(rec.coordinateAtOffset(2) == 14_408);
 
     assert(rec.coordinateAtBegin == 14_410);
     assert(rec.coordinateAtEnd   == 11_870);
@@ -119,11 +119,11 @@ debug(dhtslib_unittest) unittest
 
     assert(rec.length == 2541);
     assert(rec.relativeStart == 1);
-    assert(rec.relativeEnd == 2541);
+    assert(rec.relativeEnd == 2540);
 
     // Test forward and backward offsets
-    assert(rec.coordinateAtOffset(2) == 11_870);
-    assert(rec_neg.coordinateAtOffset(2) == 14_408);
+    assert(rec.coordinateAtOffset(2) == 11_871);
+    assert(rec_neg.coordinateAtOffset(2) == 14_407);
 
     assert(rec.coordinateAtBegin == 11_869);
     assert(rec.coordinateAtEnd   == 14_409);
@@ -162,10 +162,10 @@ debug(dhtslib_unittest) unittest
 
     assert(rec.length == 2541);
     assert(rec.relativeStart == 1);
-    assert(rec.relativeEnd == 2541);
+    assert(rec.relativeEnd == 2540);
 
     // Test forward and backward offsets
-    assert(rec.coordinateAtOffset(2) == 14_409);
+    assert(rec.coordinateAtOffset(2) == 14_408);
 
     assert(rec.coordinateAtBegin == 14_410);
     assert(rec.coordinateAtEnd   == 11_870);

@@ -353,14 +353,13 @@ struct GFFRecord(GFFVersion ver)
     /// Relative start === 1
     @property relativeStart() const { return OB(1); }
     /// Relative start === the feature length
-    @property relativeEnd() const { return OB(this.length); }
+    @property relativeEnd() const { return OB(this.length - 1); }
 
     /// Genomic coordinate at offset into feature, taking strandedness into account
     @property coordinateAtOffset(long offset) const
     {
         // GFF3 features are 1-based coordinates
-        assert(offset > 0);
-        offset--;   // necessary in a 1-based closed coordinate system
+        assert(offset >= 0);
         
         // for - strand count from end; for +, ., and ? strand count from start
         immutable auto begin = (this.strand == '-' ? this.end : this.start);
@@ -373,12 +372,12 @@ struct GFFRecord(GFFVersion ver)
     /// Genomic coordinate at beginning of feature, taking strandedness into account
     @property coordinateAtBegin() const
     {
-        return this.coordinateAtOffset(1);
+        return this.coordinateAtOffset(0);
     }
     /// Genomic coordinate at end of feature, taking strandedness into account
     @property coordinateAtEnd() const
     {
-        return this.coordinateAtOffset(this.length);
+        return this.coordinateAtOffset(this.length - 1);
     }
 
     string toString() const
