@@ -1,7 +1,7 @@
 /// @file htslib/cram.h
 /// CRAM format-specific API functions.
 /*
-    Copyright (C) 2015, 2016, 2018-2019 Genome Research Ltd.
+    Copyright (C) 2015, 2016, 2018-2020 Genome Research Ltd.
 
     Author: James Bonfield <jkb@sanger.ac.uk>
 
@@ -34,13 +34,42 @@ DEALINGS IN THE SOFTWARE.  */
 
 module htslib.cram;
 
-import core.stdc.stdarg;
-import core.sys.posix.sys.types;
+import core.stdc.stdio;
+import core.stdc.stdlib;
+import core.stdc.stdarg : va_list;
 
-import htslib.hts;
 import htslib.sam;
+import htslib.hts;
+import htslib.hfile : hFILE;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
+
+// see cram/cram_structs.h for an internal more complete copy of this enum
+
+// Htslib 1.11 had these listed without any hts prefix, and included
+// some internal values such as RANS1 and GZIP_RLE (which shouldn't have ever
+// been public).
+//
+// We can't find evidence of these being used and the data type occurs
+// nowhere in functions or structures meaning using it would be pointless.
+// However for safety, if you absolute need the API to not change then
+// define HTS_COMPAT to 101100 (XYYYZZ for X.Y[.Z], meaning 1.11).
+
+// Public methods as defined in the CRAM spec.
+
+// CRAM 2.x and 3.0
+
+// NB: the subsequent numbers may change.  They're simply here for
+// compatibility with the old API, but may have no bearing on the
+// internal way htslib works.  DO NOT USE
+
+//#include <sys/types.h>
+alias off_t = size_t;
+alias ssize_t = size_t;
 
 enum cram_block_method
 {
@@ -76,8 +105,6 @@ struct cram_metrics;
 struct cram_block_slice_hdr;
 struct cram_block_compression_hdr;
 struct refs_t;
-
-struct hFILE;
 
 // Accessor functions
 
@@ -162,7 +189,7 @@ uint cram_block_size(cram_block* b);
  * the container, meaning multiple compression headers to manipulate.
  * Changing RG may change the size of the compression header and
  * therefore the length field in the container.  Hence we rewrite all
- * blocks just incase and also emit the adjusted container.
+ * blocks just in case and also emit the adjusted container.
  *
  * The current implementation can only cope with renumbering a single
  * RG (and only then if it is using HUFFMAN or BETA codecs).  In
@@ -267,6 +294,13 @@ int cram_uncompress_block(cram_block* b);
  */
 int cram_compress_block(
     cram_fd* fd,
+    cram_block* b,
+    cram_metrics* metrics,
+    int method,
+    int level);
+int cram_compress_block2(
+    cram_fd* fd,
+    cram_slice* s,
     cram_block* b,
     cram_metrics* metrics,
     int method,
@@ -420,7 +454,7 @@ int cram_set_header(cram_fd* fd, sam_hdr_t* hdr);
  *         2 if the file is a stream and thus unseekable
  *         1 if the file contains an EOF block
  *         0 if the file does not contain an EOF block
- *        -1 if an error occured whilst reading the file or we could not seek back to where we were
+ *        -1 if an error occurred whilst reading the file or we could not seek back to where we were
  *
  */
 int cram_check_EOF(cram_fd* fd);
@@ -444,7 +478,8 @@ alias SAM_hdr = sam_hdr_t;
  * Returns a SAM_hdr struct on success (free with sam_hdr_free());
  *         NULL on failure
  */
-SAM_hdr* sam_hdr_parse_(const(char)* hdr, size_t len);
+pragma(inline, true)
+SAM_hdr* sam_hdr_parse_(const (char)* hdr, size_t len) { return sam_hdr_parse(len, hdr); }
 
 /*! Deallocates all storage used by a SAM_hdr struct.
  *
@@ -452,7 +487,8 @@ SAM_hdr* sam_hdr_parse_(const(char)* hdr, size_t len);
  * it is still non-zero then the header is assumed to be in use by another
  * caller and the free is not done.
  */
-void sam_hdr_free(SAM_hdr* hdr);
+pragma(inline, true)
+void sam_hdr_free(SAM_hdr* hdr) { sam_hdr_destroy(hdr); }
 
 /* sam_hdr_length() and sam_hdr_str() are now provided by sam.h. */
 

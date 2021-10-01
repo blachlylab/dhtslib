@@ -1,0 +1,80 @@
+25c25
+< 
+---
+> module htslib.hts_endian;
+65a66,72
+> 
+> /**
+>  TODO: All these functions are inlined which means dstep doesn't convert them
+> */
+> 
+> 
+> 
+82c89
+< ushort le_to_u16(const(ubyte)* buf);
+---
+> ushort le_to_u16 (const(ubyte)* buf);
+89c96
+< uint le_to_u32(const(ubyte)* buf);
+---
+> uint le_to_u32 (const(ubyte)* buf);
+96c103
+< ulong le_to_u64(const(ubyte)* buf);
+---
+> ulong le_to_u64 (const(ubyte)* buf);
+102c109
+< void u16_to_le(ushort val, ubyte* buf);
+---
+> void u16_to_le (ushort val, ubyte* buf);
+108c115
+< void u32_to_le(uint val, ubyte* buf);
+---
+> void u32_to_le (uint val, ubyte* buf);
+114c121
+< void u64_to_le(ulong val, ubyte* buf);
+---
+> void u64_to_le (ulong val, ubyte* buf);
+126c133
+< byte le_to_i8(const(ubyte)* buf);
+---
+> byte le_to_i8 (const(ubyte)* buf);
+134c141
+< short le_to_i16(const(ubyte)* buf);
+---
+> short le_to_i16 (const(ubyte)* buf);
+142c149
+< int le_to_i32(const(ubyte)* buf);
+---
+> int le_to_i32 (const(ubyte)* buf);
+150c157
+< long le_to_i64(const(ubyte)* buf);
+---
+> long le_to_i64 (const(ubyte)* buf);
+158c165
+< void i16_to_le(short val, ubyte* buf);
+---
+> void i16_to_le (short val, ubyte* buf);
+164c171
+< void i32_to_le(int val, ubyte* buf);
+---
+> void i32_to_le (int val, ubyte* buf);
+170c177
+< void i64_to_le(long val, ubyte* buf);
+---
+> void i64_to_le (long val, ubyte* buf);
+186c193
+< float le_to_float(const(ubyte)* buf);
+---
+> float le_to_float (const(ubyte)* buf);
+194c201
+< double le_to_double(const(ubyte)* buf);
+---
+> double le_to_double (const(ubyte)* buf);
+200c207
+< void float_to_le(float val, ubyte* buf);
+---
+> void float_to_le (float val, ubyte* buf);
+206c213
+< void double_to_le(double val, ubyte* buf);
+---
+> void double_to_le (double val, ubyte* buf);

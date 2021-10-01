@@ -20,7 +20,6 @@ vcfwriter
 bug_minimal
 sam_iter
 csam_iter
-vcf
 dhtslib-test-unittest
 
 # DUB

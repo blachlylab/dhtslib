@@ -1,0 +1,36 @@
+24a25,26
+> module htslib.vcfutils;
+> import htslib.vcf;
+40c42
+< int bcf_trim_alleles(const(bcf_hdr_t)* header, bcf1_t* line);
+---
+> int bcf_trim_alleles (const(bcf_hdr_t)* header, bcf1_t* line);
+52c54
+< int bcf_remove_alleles(const(bcf_hdr_t)* header, bcf1_t* line, int mask);
+---
+> int bcf_remove_alleles (const(bcf_hdr_t)* header, bcf1_t* line, int mask);
+65c67
+< int bcf_remove_allele_set(
+---
+> int bcf_remove_allele_set (
+83c85
+< int bcf_calc_ac(const(bcf_hdr_t)* header, bcf1_t* line, int* ac, int which);
+---
+> int bcf_calc_ac (const(bcf_hdr_t)* header, bcf1_t* line, int* ac, int which);
+107c109
+< int bcf_gt_type(bcf_fmt_t* fmt_ptr, int isample, int* ial, int* jal);
+---
+> int bcf_gt_type (bcf_fmt_t* fmt_ptr, int isample, int* ial, int* jal);
+109c111,120
+< int bcf_acgt2int(char c);
+---
+> pragma(inline, true)
+> int bcf_acgt2int(char c)
+> {
+>     if ( cast(int)c>96 ) c -= 32;
+>     if ( c=='A' ) return 0;
+>     if ( c=='C' ) return 1;
+>     if ( c=='G' ) return 2;
+>     if ( c=='T' ) return 3;
+>     return -1;
+> }

@@ -1,7 +1,7 @@
 /// @file htslib/cram.h
 /// CRAM format-specific API functions.
 /*
-    Copyright (C) 2015, 2016, 2018-2019 Genome Research Ltd.
+    Copyright (C) 2015, 2016, 2018-2020 Genome Research Ltd.
 
     Author: James Bonfield <jkb@sanger.ac.uk>
 
@@ -32,28 +32,29 @@ DEALINGS IN THE SOFTWARE.  */
  * although these should not be included directly (use this file instead).
  */
 
-module htslib.cram;
-
-import core.stdc.stdarg;
-import core.sys.posix.sys.types;
-
-import htslib.hts;
-import htslib.sam;
+import core.stdc.stdio;
+import core.stdc.stdlib;
 
 extern (C):
 
-enum cram_block_method
-{
-    BM_ERROR = -1,
-    RAW = 0,
-    GZIP = 1,
-    BZIP2 = 2,
-    LZMA = 3,
-    RANS = 4, // Generic; either order
-    RANS0 = 4,
-    RANS1 = 10, // Not externalised; stored as RANS (generic)
-    GZIP_RLE = 11 // NB: not externalised in CRAM
-}
+// see cram/cram_structs.h for an internal more complete copy of this enum
+
+// Htslib 1.11 had these listed without any hts prefix, and included
+// some internal values such as RANS1 and GZIP_RLE (which shouldn't have ever
+// been public).
+//
+// We can't find evidence of these being used and the data type occurs
+// nowhere in functions or structures meaning using it would be pointless.
+// However for safety, if you absolute need the API to not change then
+// define HTS_COMPAT to 101100 (XYYYZZ for X.Y[.Z], meaning 1.11).
+
+// Public methods as defined in the CRAM spec.
+
+// CRAM 2.x and 3.0
+
+// NB: the subsequent numbers may change.  They're simply here for
+// compatibility with the old API, but may have no bearing on the
+// internal way htslib works.  DO NOT USE
 
 enum cram_content_type
 {
@@ -162,7 +163,7 @@ uint cram_block_size(cram_block* b);
  * the container, meaning multiple compression headers to manipulate.
  * Changing RG may change the size of the compression header and
  * therefore the length field in the container.  Hence we rewrite all
- * blocks just incase and also emit the adjusted container.
+ * blocks just in case and also emit the adjusted container.
  *
  * The current implementation can only cope with renumbering a single
  * RG (and only then if it is using HUFFMAN or BETA codecs).  In
@@ -267,6 +268,13 @@ int cram_uncompress_block(cram_block* b);
  */
 int cram_compress_block(
     cram_fd* fd,
+    cram_block* b,
+    cram_metrics* metrics,
+    int method,
+    int level);
+int cram_compress_block2(
+    cram_fd* fd,
+    cram_slice* s,
     cram_block* b,
     cram_metrics* metrics,
     int method,
@@ -420,7 +428,7 @@ int cram_set_header(cram_fd* fd, sam_hdr_t* hdr);
  *         2 if the file is a stream and thus unseekable
  *         1 if the file contains an EOF block
  *         0 if the file does not contain an EOF block
- *        -1 if an error occured whilst reading the file or we could not seek back to where we were
+ *        -1 if an error occurred whilst reading the file or we could not seek back to where we were
  *
  */
 int cram_check_EOF(cram_fd* fd);
@@ -434,7 +442,7 @@ int int32_put_blk(cram_block* b, int val);
  * Header functionality is now provided by sam.h's sam_hdr_t functions.
  */
 
-alias SAM_hdr = sam_hdr_t;
+alias SAM_hdr = sam_hdr_t_;
 
 /*! Tokenises a SAM header into a hash table.
  *
@@ -472,7 +480,7 @@ void sam_hdr_free(SAM_hdr* hdr);
  * Returns 0 on success;
  *        -1 on failure
  */
-alias sam_hdr_add_PG = sam_hdr_add_pg;
+enum sam_hdr_add_PG = sam_hdr_add_pg;
 
 /**@{ -------------------------------------------------------------------*/
 

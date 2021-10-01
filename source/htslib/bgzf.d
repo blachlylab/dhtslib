@@ -30,9 +30,15 @@
 module htslib.bgzf;
 
 import core.stdc.stdio;
-import htslib.hfile: hFILE;
-
 import core.sys.posix.sys.types;
+
+import htslib.hfile : hFILE;
+import htslib.kstring;
+
+@system:
+nothrow:
+@nogc:
+
 // ssize_t doesn't exist in core.sys.posix.sys.types for windows builds
 version(Windows){
     version(Win32){
@@ -42,8 +48,6 @@ version(Windows){
         alias ssize_t = long;
     }
 }
-
-import htslib.kstring;
 
 extern (C):
 
@@ -118,19 +122,19 @@ struct BGZF
  *              outputs uncompressed data wrapped in the zlib format.
  * @return      BGZF file handler; 0 on error
  */
-BGZF* bgzf_dopen (int fd, const(char)* mode);
+BGZF* bgzf_dopen(int fd, const(char)* mode);
 
 alias bgzf_fdopen = bgzf_dopen; // for backward compatibility
 
 /**
  * Open the specified file for reading or writing.
  */
-BGZF* bgzf_open (const(char)* path, const(char)* mode);
+BGZF* bgzf_open(const(char)* path, const(char)* mode);
 
 /**
  * Open an existing hFILE stream for reading or writing.
  */
-BGZF* bgzf_hopen (hFILE* fp, const(char)* mode);
+BGZF* bgzf_hopen(hFILE* fp, const(char)* mode);
 
 /**
  * Close the BGZF and free all associated resources.
@@ -138,7 +142,7 @@ BGZF* bgzf_hopen (hFILE* fp, const(char)* mode);
  * @param fp    BGZF file handler
  * @return      0 on success and -1 on error
  */
-int bgzf_close (BGZF* fp);
+int bgzf_close(BGZF* fp);
 
 /**
  * Read up to _length_ bytes from the file storing into _data_.
@@ -148,7 +152,7 @@ int bgzf_close (BGZF* fp);
  * @param length size of data to read
  * @return       number of bytes actually read; 0 on end-of-file and -1 on error
  */
-ssize_t bgzf_read (BGZF* fp, void* data, size_t length);
+ssize_t bgzf_read(BGZF* fp, void* data, size_t length);
 
 /**
  * Write _length_ bytes from _data_ to the file.  If no I/O errors occur,
@@ -159,11 +163,11 @@ ssize_t bgzf_read (BGZF* fp, void* data, size_t length);
  * @param length size of data to write
  * @return       number of bytes written (i.e., _length_); negative on error
  */
-ssize_t bgzf_write (BGZF* fp, const(void)* data, size_t length);
+ssize_t bgzf_write(BGZF* fp, const(void)* data, size_t length);
 
 /**
  * Write _length_ bytes from _data_ to the file, the index will be used to
- * decide the amount of uncompressed data to be writen to each bgzip block.
+ * decide the amount of uncompressed data to be written to each bgzip block.
  * If no I/O errors occur, the complete _length_ bytes will be written (or
  * queued for writing).
  * @param fp     BGZF file handler
@@ -171,7 +175,7 @@ ssize_t bgzf_write (BGZF* fp, const(void)* data, size_t length);
  * @param length size of data to write
  * @return       number of bytes written (i.e., _length_); negative on error
  */
-ssize_t bgzf_block_write (BGZF* fp, const(void)* data, size_t length);
+ssize_t bgzf_block_write(BGZF* fp, const(void)* data, size_t length);
 
 /**
  * Returns the next byte in the file without consuming it.
@@ -180,7 +184,7 @@ ssize_t bgzf_block_write (BGZF* fp, const(void)* data, size_t length);
  *               -2 on error,
  *               otherwise the unsigned byte value.
  */
-int bgzf_peek (BGZF* fp);
+int bgzf_peek(BGZF* fp);
 
 /**
  * Read up to _length_ bytes directly from the underlying stream without
@@ -192,7 +196,7 @@ int bgzf_peek (BGZF* fp);
  * @param length number of raw bytes to read
  * @return       number of bytes actually read; 0 on end-of-file and -1 on error
  */
-ssize_t bgzf_raw_read (BGZF* fp, void* data, size_t length);
+ssize_t bgzf_raw_read(BGZF* fp, void* data, size_t length);
 
 /**
  * Write _length_ bytes directly to the underlying stream without
@@ -204,7 +208,7 @@ ssize_t bgzf_raw_read (BGZF* fp, void* data, size_t length);
  * @param length number of raw bytes to write
  * @return       number of bytes actually written; -1 on error
  */
-ssize_t bgzf_raw_write (BGZF* fp, const(void)* data, size_t length);
+ssize_t bgzf_raw_write(BGZF* fp, const(void)* data, size_t length);
 
 /**
  * Write the data in the buffer to the file.
@@ -212,7 +216,7 @@ ssize_t bgzf_raw_write (BGZF* fp, const(void)* data, size_t length);
  * @param fp     BGZF file handle
  * @return       0 on success and -1 on error
  */
-int bgzf_flush (BGZF* fp);
+int bgzf_flush(BGZF* fp);
 
 /**
  * Return a virtual file pointer to the current location in the file.
@@ -221,7 +225,10 @@ int bgzf_flush (BGZF* fp);
  * Return value is non-negative on success.
  */
 pragma(inline, true)
-ulong bgzf_tell(BGZF *fp) { return ((*fp).block_address << 16) | ((*fp).block_offset & 0xFFFF); }
+extern (D) auto bgzf_tell(T)(auto ref T fp)
+{
+    return (fp.block_address << 16) | (fp.block_offset & 0xFFFF);
+}
 
 /**
  * Set the file to read from the location specified by _pos_.
@@ -234,7 +241,7 @@ ulong bgzf_tell(BGZF *fp) { return ((*fp).block_address << 16) | ((*fp).block_of
  * @note It is not permitted to seek on files open for writing,
  * or files compressed with gzip (as opposed to bgzip).
  */
-long bgzf_seek (BGZF* fp, long pos, int whence);
+long bgzf_seek(BGZF* fp, long pos, int whence);
 
 /**
  * Check if the BGZF end-of-file (EOF) marker is present
@@ -245,7 +252,7 @@ long bgzf_seek (BGZF* fp, long pos, int whence);
  *              0 if the EOF marker is absent;
  *              -1 (with errno set) on error
  */
-int bgzf_check_EOF (BGZF* fp);
+int bgzf_check_EOF(BGZF* fp);
 
 /** Return the file's compression format
  *
@@ -257,7 +264,7 @@ int bgzf_check_EOF (BGZF* fp);
  *   - 2 / `bgzf` if the file is BGZF-compressed
  * @since 1.4
  */
-int bgzf_compression (BGZF* fp);
+int bgzf_compression(BGZF* fp);
 
 /**
  * Check if a file is in the BGZF format
@@ -265,8 +272,7 @@ int bgzf_compression (BGZF* fp);
  * @param fn    file name
  * @return      1 if _fn_ is BGZF; 0 if not or on I/O error
  */
-deprecated("Use bgzf_compression() or hts_detect_format() instead")
-int bgzf_is_bgzf (const(char)* fn);
+int bgzf_is_bgzf(const(char)* fn);
 
 /*********************
  * Advanced routines *
@@ -278,35 +284,35 @@ int bgzf_is_bgzf (const(char)* fn);
  * @param fp    BGZF file handler
  * @param size  size of cache in bytes; 0 to disable caching (default)
  */
-void bgzf_set_cache_size (BGZF* fp, int size);
+void bgzf_set_cache_size(BGZF* fp, int size);
 
 /**
  * Flush the file if the remaining buffer size is smaller than _size_
  * @return      0 if flushing succeeded or was not needed; negative on error
  */
-int bgzf_flush_try (BGZF* fp, ssize_t size);
+int bgzf_flush_try(BGZF* fp, ssize_t size);
 
 /**
  * Read one byte from a BGZF file. It is faster than bgzf_read()
  * @param fp     BGZF file handler
  * @return       byte read; -1 on end-of-file or error
  */
-int bgzf_getc (BGZF* fp);
+int bgzf_getc(BGZF* fp);
 
 /**
  * Read one line from a BGZF file. It is faster than bgzf_getc()
  *
  * @param fp     BGZF file handler
- * @param delim  delimitor
+ * @param delim  delimiter
  * @param str    string to write to; must be initialized
  * @return       length of the string; -1 on end-of-file; <= -2 on error
  */
-int bgzf_getline (BGZF* fp, int delim, kstring_t* str);
+int bgzf_getline(BGZF* fp, int delim, kstring_t* str);
 
 /**
  * Read the next BGZF block.
  */
-int bgzf_read_block (BGZF* fp);
+int bgzf_read_block(BGZF* fp);
 
 /**
  * Enable multi-threading (when compiled with -DBGZF_MT) via a shared
@@ -316,7 +322,7 @@ int bgzf_read_block (BGZF* fp);
  * @param fp          BGZF file handler; must be opened for writing
  * @param pool        The thread pool (see hts_create_threads)
  */
-int bgzf_thread_pool (BGZF* fp, hts_tpool* pool, int qsize);
+int bgzf_thread_pool(BGZF* fp, hts_tpool* pool, int qsize);
 
 /**
  * Enable multi-threading (only effective when the library was compiled
@@ -326,7 +332,7 @@ int bgzf_thread_pool (BGZF* fp, hts_tpool* pool, int qsize);
  * @param n_threads   #threads used for writing
  * @param n_sub_blks  #blocks processed by each thread; a value 64-256 is recommended
  */
-int bgzf_mt (BGZF* fp, int n_threads, int n_sub_blks);
+int bgzf_mt(BGZF* fp, int n_threads, int n_sub_blks);
 
 /**
  * Compress a single BGZF block.
@@ -339,7 +345,7 @@ int bgzf_mt (BGZF* fp, int n_threads, int n_sub_blks);
  * @param level  compression level
  * @return       0 on success and negative on error
  */
-int bgzf_compress (
+int bgzf_compress(
     void* dst,
     size_t* dlen,
     const(void)* src,
@@ -362,7 +368,7 @@ int bgzf_compress (
  *  @note It is not permitted to seek on files open for writing,
  *  or files compressed with gzip (as opposed to bgzip).
  */
-int bgzf_useek (BGZF* fp, off_t uoffset, int where);
+int bgzf_useek(BGZF* fp, off_t uoffset, int where);
 
 /**
  *  Position in uncompressed BGZF
@@ -371,7 +377,7 @@ int bgzf_useek (BGZF* fp, off_t uoffset, int where);
  *
  *  Returns the current offset on success and -1 on error.
  */
-off_t bgzf_utell (BGZF* fp);
+off_t bgzf_utell(BGZF* fp);
 
 /**
  * Tell BGZF to build index while compressing.
@@ -385,7 +391,7 @@ off_t bgzf_utell (BGZF* fp);
  * file handle (as threads may start reading data before the index
  * has been set up).
  */
-int bgzf_index_build_init (BGZF* fp);
+int bgzf_index_build_init(BGZF* fp);
 
 /// Load BGZF index
 /**
@@ -394,7 +400,7 @@ int bgzf_index_build_init (BGZF* fp);
  * @param suffix      suffix to add to bname (can be NULL)
  * @return 0 on success and -1 on error.
  */
-int bgzf_index_load (BGZF* fp, const(char)* bname, const(char)* suffix);
+int bgzf_index_load(BGZF* fp, const(char)* bname, const(char)* suffix);
 
 /// Load BGZF index from an hFILE
 /**
@@ -411,7 +417,7 @@ int bgzf_index_load (BGZF* fp, const(char)* bname, const(char)* suffix);
  * is only used for printing error messages; if NULL the word "index" is
  * used instead.
  */
-int bgzf_index_load_hfile (BGZF* fp, hFILE* idx, const(char)* name);
+int bgzf_index_load_hfile(BGZF* fp, hFILE* idx, const(char)* name);
 
 /// Save BGZF index
 /**
@@ -420,7 +426,7 @@ int bgzf_index_load_hfile (BGZF* fp, hFILE* idx, const(char)* name);
  * @param suffix      suffix to add to bname (can be NULL)
  * @return 0 on success and -1 on error.
  */
-int bgzf_index_dump (BGZF* fp, const(char)* bname, const(char)* suffix);
+int bgzf_index_dump(BGZF* fp, const(char)* bname, const(char)* suffix);
 
 /// Write a BGZF index to an hFILE
 /**
@@ -436,5 +442,5 @@ int bgzf_index_dump (BGZF* fp, const(char)* bname, const(char)* suffix);
  * used instead.
  */
 
-int bgzf_index_dump_hfile (BGZF* fp, hFILE* idx, const(char)* name);
+int bgzf_index_dump_hfile(BGZF* fp, hFILE* idx, const(char)* name);
 

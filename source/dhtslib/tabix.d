@@ -10,11 +10,16 @@ module dhtslib.tabix;
 
 import std.stdio;
 import std.string;
+import std.traits : ReturnType;
+import std.range : inputRangeObject, InputRangeObject;
 import core.stdc.stdlib : malloc, free;
 
 import htslib.hts;
 import htslib.kstring;
 import htslib.tbx;
+import dhtslib.coordinates;
+import dhtslib.memory;
+import dhtslib.util;
 //import htslib.regidx;
 
 /** Encapsulates a position-sorted record-oriented NGS flat file,
@@ -24,8 +29,8 @@ import htslib.tbx;
  */
 struct TabixIndexedFile {
 
-    htsFile *fp;    /// pointer to htsFile struct
-    tbx_t   *tbx;   /// pointer to tabix handle
+    HtsFile fp;    /// rc wrapper around htsFile ptr
+    Tbx   tbx;   /// rc wrapper around tabix ptr
 
     string header;  /// NGS flat file's header (if any; e.g. BED may not have one)
 
@@ -34,27 +39,20 @@ struct TabixIndexedFile {
     this(const(char)[] fn, const(char)[] fntbi = "")
     {
         debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
-        this.fp = hts_open( toStringz(fn), "r");
+        this.fp = HtsFile(hts_open( toStringz(fn), "r"));
         if ( !this.fp ) {
             writefln("Could not read %s\n", fn);
             throw new Exception("Couldn't read file");
         }
         //enum htsExactFormat format = hts_get_format(fp)->format;
-        if(fntbi!="") this.tbx = tbx_index_load2( toStringz(fn), toStringz(fntbi) );
-        else this.tbx = tbx_index_load( toStringz(fn) );
+        if(fntbi!="") this.tbx = Tbx(tbx_index_load2( toStringz(fn), toStringz(fntbi) ));
+        else this.tbx = Tbx(tbx_index_load( toStringz(fn) ));
         if (!this.tbx) { 
             writefln("Could not load .tbi index of %s\n", fn );
             throw new Exception("Couldn't load tabix index file");
         }
 
         loadHeader();
-    }
-    ~this()
-    {
-        debug(dhtslib_debug) { writeln("TabixIndexedFile dtor"); }
-        tbx_destroy(this.tbx);
-
-        if ( hts_close(this.fp) ) writefln("hts_close returned non-zero status: %s\n", fromStringz(this.fp.fn));
     }
 
     private void loadHeader()
@@ -91,15 +89,17 @@ struct TabixIndexedFile {
     /** region(r)
      *  returns an InputRange that iterates through rows of the file intersecting or contained within the requested range 
      */
-    auto region(const(char)[] r)
+    auto region(CoordSystem cs)(string chrom, Interval!cs coords)
     {
-        struct Region {
+        auto newCoords = coords.to!(CoordSystem.zbho);
+        struct Region
+        {
 
             /** TODO: determine how thread-(un)safe this is (i.e., using a potentially shared *fp and *tbx) */
-            private htsFile *fp;
-            private tbx_t   *tbx;
+            private HtsFile fp;
+            private Tbx tbx;
 
-            private hts_itr_t *itr;
+            private HtsItr itr;
             private string next;
 
             // necessary because the alternative strategy of preloading the first row
@@ -107,28 +107,16 @@ struct TabixIndexedFile {
             // re-iterating always returns first row only (since *itr is expended 
             // but first row was preloaded in this.next)
             private bool active;
+            private string chrom;
 
-            this(htsFile *fp, tbx_t *tbx, const(char)[] r)
+            this(HtsFile fp, Tbx tbx,  string chrom, Interval!(CoordSystem.zbho) coords)
             {
                 this.fp = fp;
-                this.tbx= tbx;
-
-                this.itr = tbx_itr_querys(tbx, toStringz(r) );
+                this.tbx = tbx;
+                this.chrom = chrom;
+                this.itr = HtsItr(tbx_itr_queryi(tbx, tbx_name2id(tbx, toStringz(this.chrom)), coords.start, coords.end));
+                this.empty;
                 debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
-                if (this.itr) {
-                    // Load the first record
-                    //this.popFront(); // correction, do not load the first record
-                }
-                else {
-                    // TODO handle error
-                    throw new Exception("could not allocate this.itr");
-                }
-            }
-            ~this()
-            {
-                debug(dhtslib_debug) { writeln("Region dtor // this.itr: ", this.itr); }
-                //tbx_itr_destroy(itr);
-                //free(this.kstr.s);
             }
 
             // had to remove "const" property from empty() due to manipulation of this.active
@@ -164,9 +152,102 @@ struct TabixIndexedFile {
                     free(kstr.s);
                 }
             }
+            Region save()
+            {
+                Region newRange;
+                newRange.fp = HtsFile(copyHtsFile(fp));
+                newRange.itr = HtsItr(copyHtsItr(itr));
+                newRange.tbx = tbx;
+                newRange.next = next;
+                newRange.active = active;
+                newRange.chrom = chrom;
+                return newRange;
+            }
         }
 
-        return Region(this.fp, this.tbx, r);
+        return Region(this.fp, this.tbx, chrom, newCoords);
     }
 
+}
+
+// TODO: figure out how to make this unittest with just htslib files
+
+// debug(dhtslib_unittest) unittest
+// {
+//     import htslib.hts_log;
+//     import dhtslib.vcf;
+//     import std.path : buildPath, dirName;
+
+//     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+//     hts_log_info(__FUNCTION__, "Testing TabixIndexedFile");
+//     hts_log_info(__FUNCTION__, "Loading test file");
+//     auto vcf = VCFReader(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","index.vcf"));
+//     auto vcfw = VCFWriter()
+
+// }
+
+/**
+    Range that allows reading a record based format via tabix.
+    Needs a record type that encompasses only one line of text
+    and a ChromInterval region to use for tabix filtering.
+    Rectype could be GFF3Record, BedRecord ...
+    This is a sister struct to dhtslib.bgzf.RecordReader.
+*/
+struct RecordReaderRegion(RecType, CoordSystem cs)
+{
+    /// file reader
+    TabixIndexedFile file;
+    /// file reader range
+    ReturnType!(this.initializeRange) range;
+    /// chrom of region
+    string chrom;
+    /// coordinates of region
+    Interval!cs coords;
+    /// keep the header
+    string header;
+    
+    bool emptyLine = false;
+    
+    /// string chrom and Interval ctor
+    this(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+    {
+        this.file = TabixIndexedFile(fn, fnIdx);
+        this.chrom = chrom;
+        this.coords = coords;
+        this.header = this.file.header;
+        this.range = this.initializeRange;
+        this.range.empty;
+    }
+
+    /// copy the TabixIndexedFile.region range
+    auto initializeRange()
+    {
+        return this.file.region(this.chrom, this.coords);
+    }
+
+    /// returns RecType
+    RecType front()
+    {
+        return RecType(this.range.front);
+    }
+
+    /// move the range
+    void popFront()
+    {
+        this.range.popFront;
+        if(this.range.front == "") this.emptyLine = true;
+    }
+
+    /// is the range done
+    auto empty()
+    {
+        return this.emptyLine || this.range.empty;
+    }
+
+    typeof(this) save()
+    {
+        typeof(this) newRange = this;
+        newRange.range = this.range.save;
+        return newRange;
+    }
 }

@@ -12,18 +12,13 @@ Sequence caching and multithreaded BGZF decompression are supported.
 module dhtslib.faidx;
 
 import std.string;
+import std.typecons : Tuple;
 import core.stdc.stdlib : malloc, free;
 
+import dhtslib.coordinates;
+import dhtslib.memory;
+import dhtslib.util;
 import htslib.faidx;
-
-/** Coodinate Systems, since htslib sequence fetching methods surprisingly use zero-based, closed */
-enum CoordSystem
-{
-    zbho = 0,   /// zero-based, half-open
-    zbc,        /// zero-based, closed (behavior of faidx_fetch_seq)
-    obho,       /// one-based, half-open
-    obc         /// one-based, closed
-}
 
 /** Build index for a FASTA or bgzip-compressed FASTA file.
 
@@ -57,36 +52,20 @@ test for membership, and rapidly fetch sequence at offset.
 */
 struct IndexedFastaFile {
 
-    private faidx_t *faidx;
-    private int refct;      // Postblit refcounting in case the object is passed around
-
-    this(this)
-    {
-        refct++;
-    }
-
-    invariant(){
-        assert(refct >= 0);
-    }
+    private Faidx faidx;
     
     /// construct from filename, optionally creating index if it does not exist
     /// throws Exception (TODO: remove) if file DNE, or if index DNE unless create->true
     this(string fn, bool create=false)
     {
         if (create) {
-            this.faidx = fai_load3( toStringz(fn), null, null, fai_load_options.FAI_CREATE);
+            this.faidx = Faidx(fai_load3( toStringz(fn), null, null, fai_load_options.FAI_CREATE));
             if (this.faidx is null) throw new Exception("Unable to load or create the FASTA index.");
         }
         else {
-            this.faidx = fai_load3( toStringz(fn) , null, null, 0);
+            this.faidx = Faidx(fai_load3( toStringz(fn) , null, null, 0));
             if (this.faidx is null) throw new Exception("Unable to load the FASTA index.");
         }
-        refct = 1;
-    }
-    ~this()
-    {
-        if (--refct == 0)
-            fai_destroy(this.faidx);
     }
 
     /// Enable BGZF cacheing (size: bytes)
@@ -107,71 +86,109 @@ struct IndexedFastaFile {
         //bgzf_mt(this.faidx.bgzf, nthreads, 64);
     }
 
-    /// Fetch sequence in region by assoc array-style lookup:
-    /// `string sequence = fafile["chr2:20123-30456"]`
-    auto opIndex(string region)
+    private struct OffsetType
     {
-        return fetchSequence(region);
+        ptrdiff_t offset;
+        alias offset this;
+
+        // supports e.g. $ - x
+        OffsetType opBinary(string s, T)(T val)
+        {
+            mixin("return OffsetType(offset " ~ s ~ " val);");
+        }
+
+        invariant
+        {
+            assert(this.offset <= 0, "Offset from end should be zero or negative");
+        }
+    }
+    /** Array-end `$` indexing hack courtesy of Steve Schveighoffer
+        https://forum.dlang.org/post/rl7a56$nad$1@digitalmars.com
+
+        Requires in addition to opDollar returning a bespoke non-integral type
+        a series of overloads for opIndex and opSlice taking this type
+    */
+    OffsetType opDollar(size_t dim)() if(dim == 1)
+    {
+        return OffsetType.init;
+    }
+    /// opSlice as Coordinate and an offset
+    /// i.e [ZB(2) .. $]
+    auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, OffsetType off) if(dim == 1)
+    {
+        return Tuple!(Coordinate!bs, OffsetType)(start, off);
+    }
+    /// opSlice as two offset
+    /// i.e [$-2 .. $]
+    auto opSlice(size_t dim)(OffsetType start, OffsetType end) if(dim == 1)
+    {
+        return Tuple!(OffsetType, OffsetType)(start, end);
+    }
+    /// opIndex coordinate and Offset
+    /// i.e fai["chrom1", ZB(1) .. $]
+    auto opIndex(Basis bs)(string ctg, Tuple!(Coordinate!bs, OffsetType) coords)
+    {
+        auto end = this.seqLen(ctg) + coords[1];
+        auto endCoord = ZB(end);
+        auto newEndCoord = endCoord.to!bs;
+        auto c = Interval!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
+        return fetchSequence(ctg, c);
+    }
+
+    /// opIndex two Offsets
+    /// i.e fai["chrom1", $-2 .. $]
+    auto opIndex(string ctg, Tuple!(OffsetType, OffsetType) coords)
+    {
+        auto start = this.seqLen(ctg) + coords[0];
+        auto end = this.seqLen(ctg) + coords[1];
+        auto c = ZBHO(start, end);
+        return fetchSequence(ctg, c);
+    }
+    /// opIndex one offset
+    /// i.e fai["chrom1", $-1]
+    auto opIndex(string ctg, OffsetType endoff)
+    {
+        auto end = this.seqLen(ctg) + endoff.offset;
+        auto coords = Interval!(CoordSystem.zbho)(end, end + 1);
+        return fetchSequence(ctg, coords);
     }
 
     /// Fetch sequence in region by assoc array-style lookup:
-    /// `string sequence = fafile.fetchSequence("chr2:20123-30456")`
-    string fetchSequence(string region)
+    /// Uses htslib string region parsing
+    /// `string sequence = fafile["chr2:20123-30456"]`
+    auto opIndex(string region)
     {
-        char *fetchedSeq;
-        long fetchedLen;
-        // char *fai_fetch(const faidx_t *fai, const char *reg, hts_pos_t *len);
-        // @param  len  Length of the region; -2 if seq not present, -1 general error
-        fetchedSeq = fai_fetch64(this.faidx, toStringz(region), &fetchedLen);
-
-        if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
-        else if (fetchedLen == -2) throw new Exception("fai_fetch: sequence not found");
-
-        string seq = fromStringz(fetchedSeq).idup;
-        free(fetchedSeq);
-
-        assert(seq.length == fetchedLen);
-        return seq;
+        auto coords = getIntervalFromString(region);
+        return fetchSequence(coords.contig, coords.interval);
     }
 
     /// Fetch sequence in region by multidimensional slicing:
     /// `string sequence = fafile["chr2", 20123 .. 30456]`
     ///
     /// Sadly, $ to represent max length is not supported
-    auto opIndex(string contig, int[2] pos)
+    auto opIndex(CoordSystem cs)(string contig, Interval!cs coords)
     {
-        return fetchSequence(contig, pos[0], pos[1]);
+        return fetchSequence(contig, coords);
     }
+    
     /// ditto
-    int[2] opSlice(size_t dim)(int start, int end) if (dim == 1)
+    auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, Coordinate!bs end) if (dim == 1)
     in { assert(start >= 0); assert(start <= end); }
     do
     {
-        return [start, end];
+        auto coords = Interval!(getCoordinateSystem!(bs, End.open))(start, end);
+        return coords;
     }
 
     /// Fetch sequencing in a region by function call with contig, start, end
     /// `string sequence = fafile.fetchSequence("chr2", 20123, 30456)`
-    string fetchSequence(CoordSystem cs = CoordSystem.zbho)(string contig, long start, long end)
+    string fetchSequence(CoordSystem cs)(string contig, Interval!cs coords)
     {
         char *fetchedSeq;
         long fetchedLen;
 
         // Convert given coordinates in system cs to zero-based, closed (faidx_fetch_seq)
-        static if (cs == CoordSystem.zbho) {
-            end--;
-        }
-        else static if (cs == CoordSystem.zbc) {
-            // ok
-        }
-        else static if (cs == CoordSystem.obho) {
-            start--;
-            end -= 2;
-        }
-        else static if (cs == CoordSystem.obc) {
-            start--;
-            end--;
-        }
+        auto newcoords = coords.to!(CoordSystem.zbc);
         /* htslib API for my reference:
          *
          * char *faidx_fetch_seq64(const faidx_t *fai, const char *c_name, hts_pos_t p_beg_i, hts_pos_t p_end_i, hts_pos_t *len);
@@ -185,7 +202,7 @@ struct IndexedFastaFile {
          *  by end users by calling `free()` on it.
          *
         */
-        fetchedSeq = faidx_fetch_seq64(this.faidx, toStringz(contig), start, end, &fetchedLen);
+        fetchedSeq = faidx_fetch_seq64(this.faidx, toStringz(contig), newcoords.start, newcoords.end, &fetchedLen);
         
         if (fetchedLen == -1) throw new Exception("fai_fetch: unknown error");
         else if (fetchedLen == -2) throw new Exception("fai_fetch: sequence not found");
@@ -230,4 +247,68 @@ struct IndexedFastaFile {
         if ( l == -1 ) throw new Exception("seqLen: sequence name not found");
         return l;
     }
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import dhtslib.sam;
+    import htslib.hts_log;
+    import std.path : buildPath, dirName;
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+    hts_log_info(__FUNCTION__, "Testing IndexedFastaFile");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto fai = IndexedFastaFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","ce.fa"));
+
+    fai.setCacheSize(4000000);
+
+    assert(fai.fetchSequence("CHROMOSOME_I",ZBHO(0, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",OBHO(1, 30)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",ZBC(0, 28)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",OBC(1, 29)) == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+
+    assert(fai.fetchSequence("CHROMOSOME_I",ZBHO(1, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",OBHO(2, 30)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",ZBC(1, 28)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    assert(fai.fetchSequence("CHROMOSOME_I",OBC(2, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+
+    assert(fai["CHROMOSOME_I",ZB(0) .. ZB(29)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+    import std.stdio;
+    writeln(fai["CHROMOSOME_I",OB(1) .. OB(30)]);
+    assert(fai["CHROMOSOME_I",OB(1) .. OB(30)] == "GCCTAAGCCTAAGCCTAAGCCTAAGCCTA");
+
+    assert(fai.seqLen("CHROMOSOME_I") == 1009800);
+    assert(fai.nSeq == 7);
+
+    assert(fai.hasSeq("CHROMOSOME_I"));
+    assert(!fai.hasSeq("CHROMOSOME_"));
+
+    assert(fai.seqName(0) == "CHROMOSOME_I");
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import dhtslib.sam;
+    import htslib.hts_log;
+    import std.path : buildPath, dirName;
+
+    hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+    hts_log_info(__FUNCTION__, "Testing IndexedFastaFile");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    auto fai = IndexedFastaFile(buildPath(dirName(dirName(dirName(__FILE__))),"htslib","test","ce.fa"));
+
+    fai.setCacheSize(4000000);
+
+    assert(fai.fetchSequence("CHROMOSOME_II",ZBHO(0, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    assert(fai.fetchSequence("CHROMOSOME_II",OBHO(1, 30)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    assert(fai.fetchSequence("CHROMOSOME_II",ZBC(0, 28)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    assert(fai.fetchSequence("CHROMOSOME_II",OBC(1, 29)) == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    assert(fai["CHROMOSOME_II:1-29"] == "CCTAAGCCTAAGCCTAAGCCTAAGCCTAA");
+    // "GTCAACACAGACCGTTAATTTTGGGAAGTTGAGAAATTCGCTAGTTTCTG"
+    import std.stdio;
+    assert(fai["CHROMOSOME_II",$-50 .. $] == "GTCAACACAGACCGTTAATTTTGGGAAGTTGAGAAATTCGCTAGTTTCTG");
+    
+    assert(fai["CHROMOSOME_II",OB(4951) .. $] == "GTCAACACAGACCGTTAATTTTGGGAAGTTGAGAAATTCGCTAGTTTCTG");
+    assert(fai["CHROMOSOME_II",ZB(4950) .. $] == "GTCAACACAGACCGTTAATTTTGGGAAGTTGAGAAATTCGCTAGTTTCTG");
+    assert(fai["CHROMOSOME_II",$-1] == "G");
 }

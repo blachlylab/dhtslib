@@ -7,9 +7,11 @@ import std.string : fromStringz, toStringz;
 import std.typecons : Tuple;
 import std.range.interfaces : InputRange, inputRangeObject;
 import std.range.primitives : isInputRange, ElementType;
+import std.algorithm : map;
+import std.array : array;
+import std.utf : toUTFz;
 
-import htslib.hts : htsFile, hts_open, hts_close, hts_hopen, hts_set_threads, htsExactFormat;
-import htslib.hts : hts_idx_t, hts_itr_t, hts_itr_multi_t, hts_reglist_t, hts_pair32_t;
+import htslib.hts;
 import htslib.hfile : hdopen, hclose, hFILE, off_t, htell, hseek;
 import htslib.bgzf : bgzf_tell, bgzf_seek;
 
@@ -17,8 +19,11 @@ import htslib.hts_log;
 import htslib.kstring;
 import htslib.sam;
 import dhtslib.sam.record;
+import dhtslib.coordinates;
 import dhtslib.sam.header;
 import dhtslib.sam : cmpInterval, cmpRegList;
+import dhtslib.memory;
+import dhtslib.util;
 
 alias SAMFile = SAMReader;
 /**
@@ -36,7 +41,7 @@ struct SAMReader
     private const(char)* fn;
 
     /// htsFile
-    private htsFile* fp;
+    private HtsFile fp;
 
     /// hFILE if required
     private hFILE* f;
@@ -47,12 +52,9 @@ struct SAMReader
     private off_t header_offset;
 
     /// SAM/BAM/CRAM index 
-    private hts_idx_t* idx;
+    private HtsIdx idx;
 
     private kstring_t line;
-
-    /// disallow copying
-    @disable this(this);
 
     /** Create a representation of SAM/BAM/CRAM file from given filename or File
 
@@ -73,14 +75,14 @@ struct SAMReader
         {
             this.filename = f;
             this.fn = toStringz(f);
-            this.fp = hts_open(this.fn, cast(immutable(char)*) "r");
+            this.fp = HtsFile(hts_open(this.fn, cast(immutable(char)*) "r"));
         }
         else static if (is(T == File))
         {
             this.filename = f.name();
             this.fn = toStringz(f.name);
             this.f = hdopen(f.fileno, cast(immutable(char)*) "r");
-            this.fp = hts_hopen(this.f, this.fn, cast(immutable(char)*) "r");
+            this.fp = HtsFile(hts_hopen(this.f, this.fn, cast(immutable(char)*) "r"));
         }
         else assert(0);
 
@@ -112,37 +114,13 @@ struct SAMReader
 
         // read header
         this.header = SAMHeader(sam_hdr_read(this.fp));
-        this.idx = sam_index_load(this.fp, this.fn);
-        if (this.idx == null)
-        {
-            hts_log_info(__FUNCTION__, "SAM index not found");
-            // TODO: attempt to build
-            // TODO: edit range to return empty immediately if no idx
-        }
-        hts_log_debug(__FUNCTION__, format("SAM index: %s", this.idx));
 
         // collect header offset just in case it is a sam file
         // we would like to iterate
         if(this.fp.is_bgzf) this.header_offset = bgzf_tell(this.fp.fp.bgzf);
         else this.header_offset = htell(this.fp.fp.hfile);
-    }
 
-    ~this()
-    {
-        debug (dhtslib_debug)
-        {
-            writeln("SAMFile dtor");
-        }
-        
-        // SAMHeader now takes care of this
-        // bam_hdr_destroy(this.header);
-
-        if((this.fp !is null) && (this.f is null))
-        {
-            const auto ret = hts_close(fp);
-            if (ret < 0)
-                writefln("There was an error closing %s", fromStringz(this.fn));
-        }
+        this.idx = HtsIdx(null);
     }
 
     /// number of reference sequences; from bam_hdr_t
@@ -246,90 +224,109 @@ struct SAMReader
     *   auto reads6 = bamfile.query("{HLA-DRB1*12:17}:1-100");
     *   ```
     */ 
-    auto query(string chrom, long start, long end)
+    auto query(CoordSystem cs)(string chrom, Interval!cs coords)
     in (!this.header.isNull)
     {
         auto tid = this.header.targetId(chrom);
-        return query(tid, start, end);
+        return query(tid, coords);
     }
 
     /// ditto
-    auto query(int tid, long start, long end)
+    auto query(CoordSystem cs)(int tid, Interval!cs coords)
     in (!this.header.isNull)
     {
-        auto itr = sam_itr_queryi(this.idx, tid, start, end);
-        return RecordRange(this.fp, this.header, itr);
+        /// convert to zero-based half-open
+        auto newcoords = coords.to!(CoordSystem.zbho);
+
+        /// load index
+        if(this.idx == null)
+            this.idx = HtsIdx(sam_index_load(this.fp, this.fn));
+        if (this.idx == null)
+        {
+            hts_log_error(__FUNCTION__, "SAM index not found");
+            throw new Exception("SAM index not found");
+        }
+        auto itr = HtsItr(sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end));
+        return RecordRange(this.fp, this.header, itr, this.header_offset);
     }
 
-    /// ditto
-    auto query(string q)
-    in (!this.header.isNull)
-    {
-        auto itr = sam_itr_querys(this.idx, this.header.h, toStringz(q));
-        return RecordRange(this.fp, this.header, itr);
-    }
 
     /// ditto
     auto query(string[] regions)
     in (!this.header.isNull)
     {
-        return RecordRangeMulti(this.fp, this.idx, this.header, &(this), regions);
+        /// load index
+        if(this.idx == null)
+            this.idx = HtsIdx(sam_index_load(this.fp, this.fn));
+        if (this.idx == null)
+        {
+            hts_log_error(__FUNCTION__, "SAM index not found");
+            throw new Exception("SAM index not found");
+        }
+        return RecordRangeMulti(this.fp, this.idx, this.header, regions);
     }
 
-    /// ditto
-    auto opIndex(string q)
-    {
-        return query(q);
-    }
-
-    /// ditto
+    /// opIndex with a list of string regions
+    /// bam[["chr1:1-3","chr2:4-50"]]
     auto opIndex(string[] regions)
     {
         return query(regions);
     }
 
-    /// ditto
-    auto opIndex(string tid, long[2] pos)
+    /// opIndex with a string contig and an Interval
+    /// bam["chr1", ZBHO(1,3)]
+    auto opIndex(CoordSystem cs)(string contig, Interval!cs coords)
     {
-        return query(tid, pos[0], pos[1]);
+        return query(contig, coords);
     }
 
-    /// ditto
-    auto opIndex(int tid, long[2] pos)
+    /// opIndex with an int tid and an Interval
+    /// bam[0, ZBHO(1,3)]
+    auto opIndex(CoordSystem cs)(int tid, Interval!cs coords)
     {
-        return query(tid, pos[0], pos[1]);
+        return query(tid, coords);
     }
 
-    /// ditto
-    auto opIndex(string tid, long pos)
+    /// opIndex with a string contig and a Coordinate
+    /// bam["chr1", ZB(1)]
+    auto opIndex(Basis bs)(string contig, Coordinate!bs pos)
     {
-        return query(tid, pos, pos + 1);
+        auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos, pos + 1);
+        return query(contig, coords);
     }
 
-    /// ditto
-    auto opIndex(int tid, long pos)
+    /// opIndex with an int tid and a Coordinate
+    /// bam[0, ZB(1)]
+    auto opIndex(Basis bs)(int tid, Coordinate!bs pos)
     {
-        return query(tid, pos, pos + 1);
+        auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos, pos + 1);
+        return query(tid, coords);
     }
 
-    /// ditto
+    /// opIndex with a string contig and two Coordinates
+    /// bam["chr1", ZB(1), ZB(3)]
     deprecated("use multidimensional slicing with second parameter as range ([\"chr1\", 1 .. 2])")
-    auto opIndex(string tid, long pos1, long pos2)
+    auto opIndex(Basis bs)(string tid, Coordinate!bs pos1, Coordinate!bs pos2)
     {
-        return query(tid, pos1, pos2);
+        auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos1, pos2);
+        return query(tid, coords);
     }
 
-    /// ditto
+    /// opIndex with an int tid and two Coordinates
+    /// bam[0, ZB(1), ZB(3)]
     deprecated("use multidimensional slicing with second parameter as range ([20, 1 .. 2])")
-    auto opIndex(int tid, long pos1, long pos2)
+    auto opIndex(Basis bs)(int tid, Coordinate!bs pos1, Coordinate!bs pos2)
     {
-        return query(tid, pos1, pos2);
+        auto coords = Interval!(getCoordinateSystem!(bs,End.open))(pos1, pos2);
+        return query(tid, coords);
     }
 
-    /// ditto
-    long[2] opSlice(size_t dim)(long start, long end) if (dim  == 1)
+    /// opSlice with two Coordinates
+    /// [ZB(1) .. ZB(3)]
+    auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, Coordinate!bs end) if(dim == 1)
     {
-        return [start, end];
+        assert(end > start);
+        return Interval!(getCoordinateSystem!(bs, End.open))(start, end);
     }
 
 
@@ -359,152 +356,111 @@ struct SAMReader
     {
         return OffsetType.init;
     }
-    /// ditto
+    /// opIndex with a string contig and an Offset
+    /// bam["chr1",$-2]
     auto opIndex(string ctg, OffsetType endoff)
     {
         auto tid = this.header.targetId(ctg);
         auto end = this.header.targetLength(tid) + endoff.offset;
         // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
-        return query(tid, end, end + 1);
+        auto coords = Interval!(CoordSystem.zbho)(end, end + 1);
+        return query(tid, coords);
     }
-    /// ditto
+    /// opIndex with an int tid and an Offset
+    /// bam[0,$-2]
     auto opIndex(int tid, OffsetType endoff)
     {
         auto end = this.header.targetLength(tid) + endoff.offset;
         // TODO review: is targetLength the last nt, or targetLength - 1 the last nt?
-        return query(tid, end, end + 1);
+        auto coords = Interval!(CoordSystem.zbho)(end, end + 1);
+        return query(tid, coords);
     }
-    /// ditto
-    auto opSlice(size_t dim)(long start, OffsetType off) if (dim == 1)
+
+    /// opSlice as Coordinate and an offset
+    /// i.e [ZB(2) .. $]
+    auto opSlice(size_t dim, Basis bs)(Coordinate!bs start, OffsetType off) if(dim == 1)
     {
-        return Tuple!(long, OffsetType)(start, off);
+        return Tuple!(Coordinate!bs, OffsetType)(start, off);
     }
-    /// ditto
-    auto opIndex(string ctg, Tuple!(long, OffsetType) coords)
+
+    /// opIndex with a string contig and a Coordinate and Offset
+    /// bam["chr1",ZB(1) .. $]
+    auto opIndex(Basis bs)(string ctg, Tuple!(Coordinate!bs, OffsetType) coords)
     {
         auto tid = this.header.targetId(ctg);
         auto end = this.header.targetLength(tid) + coords[1];
-        return query(tid, coords[0], end);
+        auto endCoord = ZB(end);
+        auto newEndCoord = endCoord.to!bs;
+        auto c = Interval!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
+        return query(tid, c);
     }
-    /// ditto
-    auto opIndex(int tid, Tuple!(long, OffsetType) coords)
+
+    /// opIndex with an int tid and a Coordinate and Offset
+    /// bam[0,ZB(1) .. $]
+    auto opIndex(Basis bs)(int tid, Tuple!(Coordinate!bs, OffsetType) coords)
     {
         auto end = this.header.targetLength(tid) + coords[1];
-        return query(tid, coords[0], end);
+        auto endCoord = ZB(end);
+        auto newEndCoord = endCoord.to!bs;
+        auto c = Interval!(getCoordinateSystem!(bs,End.open))(coords[0], newEndCoord);
+        return query(tid, c);
+    }
+
+    /// opSlice as two offset
+    /// i.e [$-2 .. $]
+    auto opSlice(size_t dim)(OffsetType start, OffsetType end) if(dim == 1)
+    {
+        return Tuple!(OffsetType, OffsetType)(start, end);
+    }
+
+    /// opIndex two Offsets
+    /// i.e fai["chrom1", $-2 .. $]
+    auto opIndex(string ctg, Tuple!(OffsetType, OffsetType) coords)
+    {
+        auto tid = this.header.targetId(ctg);
+        auto start = this.header.targetLength(tid) + coords[0];
+        auto end = this.header.targetLength(tid) + coords[1];
+        auto c = ZBHO(start, end);
+        return query(tid, c);
+    }
+
+    /// opIndex with an int tid and a Coordinate and Offset
+    /// bam[0,ZB(1) .. $]
+    auto opIndex(int tid, Tuple!(OffsetType, OffsetType) coords)
+    {
+        auto start = this.header.targetLength(tid) + coords[0];
+        auto end = this.header.targetLength(tid) + coords[1];
+        auto c = ZBHO(start, end);
+        return query(tid, c);
     }
 
 
     /// Return an InputRange representing all records in the SAM/BAM/CRAM
-    InputRange!SAMRecord allRecords()
+    auto allRecords()
     {
-        if (this.fp.format.format == htsExactFormat.sam)
-            return SamRecordsRange(this.fp, this.header, this.header_offset).inputRangeObject;
-        else if(this.idx == null){
-            return BamRecordsRange(this.fp, this.header, this.header_offset).inputRangeObject;
-        }else{
-            assert(this.fp.format.format == htsExactFormat.bam);
-            //auto range = AllRecordsRange(this.fp, this.header);
-            import htslib.hts : HTS_IDX_START;
-            auto itr = sam_itr_queryi(this.idx, HTS_IDX_START, 0, 0);
-            return RecordRange(this.fp, this.header, itr).inputRangeObject;
-        }
+        return AllRecordsRange(this.fp, this.header, this.header_offset);
     }
 
     deprecated("Avoid snake_case names")
     alias all_records = allRecords;
 
-    /// Iterate through all records in the BAM or BGZF compressed SAM with no index
-    struct BamRecordsRange
-    {
-        private htsFile*    fp;     // belongs to parent; shared
-        private off_t header_offset;
-        private SAMHeader header; // belongs to parent; shared
-        private bam1_t*     b;
-        private bool initialized;   // Needed to support both foreach and immediate .front()
-        private int success;        // sam_read1 return code
-
-        this(htsFile* fp, SAMHeader header, off_t header_offset)
-        {
-            this.fp = fp;
-            this.header_offset = header_offset;
-            this.header = header;
-            this.b = bam_init1();
-            
-            // Need to seek past header offset
-            bgzf_seek(fp.fp.bgzf, this.header_offset, SEEK_SET);
-        }
-
-        ~this()
-        {
-            //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
-            //TODO ?: free(this.b);
-        }
-
-        /// InputRange interface
-        @property bool empty() // @suppress(dscanner.suspicious.incorrect_infinite_range)
-        {
-            if (!this.initialized) {
-                this.popFront();
-                this.initialized = true;
-            }
-            if (success >= 0)
-                return false;
-            else if (success == -1)
-                return true;
-            else
-            {
-                hts_log_error(__FUNCTION__, "*** ERROR sam_read1 < -1");
-                return true;
-            }
-        }
-        /// ditto
-        void popFront()
-        {
-            success = sam_read1(this.fp, this.header.h, this.b);
-            //bam_destroy1(this.b);
-        }
-        /// ditto
-        SAMRecord front()
-        {
-            assert(this.initialized, "front called before empty");
-            return SAMRecord(bam_dup1(this.b), this.header);
-        }
-
-        SAMRecord moveFront()
-        {
-            auto ret = SAMRecord(bam_dup1(this.b), this.header);
-            popFront;
-            return ret;
-        }
-
-    }
 
     /// Iterate through all records in the SAM
-    struct SamRecordsRange
+    struct AllRecordsRange
     {
-        private htsFile*    fp;     // belongs to parent; shared
+        private HtsFile    fp;     // belongs to parent; shared
         private SAMHeader  header; // belongs to parent; shared
-        private off_t header_offset;
-        private bam1_t*     b;
+        private Bam1     b;
         private bool initialized;   // Needed to support both foreach and immediate .front()
         private int success;        // sam_read1 return code
 
-        this(htsFile* fp, SAMHeader header, off_t header_offset)
+        this(HtsFile fp, SAMHeader header, off_t offset)
         {
-            this.fp = fp;
-            this.header_offset = header_offset;
-            assert(this.fp.format.format == htsExactFormat.sam);
+            this.fp = copyHtsFile(fp, offset);
+            assert(this.fp.format.format == htsExactFormat.sam || this.fp.format.format == htsExactFormat.bam);
             this.header = header;
-            this.b = bam_init1();
-
-            // Need to seek past header offset
-            hseek(fp.fp.hfile, this.header_offset, SEEK_SET);
-        }
-
-        ~this()
-        {
-            //debug(dhtslib_debug) hts_log_debug(__FUNCTION__, "dtor");
-            //TODO ?: free(this.b);
+            this.b = Bam1(bam_init1());
+            this.empty;
         }
 
         /// InputRange interface
@@ -537,45 +493,53 @@ struct SAMReader
             return SAMRecord(bam_dup1(this.b), this.header);
         }
 
-        SAMRecord moveFront()
+        AllRecordsRange save()
         {
-            auto ret = SAMRecord(bam_dup1(this.b), this.header);
-            popFront;
-            return ret;
+            AllRecordsRange newRange;
+            newRange.fp = HtsFile(copyHtsFile(fp));
+            newRange.header = header;
+            newRange.b = Bam1(bam_dup1(this.b));
+            newRange.initialized = this.initialized;
+            newRange.success = this.success;
+
+            return newRange;
         }
 
     }
 
-    /// Iterate over records falling within a queried region (TODO: itr_multi_query)
-    /// TODO destroy the itr with dtor
+    /// Iterate over records falling within a queried region
     struct RecordRange
     {
-        private htsFile* fp;
+        private HtsFile fp;
         private SAMHeader h;
-        private hts_itr_t* itr;
-        private bam1_t* b;
+        private HtsItr itr;
+        private Bam1 b;
 
         private int r;  // sam_itr_next: >= 0 on success; -1 when there is no more data; < -1 on error
+        
+        private bool initialized;   // Needed to support both foreach and immediate .front()
+        private int success;        // sam_read1 return code
 
         /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
-        this(htsFile* fp, SAMHeader header, hts_itr_t* itr)
+        this(HtsFile fp, SAMHeader header, HtsItr itr, off_t offset)
         {
-            this.fp = fp;
+            this.fp = HtsFile(copyHtsFile(fp, offset));
+            this.itr = HtsItr(copyHtsItr(itr));
             this.h = header;
-            this.itr = itr;
-            this.b = bam_init1();
-            
-            //assert(itr !is null, "itr was null");
- 
-            if (this.itr !is null)
-                popFront();
+            this.b = Bam1(bam_init1);
+            this.empty;
+            assert(itr !is null, "itr was null"); 
         }
 
         /// InputRange interface
         @property bool empty()
         {
             // TODO, itr.finished shouldn't be used
-            if (this.itr is null) return true;
+            if (!this.initialized) {
+                this.popFront();
+                this.initialized = true;
+            }
+            assert(this.itr !is null);
             return (r < 0 || itr.finished) ? true : false;
         }
         /// ditto
@@ -589,11 +553,18 @@ struct SAMReader
             return SAMRecord(bam_dup1(b), this.h);
         }
 
-        SAMRecord moveFront()
+        /// make a ForwardRange
+        RecordRange save()
         {
-            auto ret = SAMRecord(bam_dup1(this.b), this.h);
-            popFront;
-            return ret;
+            RecordRange newRange;
+            newRange.fp = HtsFile(copyHtsFile(fp, itr.curr_off));
+            newRange.itr = HtsItr(copyHtsItr(itr));
+            newRange.h = h;
+            newRange.b = Bam1(bam_dup1(this.b));
+            newRange.initialized = this.initialized;
+            newRange.success = this.success;
+            newRange.r = this.r;
+            return newRange;
         }
     }
 
@@ -603,29 +574,47 @@ struct SAMReader
     /// Iterate over records falling within queried regions using a RegionList
     struct RecordRangeMulti
     {
-        private htsFile* fp;
+
+        private HtsFile fp;
         private SAMHeader h;
-        private hts_itr_multi_t* itr;
-        private bam1_t* b;
-        private hts_reglist_t[] rlist;
+        private HtsItrMulti itr;
+        private Bam1 b;
+
         private int r;
+        private bool initialized;
 
         ///
-        this(htsFile* fp, hts_idx_t* idx, SAMHeader header, SAMFile* sam, string[] regions)
+        this(HtsFile fp, HtsIdx idx, SAMHeader header, string[] regions)
         {
-            rlist = RegionList(sam, regions).getRegList();
-            this.fp = fp;
+            /// get reglist
+            auto cQueries = regions.map!(toUTFz!(char *)).array;
+            int count;
+            auto fnPtr = cast(hts_name2id_f) &sam_hdr_name2tid;
+
+            /// rlistPtr ends up being free'd by the hts_itr
+            auto rlistPtr = hts_reglist_create(cQueries.ptr, cast(int) cQueries.length, &count, cast(void *)header.h.getRef, fnPtr);
+
+
+            /// set header and fp
+            this.fp = HtsFile(copyHtsFile(fp));
             this.h = header;
-            b = bam_init1();
-            itr = sam_itr_regions(idx, this.h.h, rlist.ptr, cast(uint) rlist.length);
-            //debug(dhtslib_debug) { writeln("sam_itr null? ",(cast(int)itr)==0); }
-            hts_log_debug(__FUNCTION__, format("SAM itr null?: %s", cast(int) itr == 0));
-            popFront();
+
+            /// init bam1_t
+            b = Bam1(bam_init1());
+
+            /// get the itr
+            itr = sam_itr_regions(idx, this.h.h, rlistPtr, cast(uint) count);
+
+            empty();
         }
 
         /// InputRange interface
         @property bool empty()
         {
+            if(!initialized){
+                this.initialized = true;
+                popFront;
+            }
             return (r <= 0 && itr.finished) ? true : false;
         }
         /// ditto
@@ -638,99 +627,21 @@ struct SAMReader
         {
             return SAMRecord(bam_dup1(b), this.h);
         }
-    }
-
-    /// List of regions based on sam/bam
-    struct RegionList
-    {
-        import std.algorithm.iteration : splitter;
-        import std.algorithm.sorting : sort;
-        import std.range : drop, array;
-        import std.conv : to;
-
-        private hts_reglist_t[string] rlist;
-        private SAMFile* sam;
-
-        ///
-        this(SAMFile* sam, string[] queries)
+        /// make a ForwardRange
+        RecordRangeMulti save()
         {
-            this.sam = sam;
-            foreach (q; queries)
-            {
-                addRegion(q);
-            }
-        }
-
-        /// Add a region in standard format (chr1:2000-3000) to the RegionList
-        void addRegion(string reg)
-        {
-            //chr:1-2
-            //split into chr and 1-2
-            auto split = reg.splitter(":");
-            auto chr = split.front;
-            //split 1-2 into 1 and 2
-            split = split.drop(1).front.splitter("-");
-            if (sam.header.targetId(chr) < 0)
-            {
-                hts_log_error(__FUNCTION__, "tid not present in sam/bam");
-            }
-            addRegion(sam.header.targetId(chr), split.front.to!int, split.drop(1).front.to!int);
-        }
-
-        /// Add a region by {target/contig/chr id, start coord, end coord} to the RegionList
-        void addRegion(int tid, int beg, int end)
-        {
-            if (tid > this.sam.header.nTargets || tid < 0)
-                hts_log_error(__FUNCTION__, "tid not present in sam/bam");
-
-            auto val = (this.sam.header.targetNames[tid] in this.rlist);
-            hts_pair32_t p;
-
-            if (beg < 0)
-                hts_log_error(__FUNCTION__, "first coordinate < 0");
-
-            if (beg >= this.sam.header.targetLength(tid))
-                hts_log_error(__FUNCTION__, "first coordinate larger than tid length");
-
-            if (end < 0)
-                hts_log_error(__FUNCTION__, "second coordinate < 0");
-
-            if (end >= this.sam.header.targetLength(tid))
-                hts_log_error(__FUNCTION__, "second coordinate larger than tid length");
-
-            p.beg = beg;
-            p.end = end;
-            hts_pair32_t[] plist;
-            if (val is null)
-            {
-                hts_reglist_t r;
-
-                //set tid
-                r.tid = tid;
-
-                //create intervals
-                plist = plist ~ p;
-                r.intervals = plist.ptr;
-                r.count = cast(uint) plist.length;
-                r.min_beg = p.beg;
-                r.max_end = p.end;
-                this.rlist[this.sam.header.targetNames[tid]] = r;
-            }
-            else
-            {
-                plist = (val.intervals[0 .. val.count] ~ p).sort!(cmpInterval).array;
-                val.intervals = plist.ptr;
-                val.count = cast(uint) plist.length;
-                val.min_beg = plist[0].beg;
-                val.max_end = plist[$ - 1].end;
-            }
-        }
-
-        hts_reglist_t[] getRegList()
-        {
-            return rlist.byValue.array.sort!(cmpRegList).array;
+            RecordRangeMulti newRange;
+            newRange.fp = HtsFile(copyHtsFile(fp, itr.curr_off));
+            newRange.itr = HtsItrMulti(copyHtsItr(itr));
+            newRange.h = h;
+            newRange.b = Bam1(bam_dup1(this.b));
+            newRange.initialized = this.initialized;
+            newRange.r = this.r;
+            return newRange;
         }
     }
+    static assert(isInputRange!RecordRangeMulti);
+    static assert(is(ElementType!RecordRangeMulti == SAMRecord));
 }
 
 ///
@@ -752,11 +663,11 @@ debug(dhtslib_unittest) unittest
     assert(readrange.empty == false);
     auto read = readrange.front();
     
-    writeln(read.sequence);
+    // writeln(read.sequence);
     assert(read.sequence=="GCTAGCTCAG");
     assert(sam.allRecords.array.length == 2);
     sam2.write(read);
-    sam2.close;
+    destroy(sam2);
 
 
     // testing with multiple specified threads
@@ -793,30 +704,144 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map;
     import std.array : array;
     import std.path : buildPath,dirName;
+    import std.range : drop;
     hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
     hts_log_info(__FUNCTION__, "Testing SAMFile query");
     hts_log_info(__FUNCTION__, "Loading test file");
 
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
     assert(bam.allRecords.array.length == 112);
-    assert(bam["CHROMOSOME_I"].array.length == 18);
-    assert(bam["CHROMOSOME_II"].array.length == 34);
-    assert(bam["CHROMOSOME_III"].array.length == 41);
-    assert(bam["CHROMOSOME_IV"].array.length == 19);
-    assert(bam["CHROMOSOME_V"].array.length == 0);
-    assert(bam.query("CHROMOSOME_I:900-2000") .array.length == 14);
-    assert(bam.query("CHROMOSOME_I",900, 2000) .array.length == 14);
-    assert(bam["CHROMOSOME_I",900 .. 2000].array.length == 14);
-    assert(bam["CHROMOSOME_I",[900, 2000]].array.length == 14);
-    assert(bam[0, [900, 2000]].array.length == 14);
+    // assert(bam["CHROMOSOME_I"].array.length == 18);
+    // assert(bam["CHROMOSOME_II"].array.length == 34);
+    // assert(bam["CHROMOSOME_III"].array.length == 41);
+    // assert(bam["CHROMOSOME_IV"].array.length == 19);
+    // assert(bam["CHROMOSOME_V"].array.length == 0);
+    assert(bam.query("CHROMOSOME_I", ZBHO(900, 2000)) .array.length == 14);
+    assert(bam["CHROMOSOME_I",ZB(900) .. ZB(2000)].array.length == 14);
+    assert(bam[0, ZB(900) .. ZB(2000)].array.length == 14);
 
-    assert(bam["CHROMOSOME_I",940].array.length == 2);
-    assert(bam[0, 940].array.length == 2);
+    assert(bam["CHROMOSOME_I",ZB(940)].array.length == 2);
+    assert(bam[0, ZB(940)].array.length == 2);
 
 
-    assert(bam["CHROMOSOME_I",900 .. $].array.length == 18);
-    assert(bam[0, 900 .. $].array.length == 18);
+    assert(bam["CHROMOSOME_I",ZB(900) .. $].array.length == 18);
+    assert(bam[0, ZB(900) .. $].array.length == 18);
     assert(bam["CHROMOSOME_I",$].array.length == 0);
     assert(bam[0, $].array.length == 0);
     assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
+
+    assert(bam.query("CHROMOSOME_I", OBHO(901, 2000)) .array.length == 14);
+    assert(bam["CHROMOSOME_I",OB(901) .. OB(2001)].array.length == 14);
+    assert(bam[0, OB(901) .. OB(2001)].array.length == 14);
+
+    assert(bam["CHROMOSOME_I",OB(941)].array.length == 2);
+    assert(bam[0, OB(941)].array.length == 2);
+
+
+    assert(bam["CHROMOSOME_I",OB(901) .. $].array.length == 18);
+    assert(bam[0, OB(901) .. $].array.length == 18);
+    assert(bam["CHROMOSOME_I",$].array.length == 0);
+    assert(bam[0, $].array.length == 0);
+    assert(bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]].array.length == 33);
+
+    assert(bam["CHROMOSOME_II",$-1918 .. $].array.length == 0);
+    assert(bam["CHROMOSOME_II", ZB(3082) .. $].array.length == 0);
+    assert(bam["CHROMOSOME_II",$-1919 .. $].array.length == 1);
+    assert(bam["CHROMOSOME_II", ZB(3081) .. $].array.length == 1);
+    assert(bam["CHROMOSOME_II",$-2018 .. $].array.length == 2);
+
+    auto range = bam[["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"]];
+    auto range1 = range.save;
+    range = range.drop(5);
+    auto range2 = range.save;
+    range = range.drop(5);
+    auto range3 = range.save;
+    range = range.drop(10);
+    auto range4 = range.save;
+    assert(range1.array.length == 33);
+    assert(range2.array.length == 28);
+    assert(range3.array.length == 23);
+    assert(range4.array.length == 13);
+}
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import dhtslib.sam;
+    import std.array : array;
+    import std.path : buildPath,dirName;
+    import std.range : drop;
+    hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
+    hts_log_info(__FUNCTION__, "Testing AllRecordsRange save()");
+    hts_log_info(__FUNCTION__, "Loading test file");
+
+    auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 0);
+    assert(bam.allRecords.array.length == 112);
+    assert(bam.allRecords.array.length == 112);
+
+    auto range = bam.allRecords;
+
+    auto range1 = range.save();
+    range = range.drop(5);
+
+    auto range2 = range.save();
+    range = range.drop(5);
+
+    auto range3 = range.save();
+    range = range.drop(5);
+
+    auto range4 = range.save();
+    range = range.drop(50);
+
+    auto range5 = range.save();
+    range.popFront;
+
+    auto range6 = range.save();
+
+    assert(range1.array.length == 112);
+    assert(range2.array.length == 107);
+    assert(range3.array.length == 102);
+    assert(range4.array.length == 97);
+    assert(range5.array.length == 47);
+    assert(range6.array.length == 46);
+}
+///
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import dhtslib.sam;
+    import std.array : array;
+    import std.path : buildPath,dirName;
+    import std.range : drop;
+    hts_set_log_level(htsLogLevel.HTS_LOG_WARNING);
+    hts_log_info(__FUNCTION__, "Testing RecordsRange save()");
+    hts_log_info(__FUNCTION__, "Loading test file");
+
+    auto bam = SAMReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam"), 4);
+    
+    auto range = bam.query("CHROMOSOME_I", ZBHO(900, 2000));
+    assert(bam.query("CHROMOSOME_I", ZBHO(900, 2000)).array.length == 14);
+    
+    auto range1 =  range.save;
+    range = range.drop(1);
+    
+    auto range2 =  range.save;
+    range = range.drop(2);
+    
+    auto range3 =  range.save;
+    range = range.drop(3);
+    
+    auto range4 =  range.save;
+    range = range.drop(5);
+    
+    auto range5 =  range.save;
+    range.popFront;
+    
+    auto range6 = range.save;
+
+    assert(range1.array.length == 14);
+    assert(range2.array.length == 13);
+    assert(range3.array.length == 11);
+    assert(range4.array.length == 8);
+    assert(range5.array.length == 3);
+    assert(range6.array.length == 2);
 }

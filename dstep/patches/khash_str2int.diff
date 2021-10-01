@@ -1,0 +1,58 @@
+23a24
+> module htslib.khash_str2int;
+25a27,33
+> alias khint32_t = uint;
+> 
+> alias khint64_t = ulong;
+> 
+> alias khint_t = uint;
+> alias khiter_t = uint;
+> alias kh_cstr_t = const(char) *;
+39,45c47,53
+< kh_str2int_t* kh_init_str2int();
+< void kh_destroy_str2int(kh_str2int_t* h);
+< void kh_clear_str2int(kh_str2int_t* h);
+< khint_t kh_get_str2int(const(kh_str2int_t)* h, kh_cstr_t key);
+< int kh_resize_str2int(kh_str2int_t* h, khint_t new_n_buckets);
+< khint_t kh_put_str2int(kh_str2int_t* h, kh_cstr_t key, int* ret);
+< void kh_del_str2int(kh_str2int_t* h, khint_t x);
+---
+> kh_str2int_t* kh_init_str2int ();
+> void kh_destroy_str2int (kh_str2int_t* h);
+> void kh_clear_str2int (kh_str2int_t* h);
+> khint_t kh_get_str2int (const(kh_str2int_t)* h, kh_cstr_t key);
+> int kh_resize_str2int (kh_str2int_t* h, khint_t new_n_buckets);
+> khint_t kh_put_str2int (kh_str2int_t* h, kh_cstr_t key, int* ret);
+> void kh_del_str2int (kh_str2int_t* h, khint_t x);
+51c59
+< void* khash_str2int_init();
+---
+> void* khash_str2int_init ();
+58c66
+< void khash_str2int_destroy(void* _hash);
+---
+> void khash_str2int_destroy (void* _hash);
+63c71
+< void khash_str2int_destroy_free(void* _hash);
+---
+> void khash_str2int_destroy_free (void* _hash);
+68c76
+< int khash_str2int_has_key(void* _hash, const(char)* str);
+---
+> int khash_str2int_has_key (void* _hash, const(char)* str);
+74c82
+< int khash_str2int_get(void* _hash, const(char)* str, int* value);
+---
+> int khash_str2int_get (void* _hash, const(char)* str, int* value);
+82c90
+< int khash_str2int_inc(void* _hash, const(char)* str);
+---
+> int khash_str2int_inc (void* _hash, const(char)* str);
+89c97
+< int khash_str2int_set(void* _hash, const(char)* str, int value);
+---
+> int khash_str2int_set (void* _hash, const(char)* str, int value);
+94c102
+< int khash_str2int_size(void* _hash);
+---
+> int khash_str2int_size (void* _hash);

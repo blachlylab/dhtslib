@@ -14,6 +14,9 @@ import std.traits : isIntegral;
 
 import htslib.hts_log;
 import dhtslib.sam.record : SAMRecord;
+import dhtslib.coordinates;
+import dhtslib.memory;
+import htslib.sam : bam_get_cigar;
 
 /// Represents a CIGAR string
 /// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
@@ -22,30 +25,19 @@ struct Cigar
     /// array of distinct CIGAR ops 
     /// private now to force fixing some reference issues
     private CigarOp[] ops;
-
-    /// Since we are reference counting and Cigar doesn't usually own its data
-    /// we have to do some special things.
-
-    private int refct = 1;      // Postblit refcounting in case the object is passed around
-
-    this(this)
+    private Bam1 b;
+    /// Construct Cigar from SAMRecord
+    this(Bam1 b)
     {
-        refct++;
-    }
-
-    invariant(){
-        assert(refct >= 0);
-    }
-
-    ~this(){
-        if(--refct == 0)
-            destroy(ops);
+        this.b = b;
+        auto cigar = bam_get_cigar(this.b);
+        this(cigar, this.b.core.n_cigar);
     }
 
     /// Construct Cigar from raw data
     this(uint* cigar, uint length)
     {
-        ops = (cast(CigarOp*) cigar)[0 .. length];
+        this((cast(CigarOp*) cigar)[0 .. length]);
     }
 
     /// Construct Cigar from an array of CIGAR ops
@@ -64,12 +56,6 @@ struct Cigar
     string toString()
     {
         return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
-    }
-
-    /// get number of references to Cigar
-    int references()
-    {
-        return this.refct;
     }
 
     /// get length of cigar
@@ -233,9 +219,13 @@ union CigarOp
         return ((raw & 0xF) >> 1) == 2; // 4 or 5
     }
 
+    deprecated("Use camelCase names instead")
     alias is_query_consuming = isQueryConsuming;
+    deprecated("Use camelCase names instead")
     alias is_reference_consuming = isReferenceConsuming;
+    deprecated("Use camelCase names instead")
     alias is_match_or_mismatch = isMatchOrMismatch;
+    deprecated("Use camelCase names instead")
     alias is_clipping = isClipping;
 
     string toString(){
@@ -285,7 +275,7 @@ debug (dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
-    auto readrange = bam["CHROMOSOME_I", 914];
+    auto readrange = bam["CHROMOSOME_I", ZB(914)];
     hts_log_info(__FUNCTION__, "Getting read 1");
     assert(readrange.empty == false);
     auto read = readrange.front();
@@ -399,7 +389,7 @@ debug (dhtslib_unittest) unittest
 /// and the CIGAR op at or effecting their alignment.
 struct AlignedCoordinate
 {
-    int qpos, rpos;
+    Coordinate!(Basis.zero) qpos, rpos;
     Ops cigar_op;
 }
 
@@ -412,7 +402,7 @@ struct AlignedCoordinatesItr
     this(Cigar cigar)
     {
         itr = CigarItr(cigar);
-        current.qpos = current.rpos = -1;
+        current.qpos = current.rpos = Coordinate!(Basis.zero)(-1);
         current.cigar_op = itr.front;
         current.qpos += ((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 1);
         current.rpos += (((CIGAR_TYPE >> ((current.cigar_op & 0xF) << 1)) & 2) >> 1);
@@ -454,7 +444,7 @@ debug (dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     auto bam = SAMFile(buildPath(dirName(dirName(dirName(dirName(__FILE__)))), "htslib",
             "test", "range.bam"), 0);
-    auto readrange = bam["CHROMOSOME_I", 914];
+    auto readrange = bam["CHROMOSOME_I", ZB(914)];
     hts_log_info(__FUNCTION__, "Getting read 1");
     assert(readrange.empty == false);
     auto read = readrange.front();

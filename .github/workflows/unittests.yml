@@ -22,7 +22,7 @@ jobs:
 
       - name: Install htslib deps
         run: |
-            sudo apt-get install -y build-essential autoconf zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev libssl-dev
+            sudo apt-get update && sudo apt-get install -y build-essential autoconf zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev libssl-dev
 
       - name: Get htslib commit
         id: get-htslib-commit
@@ -49,8 +49,25 @@ jobs:
             sudo make install
             sudo ldconfig
 
+      - name: Setup additional test files
+        run: |
+            cd htslib
+            cd test
+            cd tabix
+            bgzip -c gff_file.gff > gff_file.gff.gz
+            tabix gff_file.gff.gz
+            bgzip -c bed_file.bed > bed_file.bed.gz
+            tabix bed_file.bed.gz
+            bgzip -c vcf_file.vcf > vcf_file.vcf.gz
+            tabix vcf_file.vcf.gz
+
       - name: Run tests
         run: dub -q test -b=unittest-cov
+        env:
+          LIBRARY_PATH: /usr/local/lib
+
+      - name: Run safety tests
+        run: dub -q test -c=unittest-safety
         env:
           LIBRARY_PATH: /usr/local/lib
 

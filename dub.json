@@ -5,12 +5,31 @@
     "homepage": "https://github.com/blachlylab/dhtslib",
     "license": "MIT",
     "dependencies": {
+        "dhtslib:coordinates": "*"
     },
+    "subPackages": [
+        "./coordinates/"
+    ],
+    "sourcePaths": [
+        "./source/",
+        "./coordinates"
+    ],
     "configurations": [
+        {
+            "name": "source",
+            "targetType": "library",
+            "libs": ["hts"]
+        },
         {
             "name": "unittest",
             "debugVersions": ["dhtslib_unittest"],
             "libs": ["hts"]
+        },
+        {
+            "name": "unittest-safety",
+            "debugVersions": ["dhtslib_unittest"],
+            "libs": ["hts"],
+            "dflags": ["-dip1000"]
         },
         {
             "name": "tabix_test",
@@ -51,14 +70,16 @@
             "libs": ["hts"]
         },
         {
-            "name": "source",
-            "targetType": "library",
+            "name": "chunkby_test",
+            "targetType": "executable",
+            "targetName": "chunkby",
+            "mainSourceFile": "test/chunkby.d",
             "libs": ["hts"]
         },
         {
             "name": "source-static",
             "targetType": "library",
-            "sourceFiles": ["../htslib/libhts.a"],
+            "sourceFiles": ["htslib/libhts.a"],
             "libs": [ ]
         }
     ]

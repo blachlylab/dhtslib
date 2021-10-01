@@ -12,6 +12,11 @@ import core.stdc.stdio : SEEK_SET;
 import std.parallelism : totalCPUs;
 import std.stdio : writeln, writefln;
 import std.string : fromStringz, toStringz;
+import std.range : inputRangeObject, InputRangeObject;
+import std.traits : ReturnType;
+
+import dhtslib.memory;
+import dhtslib.util;
 
 import htslib.bgzf;
 import htslib.hfile: hseek, off_t;
@@ -27,22 +32,8 @@ struct BGZFile {
     private const(char)* fn;
 
     /// htslib data structure representing the BGZF compressed file/stream fp
-    private BGZF* bgzf;
+    private Bgzf bgzf;
 
-    // ref counting to prevent closing file multiple times
-    // (free is instead now in popFront instead of dtor)
-    private int rc = 1;
-
-    // postblit ref counting
-    this(this)
-    {
-        debug(dhtslib_debug) { writeln("BGZFile postblit"); }
-        this.rc++;
-    }
-    
-    invariant(){
-        assert(rc >= 0);
-    }
 
     /// Open filename `fn` for reading
     this(string fn)
@@ -51,7 +42,7 @@ struct BGZFile {
 
         // open file
         this.fn = toStringz(fn);
-        this.bgzf = bgzf_open(this.fn, "r");
+        this.bgzf = Bgzf(bgzf_open(this.fn, "r"));
 
         // enable multi-threading
         // (only effective if library was compiled with -DBGZF_MT)
@@ -65,29 +56,21 @@ struct BGZFile {
             }
         }
     }
-    ~this()
-    {
-        debug(dhtslib_debug) { writefln("BGZFile dtor | rc=%d", this.rc); }
 
-        if(!--rc) {
-            debug(dhtslib_debug) { 
-                writefln("BGZFile closing file (rc=%d)", rc);
-            }
-            // free(this.line.s) not necessary as should be taken care of in popFront
-            // (or front() if using pre-primed range and fetching each row in popFront)
-            // on top of this, it should never have been malloc'd in this refcount=0 copy
-            if (bgzf_close(this.bgzf) != 0) writefln("hts_close returned non-zero status: %s\n", fromStringz(this.fn));
-        }
-    }
-
-    
+    /// Returns a foward range of each line
+    /// the internal buffer is reused so you must copy 
+    /// if you want it to stick around
     auto byLine(){
         struct BGZFRange
         {
-            private BGZF* bgzf;
-            private kstring_t line;
-            this(BGZF * bgzf){
-                this.bgzf = bgzf;
+            private Bgzf bgzf;
+            private Kstring line;
+            private const(char)* fn;
+            this(Bgzf bgzf, const(char)* fn){
+                this.bgzf = copyBgzf(bgzf, fn);
+                this.fn = fn;
+                line = initKstring;
+                ks_initialize(line);
                 popFront;
             }
             /// InputRange interface
@@ -95,14 +78,10 @@ struct BGZFile {
             void popFront()
             {
 
-                free(this.line.s);
-                // equivalent to htslib ks_release
-                this.line.l = 0;
-                this.line.m = 0;
-                this.line.s = null;
+                ks_clear(this.line);
                 
                 // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
-                immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
+                immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', this.line);
                 this.empty=(res < 0 ? true : false);
             }
             /// ditto
@@ -111,18 +90,32 @@ struct BGZFile {
                 auto ret = fromStringz(this.line.s);
                 return ret;
             }
+            BGZFRange save()
+            {
+                BGZFRange newRange;
+                newRange.fn = fn;
+                newRange.bgzf = Bgzf(copyBgzf(bgzf, fn));
+                newRange.line = Kstring(copyKstring(this.line));
+                return newRange;
+            }
         }
         hseek(bgzf.fp, cast(off_t) 0, SEEK_SET);
-        return BGZFRange(this.bgzf);
+        return BGZFRange(this.bgzf, this.fn);
     }
 
+    /// Returns a foward range of each line
+    /// same as above but we copy for you
     auto byLineCopy(){
         struct BGZFRange
         {
-            private BGZF* bgzf;
-            private kstring_t line;
-            this(BGZF * bgzf){
-                this.bgzf = bgzf;
+            private Bgzf bgzf;
+            private Kstring line;
+            private const(char)* fn;
+            this(Bgzf bgzf, const(char)* fn){
+                this.bgzf = copyBgzf(bgzf, fn);
+                this.fn = fn;
+                line = initKstring;
+                ks_initialize(line);
                 popFront;
             }
             /// InputRange interface
@@ -130,14 +123,9 @@ struct BGZFile {
             void popFront()
             {
 
-                free(this.line.s);
-                // equivalent to htslib ks_release
-                this.line.l = 0;
-                this.line.m = 0;
-                this.line.s = null;
-                
+                ks_clear(this.line);
                 // int bgzf_getline(BGZF *fp, int delim, kstring_t *str);
-                immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', &this.line);
+                immutable int res = bgzf_getline(this.bgzf, cast(int)'\n', this.line);
                 this.empty=(res < 0 ? true : false);
             }
             /// ditto
@@ -146,9 +134,18 @@ struct BGZFile {
                 auto ret = fromStringz(this.line.s).idup;
                 return ret;
             }
+
+            BGZFRange save()
+            {
+                BGZFRange newRange;
+                newRange.fn = fn;
+                newRange.bgzf = Bgzf(copyBgzf(bgzf, fn));
+                newRange.line = Kstring(copyKstring(this.line));
+                return newRange;
+            }
         }
         hseek(bgzf.fp, cast(off_t) 0, SEEK_SET);
-        return BGZFRange(this.bgzf);
+        return BGZFRange(this.bgzf, this.fn);
     }
 }
 
@@ -160,6 +157,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map;
     import std.array : array;
     import std.path : buildPath,dirName;
+    import std.range : drop;
     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
     hts_log_info(__FUNCTION__, "Testing BGZFile");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -170,5 +168,84 @@ debug(dhtslib_unittest) unittest
     assert(bg.byLineCopy.array.length == 500);
     assert(bg.byLineCopy.array.length == 500);
     assert(bg.byLine.array.length == 500);
+
+    
+    auto range = bg.byLineCopy;
+    auto range1 = range.save;
+    range = range.drop(200);
+    auto range2 = range.save;
+    range = range.drop(200);
+    auto range3 = range.save;
+
+    assert(range1.array.length == 500);
+    assert(range2.array.length == 300);
+    assert(range3.array.length == 100);
+
+    auto range4 = bg.byLine;
+    auto range5 = range4.save;
+    range4 = range4.drop(200);
+    auto range6 = range4.save;
+    range4 = range4.drop(200);
+    auto range7 = range4.save;
+
+    assert(range5.array.length == 500);
+    assert(range6.array.length == 300);
+    assert(range7.array.length == 100);
     // assert(bg.array == ["122333444455555"]);
+}
+
+/**
+    Range that allows reading a record based format via BGZFile.
+    Needs a record type that encompasses only one line of text.
+    Rectype could be GFF3Record, BedRecord ...
+    This is a sister struct to dhtslib.tabix.RecordReaderRegion.
+*/
+struct RecordReader(RecType)
+{
+    /// file reader
+    BGZFile file;
+    /// file reader range
+    ReturnType!(this.initializeRange) range;
+    /// keep the header
+    string header;
+
+    bool emptyLine = false;
+
+    /// string filename ctor
+    this(string fn)
+    {
+        this.file = BGZFile(fn);
+        this.range = this.initializeRange;
+        while(!this.range.empty && this.range.front.length > 0 && this.range.front[0] == '#')
+        {
+            header ~= this.range.front ~ "\n";
+            this.range.popFront;
+        }
+        if(this.header.length > 0) this.header = this.header[0 .. $-1];
+    }
+
+    /// copy the BGZFile.byLineCopy range
+    auto initializeRange()
+    {
+        return this.file.byLineCopy.inputRangeObject;
+    }
+
+    /// returns RecType
+    RecType front()
+    {
+        return RecType(this.range.front);
+    }
+
+    /// move the range
+    void popFront()
+    {
+        this.range.popFront;
+        if(this.range.front == "") this.emptyLine = true;
+    }
+
+    /// is range done
+    auto empty()
+    {
+        return this.emptyLine || this.range.empty;
+    }
 }

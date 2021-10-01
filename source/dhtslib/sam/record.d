@@ -2,7 +2,7 @@ module dhtslib.sam.record;
 
 import core.stdc.stdlib : calloc, free, realloc;
 import core.stdc.string : memset;
-import core.stdc.errno : EINVAL, EOVERFLOW, ENOMEM, ERANGE;
+import core.stdc.errno : EINVAL, EOVERFLOW, ENOMEM, ERANGE, errno;
 import std.string : fromStringz, toStringz;
 import std.algorithm : filter;
 import std.range.interfaces : InputRange, inputRangeObject;
@@ -15,6 +15,8 @@ import htslib.sam;
 import dhtslib.sam.cigar;
 import dhtslib.sam.tagvalue;
 import dhtslib.sam.header;
+import dhtslib.coordinates;
+import dhtslib.memory;
 
 /**
 Encapsulates a SAM/BAM/CRAM record,
@@ -24,32 +26,15 @@ and the htslib helper functions for speed.
 struct SAMRecord
 {
     /// Backing SAM/BAM row record
-    bam1_t* b;
+    Bam1 b;
 
     /// Corresponding SAM/BAM header data
     SAMHeader h;
-
-    private int refct = 1;      // Postblit refcounting in case the object is passed around
-
-    private Cigar p_cigar;
-
-    private bool cigarInitialized;
-    
-    private TagValue p_tagval;
-
-    this(this)
-    {
-        refct++;
-    }
-
-    invariant(){
-        assert(refct >= 0);
-    }
    
     /// ditto
     this(SAMHeader h)
     {
-        this.b = bam_init1();
+        this.b = Bam1(bam_init1);
         this.h = h;
     }
  
@@ -57,24 +42,15 @@ struct SAMRecord
     deprecated("Construct with sam_hdr_t* for mapped contig (tid) name support")
     this(bam1_t* b)
     {
-        this.b = b;
+        this.b = Bam1(b);
     }
 
     /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
     this(bam1_t* b, SAMHeader h)
     {
-        this.b = b;
+        this.b = Bam1(b);
         this.h = h;
     }
-
-    ~this()
-    {
-        if(refct > 0) refct--;
-        // remove only if no references to this or underlying bam1_t data
-        if (refct == 0 && p_cigar.references == 0 && p_tagval.references == 0)
-            bam_destroy1(this.b); // we created our own in default ctor, or received copy via bam_dup1
-    }
-
 
     /* bam1_core_t fields */
 
@@ -98,11 +74,19 @@ struct SAMRecord
     /// 0-based leftmost coordinate
     pragma(inline, true)
     @nogc @safe nothrow
-    @property long pos() { return this.b.core.pos; }
+    @property ZB pos() { return ZB(this.b.core.pos); }
     /// ditto
     pragma(inline, true)
     @nogc @safe nothrow
-    @property void pos(long pos) { this.b.core.pos = pos; }
+    @property void pos(ZB pos) { this.b.core.pos = pos.pos; }
+
+    /// 0-based, half-open coordinates that represent
+    /// the mapped length of the alignment 
+    pragma(inline, true)
+    @property ZBHO coordinates()
+    {
+        return ZBHO(this.pos, this.pos + this.cigar.alignedLength);
+    }
 
     // TODO: @field  bin     bin calculated by bam_reg2bin()
 
@@ -136,45 +120,70 @@ struct SAMRecord
 
     /// is read paired?
     pragma(inline, true)
+    @nogc @safe nothrow
     @property bool isPaired()
     {
-        return (b.core.flag & BAM_FPAIRED);
+        return cast(bool)(b.core.flag & BAM_FPAIRED);
     }
-    
-    /// is read reversed?
-    /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
-    @property bool isReversed()
+
+    /// is read paired?
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property bool isProperPair()
     {
-        version(LDC) pragma(inline, true);
-        return bam_is_rev(this.b);
+        return cast(bool)(b.core.flag & BAM_FPROPER_PAIR);
     }
 
     /// is read mapped?
+    pragma(inline, true)
+    @nogc @safe nothrow
     @property bool isMapped()
     {
-        version(LDC){
-            pragma(inline, true);
-        }
         return (b.core.flag & BAM_FUNMAP) == 0;
     }
 
     /// is read mate mapped?
+    pragma(inline, true)
+    @nogc @safe nothrow
     @property bool isMateMapped()
     {
-        version(LDC){
-            pragma(inline, true);
-        }
         return (b.core.flag & BAM_FMUNMAP) == 0;
+    }
+
+    /// is read reversed?
+    /// bool bam_is_rev(bam1_t *b) { return ( ((*b).core.flag & BAM_FREVERSE) != 0 ); }
+    pragma(inline, true)
+    @nogc @trusted nothrow
+    @property bool isReversed()
+    {
+        return bam_is_rev(this.b);
     }
 
     /// is mate reversed?
     /// bool bam_is_mrev(bam1_t *b) { return( ((*b).core.flag & BAM_FMREVERSE) != 0); }
     pragma(inline, true)
+    @nogc @trusted nothrow
     @property bool mateReversed()
     {
         return bam_is_mrev(this.b);
     }
+
+    /// is this read 1?
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property bool isRead1()
+    {
+        return cast(bool)(b.core.flag & BAM_FREAD1);
+    }
     
+    /// is this read 2?
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property bool isRead2()
+    {
+        return cast(bool)(b.core.flag & BAM_FREAD2);
+    }
+
     /// is read secondary?
     @property bool isSecondary()
     {
@@ -184,12 +193,27 @@ struct SAMRecord
         return cast(bool)(b.core.flag & BAM_FSECONDARY);
     }
 
+    /// Does this read fail qc?
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property bool isQCFail()
+    {
+        return cast(bool)(b.core.flag & BAM_FQCFAIL);
+    }
+
+    /// Is this read marked as a PCR or Optical duplicate?
+    pragma(inline, true)
+    @nogc @safe nothrow
+    @property bool isDuplicate()
+    {
+        return cast(bool)(b.core.flag & BAM_FDUP);
+    }
+
     /// is read supplementary?
+    pragma(inline, true)
+    @nogc @safe nothrow
     @property bool isSupplementary()
     {
-        version(LDC){
-            pragma(inline, true);
-        }
         return cast(bool)(b.core.flag & BAM_FSUPPLEMENTARY);
     }
 
@@ -198,9 +222,11 @@ struct SAMRecord
         return ['+','-'][isReversed()];
     }
 
-    /// Get query name (read name)
+    /// Get a slice of query name (read name)
+    /// if you keep this around you should copy it
     /// -- wraps bam_get_qname(bam1_t *b)
     pragma(inline, true)
+    @nogc @trusted nothrow
     @property const(char)[] queryName()
     {
         // auto bam_get_qname(bam1_t *b) { return (cast(char*)(*b).data); }
@@ -209,44 +235,17 @@ struct SAMRecord
     
     /// Set query name (read name)
     pragma(inline, true)
+    @trusted nothrow
     @property void queryName(string qname)
     {
-        assert(qname.length<252);
-
-        //make cstring
-        auto qname_n=qname.dup~'\0';
-
-        //append extra nulls to 32bit align cigar
-        auto extranul=0;
-        for (; qname_n.length % 4 != 0; extranul++) qname_n~='\0';
-        assert(extranul<=3);
-
-        //get length of rest of data
-        auto l_rest=b.l_data-b.core.l_qname;
-
-        //copy rest of data
-        ubyte[] rest=b.data[b.core.l_qname..b.l_data].dup;
-        
-        //if not enough space
-        if(qname_n.length+l_rest>b.m_data){
-            auto ptr=cast(ubyte*)realloc(b.data,qname_n.length+l_rest);
-            assert(ptr!=null);
-            b.data=ptr;
-            b.m_data=cast(uint)qname_n.length+l_rest;
-        }
-
-        //reassign q_name and rest of data
-        b.data[0..qname_n.length]=(cast(ubyte[])qname_n);
-        b.data[qname_n.length..qname_n.length+l_rest]=rest;
-
-        //reset data length, qname length, extra nul length
-        b.l_data=cast(uint)qname_n.length+l_rest;
-        b.core.l_qname=cast(ubyte)(qname_n.length);
-        b.core.l_extranul=cast(ubyte)extranul;
+        auto ret = bam_set_qname(this.b, toStringz(qname));
+        if(ret != 0)
+            hts_log_error(__FUNCTION__, "Could not set queryname");
     }
 
     /// query (and quality string) length
     pragma(inline, true)
+    @nogc @safe nothrow
     @property int length()
     {
         return this.b.core.l_qseq;
@@ -254,6 +253,8 @@ struct SAMRecord
 
     /// Return char array of the sequence
     /// see samtools/sam_view.c: get_read
+    pragma(inline, true)
+    @trusted nothrow
     @property const(char)[] sequence()
     {
         // calloc fills with \0; +1 len for Cstring
@@ -273,73 +274,86 @@ struct SAMRecord
 
     /// Assigns sequence and resets quality score
     pragma(inline, true)
+    @trusted nothrow
     @property void sequence(const(char)[] seq)
     {
+        /// There is no bam_seq_seq
+
         //nibble encode sequence
         ubyte[] en_seq;
-        en_seq.length=(seq.length+1)>>1;
-        for(auto i=0;i<seq.length;i++){
-            en_seq[i>>1]|=seq_nt16_table[seq[i]]<< ((~i&1)<<2);
+        en_seq.length = (seq.length + 1) >> 1;
+        
+        for(auto i=0;i < seq.length;i++){
+            bam_set_seqi(en_seq.ptr, i, seq_nt16_table[seq[i]]);
         }
 
         //get length of data before seq
-        uint l_prev=b.core.l_qname + cast(uint)(b.core.n_cigar*uint.sizeof);
+        uint l_prev = b.core.l_qname + cast(uint)(b.core.n_cigar * uint.sizeof);
 
         //get starting point after seq
-        uint start_rest=l_prev+((b.core.l_qseq+1)>>1)+b.core.l_qseq;
+        uint start_rest = l_prev + ((b.core.l_qseq + 1) >> 1) + b.core.l_qseq;
 
         //copy previous data
-        ubyte[] prev=b.data[0..l_prev].dup;
+        ubyte[] prev=b.data[0 .. l_prev].dup;
 
         //copy rest of data
-        ubyte[] rest=b.data[start_rest..b.l_data].dup;
+        ubyte[] rest=b.data[start_rest .. b.l_data].dup;
         
         //if not enough space
-        if(en_seq.length+seq.length+l_prev+(b.l_data-start_rest)>b.m_data){
-            auto ptr=cast(ubyte*)realloc(b.data,en_seq.length+seq.length+l_prev+(b.l_data-start_rest));
-            assert(ptr!=null);
-            b.data=ptr;
-            b.m_data=cast(uint)en_seq.length+cast(uint)seq.length+l_prev+(b.l_data-start_rest);
+        if(en_seq.length + seq.length + l_prev + (b.l_data - start_rest) > b.m_data){
+
+            // realloc
+            auto ptr = cast(ubyte*) realloc(b.data, en_seq.length + seq.length + l_prev + (b.l_data - start_rest));
+            assert(ptr != null);
+            b.data = ptr;
+
+            // increase capacity
+            b.m_data = cast(uint)en_seq.length + cast(uint) seq.length + l_prev + (b.l_data - start_rest);
         }
 
         //reassign q_name and rest of data
-        b.data[0..l_prev]=prev;
-        b.data[l_prev..en_seq.length+l_prev]=en_seq;
+        b.data[0 .. l_prev] = prev;
+        b.data[l_prev .. en_seq.length + l_prev] = en_seq;
         //set qscores to 255 
-        memset(b.data+en_seq.length+l_prev,255,seq.length);
-        b.data[l_prev+en_seq.length+seq.length..l_prev+en_seq.length+seq.length+(b.l_data-start_rest)]=rest;
+        memset(b.data + en_seq.length + l_prev, 255, seq.length);
+        b.data[l_prev + en_seq.length + seq.length .. l_prev + en_seq.length + seq.length + (b.l_data - start_rest)] = rest;
 
         //reset data length, seq length
-        b.l_data=cast(uint)en_seq.length+cast(uint)seq.length+l_prev+(b.l_data-start_rest);
-        b.core.l_qseq=cast(int)(seq.length);
+        b.l_data = cast(uint) en_seq.length + cast(uint) seq.length + l_prev + (b.l_data-start_rest);
+        b.core.l_qseq = cast(int) (seq.length);
     }
 
     /// Return array of the quality scores
     /// see samtools/sam_view.c: get_quality
     /// TODO: Discussion -- should we return const(ubyte[]) or const(ubyte)[] instead?
+    pragma(inline, true)
+    @nogc @trusted nothrow
     @property const(ubyte)[] qscores()
     {
-
         auto slice = bam_get_qual(this.b)[0 .. this.b.core.l_qseq];
         return slice;
     }
 
     /// Set quality scores from raw ubyte quality score array given that it is the same length as the bam sequence
     pragma(inline, true)
+    @trusted nothrow
     @property void qscores(const(ubyte)[] seq)
     {
+        /// There is no bam_seq_qual
+        
         if(seq.length != b.core.l_qseq){
             hts_log_error(__FUNCTION__,"qscore length does not match sequence length");
             return;
         }
         
         //get length of data before seq
-        uint l_prev = b.core.l_qname + cast(uint)(b.core.n_cigar * uint.sizeof) + ((b.core.l_qseq + 1) >> 1);
+        uint l_prev = b.core.l_qname + cast(uint) (b.core.n_cigar * uint.sizeof) + ((b.core.l_qseq + 1) >> 1);
         b.data[l_prev .. seq.length + l_prev] = seq;
     }
 
     /// get phred-scaled base qualities as char array
     pragma(inline, true)
+    @trusted nothrow
     const(char)[] qscoresPhredScaled()
     {
         auto bqs = this.qscores.dup;
@@ -348,37 +362,39 @@ struct SAMRecord
     }
 
     /// Create cigar from bam1_t record
+    pragma(inline, true)
     @property Cigar cigar()
     {
-        // see if cigar is already initialized
-        if(!cigarInitialized) 
-            p_cigar = Cigar(bam_get_cigar(b), (*b).core.n_cigar);
-            this.cigarInitialized = true;
-        return p_cigar;
+        return Cigar(this.b);
     }
 
     /// Assign a cigar string
     pragma(inline, true)
+    @trusted
     @property void cigar(Cigar cigar)
     {
-        
+        // no bam_set_cigar
+
         //get length of data before seq
-        uint l_prev=b.core.l_qname;
+        uint l_prev = b.core.l_qname;
 
         //get starting point after seq
-        uint start_rest=l_prev+cast(uint)(b.core.n_cigar*uint.sizeof);
+        uint start_rest = l_prev + cast(uint)(b.core.n_cigar * uint.sizeof);
 
         //copy previous data
-        ubyte[] prev=b.data[0..l_prev].dup;
+        ubyte[] prev = b.data[0..l_prev].dup;
 
         //copy rest of data
-        ubyte[] rest=b.data[start_rest..b.l_data].dup;
+        ubyte[] rest = b.data[start_rest..b.l_data].dup;
 
         //if not enough space
         if(uint.sizeof * cigar.length + l_prev + (b.l_data - start_rest) > b.m_data){
+            // realloc
             auto ptr = cast(ubyte*) realloc(b.data, uint.sizeof * cigar.length + l_prev + (b.l_data - start_rest));
             assert(ptr != null);
             b.data = ptr;
+
+            // increase capacity
             b.m_data=cast(uint)(uint.sizeof * cigar.length) + l_prev + (b.l_data - start_rest);
         }
 
@@ -389,16 +405,14 @@ struct SAMRecord
         b.data[l_prev + uint.sizeof * cigar.length .. l_prev + uint.sizeof * cigar.length + (b.l_data - start_rest)] = rest;
 
         //reset data length, seq length
-        b.l_data = cast(uint)(uint.sizeof * cigar.length) + l_prev + (b.l_data - start_rest);
-        b.core.n_cigar=cast(uint)(cigar.length);
-        p_cigar = Cigar(bam_get_cigar(b), (*b).core.n_cigar);
+        b.l_data = cast(uint) (uint.sizeof * cigar.length) + l_prev + (b.l_data - start_rest);
+        b.core.n_cigar = cast(uint) (cigar.length);
     }
 
     /// Get aux tag from bam1_t record and return a TagValue
     TagValue opIndex(string val)
     {
-        p_tagval = TagValue(b, val[0..2]);
-        return p_tagval;
+        return TagValue(this.b, val[0..2]);
     }
 
     /// Assign a tag key value pair
@@ -406,13 +420,14 @@ struct SAMRecord
     if(!isArray!T || isSomeString!T)
     {
         static if(isIntegral!T){
-            auto err = bam_aux_update_int(b,index[0..2],value);
+            auto err = bam_aux_update_int(b, index[0..2], value);
         }else static if(is(T==float)){
-            auto err = bam_aux_update_float(b,index[0..2],value);
+            auto err = bam_aux_update_float(b, index[0..2], value);
         }else static if(isSomeString!T){
-            auto err = bam_aux_update_str(b,index[0..2],cast(int)value.length+1,toStringz(value));
+            auto err = bam_aux_update_str(b, index[0..2], cast(int) value.length, value.ptr);
         }
-        switch(err){
+        if(err == 0) return;
+        switch(errno){
             case EINVAL:
                 throw new Exception("The bam record's aux data is corrupt or an existing tag" ~ 
                 " with the given ID is not of an integer type (c, C, s, S, i or I).");
@@ -437,8 +452,9 @@ struct SAMRecord
     void opIndexAssign(T)(T[] value, string index)
     if(!isSomeString!(T[]))
     {
-        auto err = bam_aux_update_array(b,index[0..2],TypeChars[TypeIndex!T],cast(int) value.length,value.ptr);
-        switch(err){
+        auto err = bam_aux_update_array(b, index[0..2], TypeChars[TypeIndex!T], cast(int) value.length, value.ptr);
+        if(err == 0) return;
+        switch(errno){
             case EINVAL:
                 throw new Exception("The bam record's aux data is corrupt or an existing tag" ~ 
                 " with the given ID is not of an integer type (c, C, s, S, i or I).");
@@ -503,15 +519,15 @@ struct SAMRecord
 
     struct AlignedPair(bool refSeq)
     {
-        long qpos, rpos;
+        Coordinate!(Basis.zero) qpos, rpos;
         Ops cigar_op;
         char queryBase;
         static if(refSeq) char refBase;
 
         string toString(){
             import std.conv : to;
-            static if(refSeq) return rpos.to!string ~ ":" ~ refBase ~ " > " ~ qpos.to!string ~ ":" ~ queryBase;
-            else return rpos.to!string ~ ":" ~ qpos.to!string ~ ":" ~ queryBase;
+            static if(refSeq) return rpos.pos.to!string ~ ":" ~ refBase ~ " > " ~ qpos.pos.to!string ~ ":" ~ queryBase;
+            else return rpos.pos.to!string ~ ":" ~ qpos.pos.to!string ~ ":" ~ queryBase;
         }
     }
 
@@ -689,6 +705,9 @@ debug(dhtslib_unittest) unittest
     assert(read.cigar.toString() == "78M1D22M");
     assert(read["RG"].check!string);
     assert(read["RG"].to!string=="1");
+
+    //we do this only to force realloc
+    read.b.m_data=read.b.l_data;
 
     //change sequence
     hts_log_info(__FUNCTION__, "Testing sequence");

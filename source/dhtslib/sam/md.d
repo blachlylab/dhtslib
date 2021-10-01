@@ -12,7 +12,7 @@ Reference: https://samtools.github.io/hts-specs/SAMtags.pdf
 */
 module dhtslib.sam.md;
 
-import dhtslib.sam : SAMRecord;
+import dhtslib.sam.record : SAMRecord;
 import dhtslib.sam.cigar;
 import htslib.hts_log;
 import std.regex;
