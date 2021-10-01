@@ -498,7 +498,7 @@ struct SAMReader
         {
             AllRecordsRange newRange;
             newRange.fp = HtsFile(copyHtsFile(fp));
-            newRange.header = header.dup;
+            newRange.header = header;
             newRange.b = Bam1(bam_dup1(this.b));
             newRange.initialized = this.initialized;
             newRange.success = this.success;
@@ -560,7 +560,7 @@ struct SAMReader
             RecordRange newRange;
             newRange.fp = HtsFile(copyHtsFile(fp, itr.curr_off));
             newRange.itr = HtsItr(copyHtsItr(itr));
-            newRange.h = h.dup;
+            newRange.h = h;
             newRange.b = Bam1(bam_dup1(this.b));
             newRange.initialized = this.initialized;
             newRange.success = this.success;
@@ -634,7 +634,7 @@ struct SAMReader
             RecordRangeMulti newRange;
             newRange.fp = HtsFile(copyHtsFile(fp, itr.curr_off));
             newRange.itr = HtsItrMulti(copyHtsItr(itr));
-            newRange.h = h.dup;
+            newRange.h = h;
             newRange.b = Bam1(bam_dup1(this.b));
             newRange.initialized = this.initialized;
             newRange.r = this.r;

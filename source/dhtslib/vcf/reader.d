@@ -160,7 +160,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         }else{
             newRange.fp = HtsFile(copyHtsFile(this.fp));
         }
-        newRange.vcfhdr = vcfhdr.dup;
+        newRange.vcfhdr = vcfhdr;
         newRange.b = Bcf1(bcf_dup(this.b));
         newRange.initialized = initialized;
         newRange.success = success;
