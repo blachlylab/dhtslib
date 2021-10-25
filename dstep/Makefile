@@ -108,11 +108,13 @@ vpath %.diff patches
 
 # create patch files for patching
 # converted headers to current bindings 
-# ignores comment changes and whitespace
 $(patchFiles): patches/%.diff: /tmp/%.d %.h
 	diff $< ../source/htslib/$*.d > $@; [ $$? -eq 1 ]
 
 
+# create patch files for viewing
+# significant changes by ignoring
+# changes in comment style and whitespace
 $(changePatchFiles): changes/%.diff: /tmp/%.d %.h
 	diff -w \
 	<(sed -E 's;///.*;;g; s;//.*;;g; s;/\*\*;/*;g;' $<) \

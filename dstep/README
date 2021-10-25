@@ -11,4 +11,13 @@ This will also be critically important when upgrading the bindings to a new
 library version, so that we do not have to manually track fixes to the auto-
 mated conversion and can re-apply them (assuming `patch` can locate the hunk)
 
-Add new conversion to the Makefile
+To update bindings:
+```bash
+make clean
+cp htslib/htslib/* source/htslib/include/
+make
+```
+
+Patch files under patches are used to patch the output from dstep.
+Patch files under changes are simplified to filter out changes
+in whitespace and comments. 
