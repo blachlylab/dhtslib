@@ -1,0 +1,15 @@
+55d54
+< 
+58c57,66
+< import core.stdc.stdlib;
+---
+> import core.stdc.stddef;
+> 
+> import htslib.hts;
+> import htslib.vcf;
+> import htslib.kstring : kstring_t;
+> import htslib.tbx : tbx_t;
+> 
+> @system:
+> nothrow:
+> @nogc:

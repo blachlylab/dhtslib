@@ -1,0 +1,15 @@
+26d25
+< 
+31a31,34
+> @system:
+> nothrow:
+> @nogc:
+> 
+34,36c37,39
+< alias netread = read;
+< alias netwrite = write;
+< alias netclose = close;
+---
+> 
+> 
+> 
