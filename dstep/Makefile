@@ -58,7 +58,7 @@ patchFiles = \
 	patches/vcf_sweep.diff \
 	patches/vcfutils.diff
 
-all: $(outputfiles)
+all: $(outputfiles) $(patchFiles)
 .PHONY: all
 
 # clean out files
