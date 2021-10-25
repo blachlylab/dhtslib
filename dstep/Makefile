@@ -58,17 +58,45 @@ patchFiles = \
 	patches/vcf_sweep.diff \
 	patches/vcfutils.diff
 
+changePatchFiles = \
+	changes/bgzf.diff \
+	changes/cram.diff \
+	changes/faidx.diff \
+	changes/hfile.diff \
+	changes/hts.diff \
+	changes/hts_endian.diff \
+	changes/hts_expr.diff \
+	changes/hts_log.diff \
+	changes/kbitset.diff \
+	changes/kfunc.diff \
+	changes/knetfile.diff \
+	changes/kroundup.diff \
+	changes/kstring.diff \
+	changes/regidx.diff \
+	changes/sam.diff \
+	changes/synced_bcf_reader.diff \
+	changes/tbx.diff \
+	changes/thread_pool.diff \
+	changes/vcf.diff \
+	changes/vcf_sweep.diff \
+	changes/vcfutils.diff
+
 all: $(outputfiles) $(patchFiles)
 .PHONY: all
+
+patches: $(patchFiles)
+.PHONY: patches
+
+changes: $(changePatchFiles)
+.PHONY: changes
 
 # clean out files
 clean:
 	rm patches/*
 	rm output/*
-	
 
-patches: $(patchFiles)
-.PHONY: patches
+apply:
+	cp output/* ../source/htslib/
 
 vpath %.h include
 vpath %.diff patches
@@ -81,11 +109,17 @@ vpath %.diff patches
 # create patch files for patching
 # converted headers to current bindings 
 # ignores comment changes and whitespace
-$(patchFiles): patches/%.diff: %.h
-	$(DSTEP) -o /tmp/$(notdir $@) $<
-	diff -w /tmp/$(notdir $@) ../source/htslib/$*.d > $@; [ $$? -eq 1 ]
+$(patchFiles): patches/%.diff: /tmp/%.d %.h
+	diff $< ../source/htslib/$*.d > $@; [ $$? -eq 1 ]
+
+
+$(changePatchFiles): changes/%.diff: /tmp/%.d %.h
+	diff -w \
+	<(sed -E 's;///.*;;g; s;//.*;;g; s;/\*\*;/*;g;' $<) \
+	<(sed -E 's;///.*;;g; s;//.*;;g; s;/\*\*;/*;g;' ../source/htslib/$*.d) \
+	> $@; [ $$? -eq 1 ]
+
 
 # patch converted to match bindings
-$(outputfiles): output/%.d: %.h %.diff
-	$(DSTEP) -o /tmp/$(notdir $@) $< 
-	patch /tmp/$(notdir $@) -o $@ < patches/$*.diff
+$(outputfiles): output/%.d: /tmp/%.d %.h %.diff
+	patch $< -o $@ < patches/$*.diff
