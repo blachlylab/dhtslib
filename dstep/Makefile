@@ -1,6 +1,17 @@
+SHELL=bash
 
-DSTEP=dstep --space-after-function-name=false
+# commandline from features I was working on
+# adding to dstep
+# DSTEP=../../dstep/bin/dstep \
+	--package htslib \
+	--space-after-function-name=false \
+	--roots ../htslib/htslib \
+	--global-attribute @system \
+	--global-attribute nothrow \
+	--global-attribute @nogc
 
+
+DSTEP=dstep --package htslib --space-after-function-name=false 
 outputfiles = \
 	output/bgzf.d \
 	output/cram.d \
@@ -24,20 +35,57 @@ outputfiles = \
 	output/vcf_sweep.d \
 	output/vcfutils.d
 
+patchFiles = \
+	patches/bgzf.diff \
+	patches/cram.diff \
+	patches/faidx.diff \
+	patches/hfile.diff \
+	patches/hts.diff \
+	patches/hts_endian.diff \
+	patches/hts_expr.diff \
+	patches/hts_log.diff \
+	patches/kbitset.diff \
+	patches/kfunc.diff \
+	patches/knetfile.diff \
+	patches/kroundup.diff \
+	patches/kstring.diff \
+	patches/regidx.diff \
+	patches/sam.diff \
+	patches/synced_bcf_reader.diff \
+	patches/tbx.diff \
+	patches/thread_pool.diff \
+	patches/vcf.diff \
+	patches/vcf_sweep.diff \
+	patches/vcfutils.diff
+
 all: $(outputfiles)
 .PHONY: all
 
-vpath %.h ../htslib/htslib/
-vpath %.d ../source/htslib/
+# clean out files
+clean:
+	rm patches/*
+	rm output/*
+	
 
-converted/%.d: %.h
-	$(DSTEP) $< -o converted/$(notdir $@)
+patches: $(patchFiles)
+.PHONY: patches
 
-patches/%.diff: converted/%.d %.h %.d
-	diff ../source/htslib/$*.d $< | grep -E -e '[0-9]+a[0-9]+' -e '>' > $@; [ $$? -eq 1 ] 
+vpath %.h include
+vpath %.diff patches
 
-$(outputfiles): output/%.d: %.d patches/%.diff 
-	patch $< -o $@ < $(word 2,$^)
+# perform dstep conversion of latest
+# htslib headers in sub-repo
+/tmp/%.d: %.h
+	$(DSTEP) -o /tmp/$(notdir $@) $<
 
+# create patch files for patching
+# converted headers to current bindings 
+# ignores comment changes and whitespace
+$(patchFiles): patches/%.diff: %.h
+	$(DSTEP) -o /tmp/$(notdir $@) $<
+	diff -w /tmp/$(notdir $@) ../source/htslib/$*.d > $@; [ $$? -eq 1 ]
 
-
+# patch converted to match bindings
+$(outputfiles): output/%.d: %.h %.diff
+	$(DSTEP) -o /tmp/$(notdir $@) $< 
+	patch /tmp/$(notdir $@) -o $@ < patches/$*.diff
