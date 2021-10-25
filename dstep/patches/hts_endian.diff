@@ -33,17 +33,23 @@
 < enum HTS_ALLOW_UNALIGNED = 1;
 ---
 > // Consider using AX_CHECK_ALIGNED_ACCESS_REQUIRED in autoconf.
-74a91,95
+75,79c91,186
+< alias uint16_u = ushort;
+< alias uint32_u = uint;
+< alias uint64_u = c_ulong;
+< 
+< /// Get a uint16_t value from an unsigned byte array
+---
 > static if(HTS_ALLOW_UNALIGNED){
 >     alias uint16_u = align(1) ushort;
 >     alias uint32_u = align(1) uint;
 >     alias uint64_u = align(1) c_ulong;
 > }else{
-77a99
+>     alias uint16_u = ushort;
+>     alias uint32_u = uint;
+>     alias uint64_u = c_ulong;    
 > }
-79c101,186
-< /// Get a uint16_t value from an unsigned byte array
----
+> 
 > /// Basically just a byte
 > /// This workaround to avoid int promotion issues
 > /// implmentation direvied from this post on the dlang forums

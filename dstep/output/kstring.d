@@ -276,7 +276,7 @@ int kputuw(T)(T x, kstring_t* s){
     uint l, j;
     char * cp;
 
-// Trivial case - also prevents __builtin_clz(0), which is undefined
+    // Trivial case - also prevents __builtin_clz(0), which is undefined
     if (x < 10) {
         if (ks_resize(s, s.l + 2) < 0)
             return EOF;
@@ -285,23 +285,23 @@ int kputuw(T)(T x, kstring_t* s){
         return 0;
     }
 
-// Find out how many digits are to be printed.
+    // Find out how many digits are to be printed.
 	version(LDC){
-/*
- * Table method - should be quick if clz can be done in hardware.
- * Find the most significant bit of the value to print and look
- * up in a table to find out how many decimal digits are needed.
- * This number needs to be adjusted by 1 for cases where the decimal
- * length could vary for a given number of bits (for example,
- * a four bit number could be between 8 and 15).
- */
+			/*
+		* Table method - should be quick if clz can be done in hardware.
+		* Find the most significant bit of the value to print and look
+		* up in a table to find out how many decimal digits are needed.
+		* This number needs to be adjusted by 1 for cases where the decimal
+		* length could vary for a given number of bits (for example,
+		* a four bit number could be between 8 and 15).
+		*/
 		import ldc.intrinsics;
 
 		// ldc version of __builtin_clz
 		l = llvm_ctlz(x,true);
 		l = kputuw_num_digits[l] - (x < kputuw_thresholds[l]);
 	}else{
-// Fallback for when clz is not available
+	// Fallback for when clz is not available
 		m = 1;
 		l = 0;
 		do {
@@ -313,7 +313,7 @@ int kputuw(T)(T x, kstring_t* s){
     if (ks_resize(s, s.l + l + 2) < 0)
         return EOF;
 
-// Add digits two at a time
+    // Add digits two at a time
     j = l;
     cp = s.s + s.l;
     while (x >= 10) {
@@ -322,7 +322,7 @@ int kputuw(T)(T x, kstring_t* s){
         memcpy(&cp[j-=2], d, 2);
     }
 
-// Last one (if necessary).  We know that x < 10 by now.
+    // Last one (if necessary).  We know that x < 10 by now.
     if (j == 1)
         cp[0] = cast(char)(x + '0');
 

@@ -27,18 +27,17 @@ DEALINGS IN THE SOFTWARE.  */
 module htslib.sam;
 
 import core.stdc.stddef;
-import core.stdc.stddef;
-import std.format: format;
 import core.stdc.stdlib;
+import std.format: format;
+
 import htslib.hts;
 import htslib.hts_log;
 import htslib.bgzf : BGZF;
 import htslib.kstring : kstring_t, ssize_t;
 
 @system:
-
-@nogc nothrow {
 extern (C):
+@nogc nothrow {
 
 /// Highest SAM format version supported by this library
 enum SAM_FORMAT_VERSION = "1.6";
@@ -2021,12 +2020,12 @@ enum htsRealnFlags {
     BAQ_REDO = 4,
 
     // Platform subfield, in bit position 3 onwards
-    BAQ_AUTO = 0 << 3,
-    BAQ_ILLUMINA = 1 << 3,
-    BAQ_PACBIOCCS = 2 << 3,
-    BAQ_PACBIO = 3 << 3,
-    BAQ_ONT = 4 << 3,
-    BAQ_GENAPSYS = 5 << 3
+    BAQ_AUTO = 0<<3,
+    BAQ_ILLUMINA = 1<<3,
+    BAQ_PACBIOCCS = 2<<3,
+    BAQ_PACBIO = 3<<3,
+    BAQ_ONT = 4<<3,
+    BAQ_GENAPSYS = 5<<3
 }
 
 /// Calculate BAQ scores

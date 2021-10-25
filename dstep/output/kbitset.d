@@ -101,7 +101,7 @@ kbitset_t* kbs_init2 (size_t ni, int fill)
 	if (bs == null) return null;
 	bs.n = bs.n_max = n;
 	memset(cast(void*)bs.b, fill? ~0 : 0, n * uint.sizeof);
-// b[n] is always non-zero (a fact used by kbs_next()).
+	// b[n] is always non-zero (a fact used by kbs_next()).
 	bs.b[n] = kbs_last_mask(ni);
 	if (fill) bs.b[n-1] &= bs.b[n];
 	return bs;

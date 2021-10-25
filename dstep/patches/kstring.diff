@@ -104,8 +104,16 @@
 > 	s.s = null;
 > 	return ss;
 > }
-145c194,211
+145,153c194,200
 < void ks_free(kstring_t* s);
+< 
+< int kputsn(const(char)* p, size_t l, kstring_t* s);
+< 
+< int kputs(const(char)* p, kstring_t* s);
+< 
+< int kputc(int c, kstring_t* s);
+< 
+< int kputc_(int c, kstring_t* s);
 ---
 > void ks_free(kstring_t* s)
 > {
@@ -114,7 +122,9 @@
 >         ks_initialize(s);
 >     }
 > }
-> 
+155c202,211
+< int kputsn_(const(void)* p, size_t l, kstring_t* s);
+---
 > int kputsn(const(char)* p, size_t l, kstring_t* s)
 > {
 > 	size_t new_sz = s.l + l + 2;
@@ -125,15 +135,15 @@
 > 	s.s[s.l] = 0;
 > 	return cast(int)l;	// no implicit down casting
 > }
-147c213,216
-< int kputsn(const(char)* p, size_t l, kstring_t* s);
+157c213,216
+< // Trivial case - also prevents __builtin_clz(0), which is undefined
 ---
 > int kputs(const(char)* p, kstring_t* s)
 > {
 > 	return kputsn(p, strlen(p), s);
 > }
-149c218,225
-< int kputs(const(char)* p, kstring_t* s);
+159c218,225
+< // Find out how many digits are to be printed.
 ---
 > int kputc(int c, kstring_t* s)
 > {
@@ -143,8 +153,15 @@
 > 	s.s[s.l] = 0;
 > 	return cast(ubyte)c;
 > }
-151c227,233
-< int kputc(int c, kstring_t* s);
+161,168c227,233
+< /*
+<  * Table method - should be quick if clz can be done in hardware.
+<  * Find the most significant bit of the value to print and look
+<  * up in a table to find out how many decimal digits are needed.
+<  * This number needs to be adjusted by 1 for cases where the decimal
+<  * length could vary for a given number of bits (for example,
+<  * a four bit number could be between 8 and 15).
+<  */
 ---
 > int kputc_(int c, kstring_t* s)
 > {
@@ -153,8 +170,8 @@
 > 	s.s[s.l++] = cast(char)c;	// no implicit down casting
 > 	return 1;
 > }
-153c235,243
-< int kputc_(int c, kstring_t* s);
+170c235,243
+< // Fallback for when clz is not available
 ---
 > int kputsn_(const(void)* p, size_t l, kstring_t* s)
 > {
@@ -165,8 +182,8 @@
 > 	s.l += l;
 > 	return cast(int)l;	// no implicit down casting
 > }
-155c245,277
-< int kputsn_(const(void)* p, size_t l, kstring_t* s);
+172c245,332
+< // Add digits two at a time
 ---
 > // htslib 1.10 replaced this function with a higher performance
 > // version using BSR/CTLZ intrinsics . this diverges from klib's
@@ -201,7 +218,8 @@
 >         "90919293949596979899";
 >     uint l, j;
 >     char * cp;
-157a280,286
+> 
+>     // Trivial case - also prevents __builtin_clz(0), which is undefined
 >     if (x < 10) {
 >         if (ks_resize(s, s.l + 2) < 0)
 >             return EOF;
@@ -209,18 +227,24 @@
 >         s.s[s.l] = 0;
 >         return 0;
 >     }
-160c289
-< 
----
+> 
+>     // Find out how many digits are to be printed.
 > 	version(LDC){
-168a298
+> 			/*
+> 		* Table method - should be quick if clz can be done in hardware.
+> 		* Find the most significant bit of the value to print and look
+> 		* up in a table to find out how many decimal digits are needed.
+> 		* This number needs to be adjusted by 1 for cases where the decimal
+> 		* length could vary for a given number of bits (for example,
+> 		* a four bit number could be between 8 and 15).
+> 		*/
 > 		import ldc.intrinsics;
-169a300,303
+> 
 > 		// ldc version of __builtin_clz
 > 		l = llvm_ctlz(x,true);
 > 		l = kputuw_num_digits[l] - (x < kputuw_thresholds[l]);
 > 	}else{
-170a305,314
+> 	// Fallback for when clz is not available
 > 		m = 1;
 > 		l = 0;
 > 		do {
@@ -231,7 +255,8 @@
 > 
 >     if (ks_resize(s, s.l + l + 2) < 0)
 >         return EOF;
-172a317,323
+> 
+>     // Add digits two at a time
 >     j = l;
 >     cp = s.s + s.l;
 >     while (x >= 10) {
@@ -239,20 +264,18 @@
 >         x /= 100;
 >         memcpy(&cp[j-=2], d, 2);
 >     }
-175c326,327
-< int kputuw(uint x, kstring_t* s);
----
+> 
+>     // Last one (if necessary).  We know that x < 10 by now.
 >     if (j == 1)
 >         cp[0] = cast(char)(x + '0');
-177c329,332
-< int kputw(int c, kstring_t* s);
----
+> 
 >     s.l += l;
 >     s.s[s.l] = 0;
 >     return 0;
 > }
-179c334,342
-< int kputll(long c, kstring_t* s);
+174,175c334,342
+< // Last one (if necessary).  We know that x < 10 by now.
+< int kputuw(uint x, kstring_t* s);
 ---
 > int kputw(int c, kstring_t* s)
 > {
@@ -263,12 +286,14 @@
 >             return EOF;
 >         s.s[s.l++] = '-';
 >     }
-181c344,364
-< int kputl(c_long c, kstring_t* s);
+177c344,345
+< int kputw(int c, kstring_t* s);
 ---
 >     return kputuw(x, s);
 > }
-> 
+179c347,360
+< int kputll(long c, kstring_t* s);
+---
 > int kputll(long c, kstring_t* s)
 > {
 > 	char[32] buf;
@@ -283,7 +308,9 @@
 > 	s.s[s.l] = 0;
 > 	return 0;
 > }
-> 
+181c362,364
+< int kputl(c_long c, kstring_t* s);
+---
 > int kputl(c_long c, kstring_t* s) {
 >     return kputll(c, s);
 > }

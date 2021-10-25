@@ -93,9 +93,9 @@ static if(HTS_ALLOW_UNALIGNED){
     alias uint32_u = align(1) uint;
     alias uint64_u = align(1) c_ulong;
 }else{
-alias uint16_u = ushort;
-alias uint32_u = uint;
-alias uint64_u = c_ulong;
+    alias uint16_u = ushort;
+    alias uint32_u = uint;
+    alias uint64_u = c_ulong;    
 }
 
 /// Basically just a byte

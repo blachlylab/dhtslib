@@ -53,8 +53,8 @@ version(Windows)
 }
 else
 {
-enum HTS_PATH_SEPARATOR_CHAR = ':';
-enum HTS_PATH_SEPARATOR_STR = ":";
+    enum HTS_PATH_SEPARATOR_CHAR = ':';
+    enum HTS_PATH_SEPARATOR_STR = ":";
 }
 
 
@@ -394,7 +394,7 @@ alias cram_option = hts_fmt_option;
 
 /// Options for cache, (de)compression, threads, CRAM, etc.
 struct hts_opt // @suppress(dscanner.style.phobos_naming_convention)
-    {
+{
     char *arg;          /// string form, strdup()ed
     hts_fmt_option opt; /// tokenised key
     /// option value
@@ -1156,7 +1156,7 @@ const(char *)* hts_idx_seqnames(const(hts_idx_t)* idx, int* n, hts_id2name_f get
 /** @param      idx    Index
     @return The number of targets
  */
-int hts_idx_nseq(const(hts_idx_t)* idx);
+int hts_idx_nseq(const(hts_idx_t) *idx);
 
 ///////////////////////////////////////////////////////////
 // Region parsing

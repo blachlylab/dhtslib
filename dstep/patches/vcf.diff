@@ -264,8 +264,11 @@
 ---
 > /// Variable-length data from a VCF record
 > struct bcf_dec_t // @suppress(dscanner.style.phobos_naming_convention)
-201a223
+202c223,224
+<     int m_fmt;
+---
 >     /// allocated size (high-water mark); do not change 
+>     int m_fmt;          
 207,228c229,250
 <     int m_flt; // allocated size (high-water mark); do not change
 <     int n_flt; // Number of FILTER fields
@@ -362,7 +365,7 @@
 > pragma(inline, true) auto bcf_hdr_nsamples (bcf_hdr_t *hdr)
 723a751
 > /// Lookup header record by key
-839,856c867,875
+839,857c867,876
 < extern (D) auto bcf_update_info_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_info(hdr, line, key, values, n, BCF_HT_INT);
@@ -381,6 +384,7 @@
 < extern (D) auto bcf_update_info_string(T0, T1, T2, T3)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 string)
 < {
 <     return bcf_update_info(hdr, line, key, string, 1, BCF_HT_STR);
+< }
 ---
 > pragma(inline, true) {    // TODO: rewrite as template
 >     auto bcf_update_info_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(void) *values, int n) // @suppress(dscanner.style.undocumented_declaration)
@@ -391,17 +395,22 @@
 >         { return bcf_update_info(hdr, line, key, values, n, BCF_HT_FLAG); }
 >     auto bcf_update_info_string(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(void) *values) // @suppress(dscanner.style.undocumented_declaration)
 >         { return bcf_update_info(hdr, line, key, values, 1, BCF_HT_STR); }
-883,885c902,903
+>     }
+859c878
+< int bcf_update_info(
+---
+> int bcf_update_info (
+883,888c902,908
 < int bcf_update_info_int64(
 <     const(bcf_hdr_t)* hdr,
 <     bcf1_t* line,
----
-> pragma(inline, true)
-> auto bcf_update_info_int64( const(bcf_hdr_t) *hdr, bcf1_t *line,
-887,888c905,908
+<     const(char)* key,
 <     const(long)* values,
 <     int n);
 ---
+> pragma(inline, true)
+> auto bcf_update_info_int64( const(bcf_hdr_t) *hdr, bcf1_t *line,
+>                             const(char) *key,
 >                             const(long) *values, int n)
 > {
 >     return bcf_update_info(hdr, line, key, values, n, BCF_HT_LONG);
@@ -444,6 +453,10 @@
 < } // See bcf_gt_ macros below
 ---
 > @nogc nothrow {
+926c943
+< int bcf_update_format_string(
+---
+> int bcf_update_format_string (
 941,968c958,971
 < // Macros for setting genotypes correctly, for use with bcf_update_genotypes only; idx corresponds
 < // to VCF's GT (1-based index to ALT or 0 for the reference allele) and val is the opposite, obtained
@@ -491,10 +504,13 @@
 969a973,974
 > /// ditto
 >     enum int bcf_gt_missing = 0;
-972,974c977,985
+972,977c977,986
 < extern (D) auto bcf_alleles2gt(T0, T1)(auto ref T0 a, auto ref T1 b)
 < {
 <     return a > b ? (a * (a + 1) / 2 + b) : (b * (b + 1) / 2 + a);
+< }
+< 
+< void bcf_gt2alleles(int igt, int* a, int* b);
 ---
 > pragma(inline, true) {
 >         auto bcf_alleles2gt(int a, int b) { return ((a)>(b)?((a)*((a)+1)/2+(b)):((b)*((b)+1)/2+(a))); }
@@ -505,10 +521,8 @@
 >             while ( k<igt ) { dk++; k += dk; }
 >             *b = dk - 1; *a = igt - k + *b;
 >         }
-976,977d986
-< 
-< void bcf_gt2alleles(int igt, int* a, int* b);
-1026,1043c1035,1043
+>     }
+1026,1044c1035,1044
 < extern (D) auto bcf_get_info_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_INT);
@@ -527,6 +541,7 @@
 < extern (D) auto bcf_get_info_flag(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_FLAG);
+< }
 ---
 > pragma(inline, true) {
 >     auto bcf_get_info_int32(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *tag, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration)
@@ -537,6 +552,11 @@
 >         { return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_STR); }
 >     auto bcf_get_info_flag(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *tag, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration)
 >         { return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_FLAG); }
+>     }
+1046c1046
+< int bcf_get_info_values(
+---
+> int bcf_get_info_values (
 1073,1078c1073,1080
 < int bcf_get_info_int64(
 <     const(bcf_hdr_t)* hdr,
@@ -605,26 +625,11 @@
 >     pragma(inline, true) const(char) *bcf_hdr_id2name(const(bcf_hdr_t) *hdr, int rid) { return hdr.id[BCF_DT_CTG][rid].key; } // @suppress(dscanner.style.long_line)
 >     /// ditto
 >     pragma(inline, true) const(char) *bcf_seqname(const(bcf_hdr_t) *hdr, bcf1_t *rec) { return hdr.id[BCF_DT_CTG][rec.rid].key; } // @suppress(dscanner.style.long_line)
-1218,1220c1217,1230
+1218,1247c1217,1232
 < extern (D) auto bcf_hdr_id2length(T0, T1, T2)(auto ref T0 hdr, auto ref T1 type, auto ref T2 int_id)
 < {
 <     return hdr.id[BCF_DT_ID][int_id].val.info[type] >> 8 & 0xf;
----
-> // TODO: for dict_type and col_type use ENUMs
-> pragma(inline, true) {
->     auto bcf_hdr_id2length (const(bcf_hdr_t) *hdr, int type, int int_id) { return ((hdr).id[BCF_DT_ID][int_id].val.info[type]>>8 & 0xf); } // @suppress(dscanner.style.long_line)
->     /// ditto
->     auto bcf_hdr_id2number (const(bcf_hdr_t) *hdr, int type, int int_id) { return ((hdr).id[BCF_DT_ID][int_id].val.info[type]>>12);    } // @suppress(dscanner.style.long_line)
->     /// ditto
->     uint bcf_hdr_id2type (const(bcf_hdr_t) *hdr, int type, int int_id)   { return cast(uint)((hdr).id[BCF_DT_ID][int_id].val.info[type]>>4 & 0xf); } // @suppress(dscanner.style.long_line)
->     /// ditto
->     uint bcf_hdr_id2coltype (const(bcf_hdr_t) *hdr, int type, int int_id){ return cast(uint)((hdr).id[BCF_DT_ID][int_id].val.info[type] & 0xf); } // @suppress(dscanner.style.long_line)
->     /// ditto
->     auto bcf_hdr_idinfo_exists (const(bcf_hdr_t) *hdr, int type, int int_id) { return ((int_id<0 || bcf_hdr_id2coltype(hdr,type,int_id)==0xf) ? 0 : 1); } // @suppress(dscanner.style.long_line)
->     /// ditto
->     auto bcf_hdr_id2hrc (const(bcf_hdr_t) *hdr, int dict_type, int col_type, int int_id)
->         { return ((hdr).id[(dict_type)==BCF_DT_CTG?BCF_DT_CTG:BCF_DT_ID][int_id].val.hrec[(dict_type)==BCF_DT_CTG?0:(col_type)]); // @suppress(dscanner.style.long_line)
-1222,1245d1231
+< }
 < 
 < extern (D) auto bcf_hdr_id2number(T0, T1, T2)(auto ref T0 hdr, auto ref T1 type, auto ref T2 int_id)
 < {
@@ -649,8 +654,25 @@
 < extern (D) auto bcf_hdr_id2hrec(T0, T1, T2, T3)(auto ref T0 hdr, auto ref T1 dict_type, auto ref T2 col_type, auto ref T3 int_id)
 < {
 <     return hdr.id[dict_type == BCF_DT_CTG ? BCF_DT_CTG : BCF_DT_ID][int_id].val.hrec[dict_type == BCF_DT_CTG ? 0 : col_type];
-1247d1232
+< }
 < 
+---
+> // TODO: for dict_type and col_type use ENUMs
+> pragma(inline, true) {
+>     auto bcf_hdr_id2length (const(bcf_hdr_t) *hdr, int type, int int_id) { return ((hdr).id[BCF_DT_ID][int_id].val.info[type]>>8 & 0xf); } // @suppress(dscanner.style.long_line)
+>     /// ditto
+>     auto bcf_hdr_id2number (const(bcf_hdr_t) *hdr, int type, int int_id) { return ((hdr).id[BCF_DT_ID][int_id].val.info[type]>>12);    } // @suppress(dscanner.style.long_line)
+>     /// ditto
+>     uint bcf_hdr_id2type (const(bcf_hdr_t) *hdr, int type, int int_id)   { return cast(uint)((hdr).id[BCF_DT_ID][int_id].val.info[type]>>4 & 0xf); } // @suppress(dscanner.style.long_line)
+>     /// ditto
+>     uint bcf_hdr_id2coltype (const(bcf_hdr_t) *hdr, int type, int int_id){ return cast(uint)((hdr).id[BCF_DT_ID][int_id].val.info[type] & 0xf); } // @suppress(dscanner.style.long_line)
+>     /// ditto
+>     auto bcf_hdr_idinfo_exists (const(bcf_hdr_t) *hdr, int type, int int_id) { return ((int_id<0 || bcf_hdr_id2coltype(hdr,type,int_id)==0xf) ? 0 : 1); } // @suppress(dscanner.style.long_line)
+>     /// ditto
+>     auto bcf_hdr_id2hrc (const(bcf_hdr_t) *hdr, int dict_type, int col_type, int int_id)
+>         { return ((hdr).id[(dict_type)==BCF_DT_CTG?BCF_DT_CTG:BCF_DT_ID][int_id].val.hrec[(dict_type)==BCF_DT_CTG?0:(col_type)]); // @suppress(dscanner.style.long_line)
+>     }
+> } 
 1300,1303c1285
 < extern (D) auto bcf_itr_queryi(T0, T1, T2, T3)(auto ref T0 idx, auto ref T1 tid, auto ref T2 beg, auto ref T3 end)
 < {
@@ -658,10 +680,11 @@
 < }
 ---
 > } /// closing @nogc nothrow from line 1136
-1305,1307c1287,1306
+1305,1308c1287,1309
 < extern (D) auto bcf_itr_querys(T0, T1, T2)(auto ref T0 idx, auto ref T1 hdr, auto ref T2 s)
 < {
 <     return hts_itr_querys(idx, s, cast(hts_name2id_f) bcf_hdr_name2id, hdr, hts_itr_query, bcf_readrec);
+< }
 ---
 > pragma(inline, true) {
 >     /// Generate an iterator for an integer-based range query
@@ -683,11 +706,11 @@
 >         hts_log_error(__FUNCTION__,"Only bgzf compressed files can be used with iterators");
 >         errno = EINVAL;
 >         return -2;
-1310c1309,1310
-< int bcf_itr_next(htsFile* htsfp, hts_itr_t* itr, void* r);
----
-> @nogc nothrow:
+>     }
 > 
+> @nogc nothrow:
+1310d1310
+< int bcf_itr_next(htsFile* htsfp, hts_itr_t* itr, void* r);
 1317,1320c1317
 < extern (D) auto bcf_index_load(T)(auto ref T fn)
 < {
@@ -729,12 +752,8 @@
 ---
 > enum BCF_MIN_BT_INT16 = -32_760; /* INT16_MIN + 8 */
 > enum BCF_MIN_BT_INT32 = -2_147_483_640; /* INT32_MIN + 8 */
-1469,1473c1466,1592
+1469c1466,1531
 < void bcf_float_set(float* ptr, uint value);
-< 
-< extern (D) auto bcf_float_set_vector_end(T)(auto ref T x)
-< {
-<     return bcf_float_set(&x, bcf_float_vector_end);
 ---
 > version(LDC) pragma(inline, true):
 > version(GNU) pragma(inline, true):
@@ -802,14 +821,21 @@
 >         case BCF_BT_NULL:  e |= kputc('.', str) < 0; break;
 >         default: hts_log_error("Unexpected type %d", fmt.type); return -2;
 >     }
-> 
+1471,1473c1533
+< extern (D) auto bcf_float_set_vector_end(T)(auto ref T x)
+< {
+<     return bcf_float_set(&x, bcf_float_vector_end);
+---
 >     return e == 0 ? 0 : -1;
-> }
-> 
+1476c1536,1538
+< extern (D) auto bcf_float_set_missing(T)(auto ref T x)
+---
 > 
 > pragma(inline, true)
 > int bcf_enc_size(kstring_t *s, int size, int type)
-> {
+1478c1540,1558
+<     return bcf_float_set(&x, bcf_float_missing);
+---
 >     uint32_t e = 0;
 >     if (size >= 15) {
 >         e |= kputc(15<<4|type, s) < 0;
@@ -829,9 +855,18 @@
 >         }
 >     } else e |= kputc(size<<4|type, s) < 0;
 >     return e == 0 ? 0 : -1;
-> }
-> 
-> 
+1481,1490d1560
+< int bcf_float_is_missing(float f);
+< int bcf_float_is_vector_end(float f);
+< 
+< int bcf_format_gt(bcf_fmt_t* fmt, int isample, kstring_t* str);
+< 
+< int bcf_enc_size(kstring_t* s, int size, int type);
+< 
+< int bcf_enc_inttype(c_long x);
+< 
+< int bcf_enc_int1(kstring_t* s, int x);
+1491a1562,1595
 > /// Undocumented Encode integer type?
 > pragma(inline, true)
 > int bcf_enc_inttype(long x)
@@ -863,26 +898,9 @@
 >         int32_t z = x;
 >         e |= bcf_enc_size(s, 1, BCF_BT_INT32);
 >         e |= kputsn(cast(char*)&z, 4, s) < 0;
-1475,1478c1594
-< 
-< extern (D) auto bcf_float_set_missing(T)(auto ref T x)
-< {
-<     return bcf_float_set(&x, bcf_float_missing);
----
+>     }
 >     return e == 0 ? 0 : -1;
-1480,1491d1595
-< 
-< int bcf_float_is_missing(float f);
-< int bcf_float_is_vector_end(float f);
-< 
-< int bcf_format_gt(bcf_fmt_t* fmt, int isample, kstring_t* str);
-< 
-< int bcf_enc_size(kstring_t* s, int size, int type);
-< 
-< int bcf_enc_inttype(c_long x);
-< 
-< int bcf_enc_int1(kstring_t* s, int x);
-< 
+> }
 1506,1508c1610,1628
 < 
 < // Invalid type.

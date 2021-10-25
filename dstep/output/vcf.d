@@ -221,7 +221,7 @@ enum BCF1_DIRTY_INF = 8; /// INFO was edited
 struct bcf_dec_t // @suppress(dscanner.style.phobos_naming_convention)
 {
     /// allocated size (high-water mark); do not change 
-    int m_fmt;
+    int m_fmt;          
     int m_info;
     int m_id;
     int m_als;
@@ -873,9 +873,9 @@ pragma(inline, true) {    // TODO: rewrite as template
         { return bcf_update_info(hdr, line, key, values, n, BCF_HT_FLAG); }
     auto bcf_update_info_string(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(void) *values) // @suppress(dscanner.style.undocumented_declaration)
         { return bcf_update_info(hdr, line, key, values, 1, BCF_HT_STR); }
-}
+    }
 
-int bcf_update_info(
+int bcf_update_info (
     const(bcf_hdr_t)* hdr,
     bcf1_t* line,
     const(char)* key,
@@ -901,7 +901,7 @@ int bcf_update_info(
  */
 pragma(inline, true)
 auto bcf_update_info_int64( const(bcf_hdr_t) *hdr, bcf1_t *line,
-    const(char)* key,
+                            const(char) *key,
                             const(long) *values, int n)
 {
     return bcf_update_info(hdr, line, key, values, n, BCF_HT_LONG);
@@ -940,7 +940,7 @@ pragma(inline, true) {
 
 @nogc nothrow {
 
-int bcf_update_format_string(
+int bcf_update_format_string (
     const(bcf_hdr_t)* hdr,
     bcf1_t* line,
     const(char)* key,
@@ -983,7 +983,7 @@ pragma(inline, true) {
             while ( k<igt ) { dk++; k += dk; }
             *b = dk - 1; *a = igt - k + *b;
         }
-}
+    }
 
 /**
  * bcf_get_fmt() - returns pointer to FORMAT's field data
@@ -1041,9 +1041,9 @@ pragma(inline, true) {
         { return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_STR); }
     auto bcf_get_info_flag(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *tag, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration)
         { return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_FLAG); }
-}
+    }
 
-int bcf_get_info_values(
+int bcf_get_info_values (
     const(bcf_hdr_t)* hdr,
     bcf1_t* line,
     const(char)* tag,
@@ -1228,8 +1228,8 @@ pragma(inline, true) {
     /// ditto
     auto bcf_hdr_id2hrc (const(bcf_hdr_t) *hdr, int dict_type, int col_type, int int_id)
         { return ((hdr).id[(dict_type)==BCF_DT_CTG?BCF_DT_CTG:BCF_DT_ID][int_id].val.hrec[(dict_type)==BCF_DT_CTG?0:(col_type)]); // @suppress(dscanner.style.long_line)
-}
-}
+    }
+} 
 /// Convert BCF FORMAT data to string form
 /**
  * @param s    kstring to write into
@@ -1304,7 +1304,7 @@ pragma(inline, true) {
         hts_log_error(__FUNCTION__,"Only bgzf compressed files can be used with iterators");
         errno = EINVAL;
         return -2;
-}
+    }
 
 @nogc nothrow:
 
@@ -1590,7 +1590,7 @@ int bcf_enc_int1(kstring_t *s, int32_t x)
         int32_t z = x;
         e |= bcf_enc_size(s, 1, BCF_BT_INT32);
         e |= kputsn(cast(char*)&z, 4, s) < 0;
-}
+    }
     return e == 0 ? 0 : -1;
 }
 /// Return the value of a single typed integer.
