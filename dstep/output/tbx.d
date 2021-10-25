@@ -23,6 +23,14 @@ THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
+module htslib.tbx;
+
+import htslib.hts;
+import htslib.bgzf : BGZF;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
 
@@ -58,29 +66,32 @@ extern __gshared const tbx_conf_t tbx_conf_vcf;
 
 alias tbx_itr_destroy = hts_itr_destroy;
 
-extern (D) auto tbx_itr_queryi(T0, T1, T2, T3)(auto ref T0 tbx, auto ref T1 tid, auto ref T2 beg, auto ref T3 end)
+pragma(inline, true)
+auto tbx_itr_queryi(const tbx_t *tbx, int tid, hts_pos_t beg, hts_pos_t end)
+    { return hts_itr_query(tbx.idx, tid, beg, end, &tbx_readrec); }
+
+pragma(inline, true)
+auto tbx_itr_querys(const tbx_t *tbx, const char *s)
 {
-    return hts_itr_query(tbx.idx, tid, beg, end, tbx_readrec);
+    return hts_itr_querys(tbx.idx, s,
+        cast(hts_name2id_f)(&tbx_name2id),
+        cast(void*)tbx,
+        &hts_itr_query,
+        &tbx_readrec);
 }
 
-extern (D) auto tbx_itr_querys(T0, T1)(auto ref T0 tbx, auto ref T1 s)
-{
-    return hts_itr_querys(tbx.idx, s, cast(hts_name2id_f) tbx_name2id, tbx, hts_itr_query, tbx_readrec);
-}
+pragma(inline, true)
+auto tbx_itr_next(htsFile *htsfp, tbx_t *tbx, hts_itr_t *itr, void *r)
+    { return hts_itr_next(hts_get_bgzfp(htsfp), itr, r, tbx); }
 
-extern (D) auto tbx_itr_next(T0, T1, T2, T3)(auto ref T0 htsfp, auto ref T1 tbx, auto ref T2 itr, auto ref T3 r)
-{
-    return hts_itr_next(hts_get_bgzfp(htsfp), itr, r, tbx);
-}
+pragma(inline, true)
+auto tbx_bgzf_itr_next(BGZF *bgzfp, tbx_t *tbx, hts_itr_t *itr, void *r)
+    { return hts_itr_next(bgzfp, itr, r, tbx); }
 
-extern (D) auto tbx_bgzf_itr_next(T0, T1, T2, T3)(auto ref T0 bgzfp, auto ref T1 tbx, auto ref T2 itr, auto ref T3 r)
-{
-    return hts_itr_next(bgzfp, itr, r, tbx);
-}
-
+// contig name to integer id
 int tbx_name2id(tbx_t* tbx, const(char)* ss);
 
-/* Internal helper function used by tbx_itr_next() */
+/* Internal helper function used by tbx_itr_next() defined in hts.c -- do not use directly*/
 BGZF* hts_get_bgzfp(htsFile* fp);
 
 int tbx_readrec(
@@ -151,7 +162,9 @@ tbx_t* tbx_index_load2(const(char)* fn, const(char)* fnidx);
 */
 tbx_t* tbx_index_load3(const(char)* fn, const(char)* fnidx, int flags);
 
+/// return C-style array of sequence names (NB: free the array but not the values)
 const(char*)* tbx_seqnames(tbx_t* tbx, int* n); // free the array but not the values
 
+/// destroy/dealloc tabix data
 void tbx_destroy(tbx_t* tbx);
 

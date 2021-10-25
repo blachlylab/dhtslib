@@ -24,25 +24,39 @@ THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
+module htslib.hts;
 
 import core.stdc.config;
 import core.stdc.inttypes;
 import core.stdc.limits;
 import core.stdc.stdint;
 
+import htslib.bgzf : BGZF;
+import htslib.cram : cram_fd;
+import htslib.hfile : hFILE;
+import htslib.thread_pool : hts_tpool;
+import htslib.sam : sam_hdr_t;
+import htslib.kstring : kstring_t;
+
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 // Separator used to split HTS_PATH (for plugins); REF_PATH (cram references)
 
+version(Windows)
+{
+    enum HTS_PATH_SEPARATOR_CHAR = ';';
+    enum HTS_PATH_SEPARATOR_STR = ";";
+}
+else
+{
 enum HTS_PATH_SEPARATOR_CHAR = ':';
 enum HTS_PATH_SEPARATOR_STR = ":";
+}
 
-struct BGZF;
-
-struct cram_fd;
-struct hFILE;
-struct hts_tpool;
-struct sam_hdr_t;
 
 /**
  * @hideinitializer
@@ -117,6 +131,14 @@ enum HTS_RESIZE_CLEAR = 1;
  * be cleared.
  */
 
+pragma(inline,true)
+int hts_resize(T)(size_t num, ref size_t size, T* ptr, int flags)
+{
+    return (num > size)
+        ? hts_resize_array_(T.sizeof, num, size_t.sizeof, &size, cast(void **)&ptr, flags, __FUNCTION__)
+        : 0;
+}
+
 /// Release resources when dlclosing a dynamically loaded HTSlib
 /** @discussion
  *  Normally HTSlib cleans up automatically when your program exits,
@@ -141,17 +163,19 @@ void hts_free(void* ptr);
 // Add new entries only at the end (but before the *_maximum entry)
 // of these enums, as their numbering is part of the htslib ABI.
 
-enum htsFormatCategory
+/// Broad format category (sequence data, variant data, index, regions, etc.)
+enum htsFormatCategory // @suppress(dscanner.style.phobos_naming_convention)
 {
     unknown_category = 0,
     sequence_data = 1, // Sequence data -- SAM, BAM, CRAM, etc
     variant_data = 2, // Variant calling data -- VCF, BCF, etc
     index_file = 3, // Index file associated with some data file
     region_list = 4, // Coordinate intervals or regions -- BED, etc
-    category_maximum = 32767
+    category_maximum = 32_767
 }
 
-enum htsExactFormat
+/// Specific format (SAM, BAM, CRAM, BCF, VCF, TBI, BED, etc.)
+enum htsExactFormat // @suppress(dscanner.style.phobos_naming_convention)
 {
     unknown_format = 0,
     binary_format = 1,
@@ -175,10 +199,11 @@ enum htsExactFormat
     fai_format = 18,
     fqi_format = 19,
     hts_crypt4gh_format = 20,
-    format_maximum = 32767
+    format_maximum = 32_767
 }
 
-enum htsCompression
+/// Compression type
+enum htsCompression // @suppress(dscanner.style.phobos_naming_convention)
 {
     no_compression = 0,
     gzip = 1,
@@ -186,24 +211,19 @@ enum htsCompression
     custom = 3,
     bzip2_compression = 4,
     razf_compression = 5,
-    compression_maximum = 32767
+    compression_maximum = 32_767
 }
 
 struct htsFormat
 {
-    htsFormatCategory category;
-    htsExactFormat format;
-
-    struct _Anonymous_0
-    {
-        short major;
-        short minor;
-    }
-
-    _Anonymous_0 version_;
-    htsCompression compression;
-    short compression_level; // currently unused
-    void* specific; // format specific options; see struct hts_opt.
+    htsFormatCategory category; /// Broad format category (sequence data, variant data, index, regions, etc.)
+    htsExactFormat format;      /// Specific format (SAM, BAM, CRAM, BCF, VCF, TBI, BED, etc.)
+    /// format version
+    struct Vers { short major, minor; } // @suppress(dscanner.style.undocumented_declaration)
+    Vers v; /// format version
+    htsCompression compression; /// Compression type
+    short compression_level;/// currently unused
+    void *specific;         /// format specific options; see struct hts_opt.
 }
 
 struct hts_idx_t;
@@ -225,7 +245,7 @@ struct hts_filter_t;
 //  - is_bgzf and is_cram flags indicate which fp union member to use.
 //    Note is_bgzf being set does not indicate the flag is BGZF compressed,
 //    nor even whether it is compressed at all (eg on naked BAMs).
-struct htsFile
+struct htsFile // @suppress(dscanner.style.phobos_naming_convention)
 {
     import std.bitmanip : bitfields;
 
@@ -236,43 +256,40 @@ struct htsFile
         uint, "is_cram", 1,
         uint, "is_bgzf", 1,
         uint, "dummy", 27));
-
-    long lineno;
-    kstring_t line;
-    char* fn;
-    char* fn_aux;
-
-    union _Anonymous_1
-    {
-        BGZF* bgzf;
-        cram_fd* cram;
-        hFILE* hfile;
+    long lineno; /// uncompressed(?) file line no.
+    kstring_t line; /// buffer to hold line
+    char *fn;       /// filename
+    char *fn_aux;   /// auxillary (i.e, index) file name
+    /// hFile plus any needed bgzf or CRAM (if applicable) structure data
+    union FP {
+        BGZF *bgzf;     /// see bgzf.d
+        cram_fd *cram;  /// see cram.d
+        hFILE *hfile;   /// see hfile.d
     }
-
-    _Anonymous_1 fp;
+    FP fp;              /// hFile plus any needed bgzf or CRAM (if applicable) structure data
     void* state; // format specific state information
-    htsFormat format;
+    htsFormat format;   /// hts file complete file format information
     hts_idx_t* idx;
     const(char)* fnidx;
     sam_hdr_t* bam_header;
     hts_filter_t* filter;
 }
 
-// A combined thread pool and queue allocation size.
-// The pool should already be defined, but qsize may be zero to
-// indicate an appropriate queue size is taken from the pool.
-//
-// Reasons for explicitly setting it could be where many more file
-// descriptors are in use than threads, so keeping memory low is
-// important.
-struct htsThreadPool
+/// A combined thread pool and queue allocation size.
+/// The pool should already be defined, but qsize may be zero to
+/// indicate an appropriate queue size is taken from the pool.
+///
+/// Reasons for explicitly setting it could be where many more file
+/// descriptors are in use than threads, so keeping memory low is
+/// important.
+struct htsThreadPool // @suppress(dscanner.style.phobos_naming_convention)
 {
     hts_tpool* pool; // The shared thread pool itself
     int qsize; // Size of I/O queue to use for this fp
 }
 
-// REQUIRED_FIELDS
-enum sam_fields
+/// REQUIRED_FIELDS
+enum sam_fields // @suppress(dscanner.style.phobos_naming_convention)
 {
     SAM_QNAME = 0x00000001,
     SAM_FLAG = 0x00000002,
@@ -289,7 +306,7 @@ enum sam_fields
     SAM_RGAUX = 0x00001000
 }
 
-// Mostly CRAM only, but this could also include other format options
+/// Mostly CRAM only, but this could also include other format options
 enum hts_fmt_option
 {
     // CRAM specific
@@ -329,11 +346,41 @@ enum hts_fmt_option
     HTS_OPT_CACHE_SIZE = 103,
     HTS_OPT_BLOCK_SIZE = 104,
     HTS_OPT_FILTER = 105,
-    HTS_OPT_PROFILE = 106
+    HTS_OPT_PROFILE = 106,
+
+    // Fastq
+
+    // Boolean.
+    // Read / Write CASAVA 1.8 format.
+    // See https://emea.support.illumina.com/content/dam/illumina-support/documents/documentation/software_documentation/bcl2fastq/bcl2fastq_letterbooklet_15038058brpmi.pdf
+    //
+    // The CASAVA tag matches \d:[YN]:\d+:[ACGTN]+
+    // The first \d is read 1/2 (1 or 2), [YN] is QC-PASS/FAIL flag,
+    // \d+ is a control number, and the sequence at the end is
+    // for barcode sequence.  Barcodes are read into the aux tag defined
+    // by FASTQ_OPT_BARCODE ("BC" by default).
+    FASTQ_OPT_CASAVA = 1000,
+
+    // String.
+    // Whether to read / write extra SAM format aux tags from the fastq
+    // identifier line.  For reading this can simply be "1" to request
+    // decoding aux tags.  For writing it is a comma separated list of aux
+    // tag types to be written out.
+    FASTQ_OPT_AUX = 1001,
+
+    // Boolean.
+    // Whether to add /1 and /2 to read identifiers when writing FASTQ.
+    // These come from the BAM_FREAD1 or BAM_FREAD2 flags.
+    // (Detecting the /1 and /2 is automatic when reading fastq.)
+    FASTQ_OPT_RNUM = 1002,
+
+    // Two character string.
+    // Barcode aux tag for CASAVA; defaults to "BC".
+    FASTQ_OPT_BARCODE = 1003,
 }
 
-// Profile options for encoding; primarily used at present in CRAM
-// but also usable in BAM as a synonym for deflate compression levels.
+/// Profile options for encoding; primarily used at present in CRAM
+/// but also usable in BAM as a synonym for deflate compression levels.
 enum hts_profile_option
 {
     HTS_PROFILE_FAST = 0,
@@ -342,22 +389,21 @@ enum hts_profile_option
     HTS_PROFILE_ARCHIVE = 3
 }
 
-// For backwards compatibility
+/// For backwards compatibility
 alias cram_option = hts_fmt_option;
 
-struct hts_opt
-{
-    char* arg; // string form, strdup()ed
-    hts_fmt_option opt; // tokenised key
-    // ... and value
-    union _Anonymous_2
+/// Options for cache, (de)compression, threads, CRAM, etc.
+struct hts_opt // @suppress(dscanner.style.phobos_naming_convention)
     {
-        int i;
-        char* s;
+    char *arg;          /// string form, strdup()ed
+    hts_fmt_option opt; /// tokenised key
+    /// option value
+    union VAL {         /// ... and value
+        int i;          /// int value
+        char *s;        /// string value
     }
-
-    _Anonymous_2 val;
-    hts_opt* next;
+    VAL val;            /// value
+    hts_opt *next;      /// next option (linked list)
 }
 
 /*
@@ -369,7 +415,7 @@ enum HTS_IDX_DELIM = "##idx##";
  * Exported functions *
  **********************/
 
-/*
+/**
  * Parses arg and appends it to the option list.
  *
  * Returns 0 on success;
@@ -377,7 +423,7 @@ enum HTS_IDX_DELIM = "##idx##";
  */
 int hts_opt_add(hts_opt** opts, const(char)* c_arg);
 
-/*
+/**
  * Applies an hts_opt option list to a given htsFile.
  *
  * Returns 0 on success
@@ -385,12 +431,12 @@ int hts_opt_add(hts_opt** opts, const(char)* c_arg);
  */
 int hts_opt_apply(htsFile* fp, hts_opt* opts);
 
-/*
+/**
  * Frees an hts_opt list.
  */
 void hts_opt_free(hts_opt* opts);
 
-/*
+/**
  * Accepts a string file format (sam, bam, cram, vcf, bam) optionally
  * followed by a comma separated list of key=value options and splits
  * these up into the fields of htsFormat struct.
@@ -400,7 +446,7 @@ void hts_opt_free(hts_opt* opts);
  */
 int hts_parse_format(htsFormat* opt, const(char)* str);
 
-/*
+/**
  * Tokenise options as (key(=value)?,)*(key(=value)?)?
  * NB: No provision for ',' appearing in the value!
  * Add backslashing rules?
@@ -418,26 +464,50 @@ The input character may be either an IUPAC ambiguity code, '=' for 0, or
 '0'/'1'/'2'/'3' for a result of 1/2/4/8.  The result is encoded as 1/2/4/8
 for A/C/G/T or combinations of these bits for ambiguous bases.
 */
-extern __gshared const(ubyte)[256] seq_nt16_table;
 
-/*! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
+version(Windows){
+    __gshared const(ubyte)[256] seq_nt16_table = [
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        1, 2, 4, 8, 15,15,15,15, 15,15,15,15, 15, 0 /*=*/,15,15,
+        15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+        15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+        15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+        15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+        15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
+    ];
+}else{
+    extern __gshared const(ubyte)[256] seq_nt16_table;
+}
+/**! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
 ambiguity code letter (or '=' when given 0).
 */
-extern __gshared const(char)[] seq_nt16_str;
 
-/*! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
+version(Windows) __gshared const(char)[16] seq_nt16_str = ['=','A','C','M','G','R','S','V','T','W','Y','H','K','D','B','N'];
+else extern __gshared const(char)[16] seq_nt16_str;
+
+/**! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
 Returns 0/1/2/3 for 1/2/4/8 (i.e., A/C/G/T), or 4 otherwise (0 or ambiguous).
 */
-extern __gshared const(int)[] seq_nt16_int;
-
-/*!
+version(Windows) __gshared const(int)[16] seq_nt16_int = [ 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 ];
+else extern __gshared const(int)[16] seq_nt16_int;
+/**!
   @abstract  Get the htslib version number
   @return    For released versions, a string like "N.N[.N]"; or git describe
   output if using a library built within a Git repository.
 */
 const(char)* hts_version();
 
-/*!
+/**!
   @abstract  Compile-time HTSlib version number, for use in #if checks
   @return    For released versions X.Y[.Z], an integer of the form XYYYZZ;
   useful for preprocessor conditionals such as
@@ -447,9 +517,9 @@ const(char)* hts_version();
 // Immediately after release, bump ZZ to 90 to distinguish in-development
 // Git repository builds from the release; you may wish to increment this
 // further when significant features are merged.
-enum HTS_VERSION = 101200;
+enum HTS_VERSION = 101300;
 
-/*! @abstract Introspection on the features enabled in htslib
+/**! @abstract Introspection on the features enabled in htslib
  *
  * @return a bitfield of HTS_FEATURE_* macros.
  */
@@ -457,36 +527,36 @@ uint hts_features();
 
 const(char)* hts_test_feature(uint id);
 
-/*! @abstract Introspection on the features enabled in htslib, string form
+/**! @abstract Introspection on the features enabled in htslib, string form
  *
  * @return a string describing htslib build features
  */
 const(char)* hts_feature_string();
 
-// Whether ./configure was used or vanilla Makefile
+/// Whether ./configure was used or vanilla Makefile
 enum HTS_FEATURE_CONFIGURE = 1;
 
-// Whether --enable-plugins was used
+/// Whether --enable-plugins was used
 enum HTS_FEATURE_PLUGINS = 2;
 
-// Transport specific
+/// Transport specific
 enum HTS_FEATURE_LIBCURL = 1u << 10;
 enum HTS_FEATURE_S3 = 1u << 11;
 enum HTS_FEATURE_GCS = 1u << 12;
 
-// Compression options
+/// Compression options
 enum HTS_FEATURE_LIBDEFLATE = 1u << 20;
 enum HTS_FEATURE_LZMA = 1u << 21;
 enum HTS_FEATURE_BZIP2 = 1u << 22;
 enum HTS_FEATURE_HTSCODECS = 1u << 23; // htscodecs library version
 
-// Build params
+/// Build params
 enum HTS_FEATURE_CC = 1u << 27;
 enum HTS_FEATURE_CFLAGS = 1u << 28;
 enum HTS_FEATURE_CPPFLAGS = 1u << 29;
 enum HTS_FEATURE_LDFLAGS = 1u << 30;
 
-/*!
+/**!
   @abstract    Determine format by peeking at the start of a file
   @param fp    File opened for reading, positioned at the beginning
   @param fmt   Format structure that will be filled out on return
@@ -494,20 +564,20 @@ enum HTS_FEATURE_LDFLAGS = 1u << 30;
 */
 int hts_detect_format(hFILE* fp, htsFormat* fmt);
 
-/*!
+/**!
   @abstract    Get a human-readable description of the file format
   @param fmt   Format structure holding type, version, compression, etc.
   @return      Description string, to be freed by the caller after use.
 */
 char* hts_format_description(const(htsFormat)* format);
 
-/*!
+/**!
   @abstract       Open a sequence data (SAM/BAM/CRAM) or variant data (VCF/BCF)
                   or possibly-compressed textual line-orientated file
   @param fn       The file name or "-" for stdin/stdout. For indexed files
                   with a non-standard naming, the file name can include the
                   name of the index file delimited with HTS_IDX_DELIM
-  @param mode     Mode matching / [rwa][bceguxz0-9]* /
+  @param mode     Mode matching / [rwa][bcefFguxz0-9]* /
   @discussion
       With 'r' opens for reading; any further format mode letters are ignored
       as the format is detected by checking the first few bytes or BGZF blocks
@@ -533,7 +603,7 @@ char* hts_format_description(const(htsFormat)* format);
 */
 htsFile* hts_open(const(char)* fn, const(char)* mode);
 
-/*!
+/**!
   @abstract       Open a SAM/BAM/CRAM/VCF/BCF/etc file
   @param fn       The file name or "-" for stdin/stdout
   @param mode     Open mode, as per hts_open()
@@ -552,35 +622,35 @@ htsFile* hts_open_format(
     const(char)* mode,
     const(htsFormat)* fmt);
 
-/*!
+/**!
   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file
   @param fn       The already-open file handle
   @param mode     Open mode, as per hts_open()
 */
 htsFile* hts_hopen(hFILE* fp, const(char)* fn, const(char)* mode);
 
-/*!
+/**!
   @abstract  Close a file handle, flushing buffered data for output streams
   @param fp  The file handle to be closed
   @return    0 for success, or negative if an error occurred.
 */
 int hts_close(htsFile* fp);
 
-/*!
+/**!
   @abstract  Returns the file's format information
   @param fp  The file handle
   @return    Read-only pointer to the file's htsFormat.
 */
 const(htsFormat)* hts_get_format(htsFile* fp);
 
-/*!
+/**!
   @ abstract      Returns a string containing the file format extension.
   @ param format  Format structure containing the file type.
   @ return        A string ("sam", "bam", etc) or "?" for unknown formats.
  */
 const(char)* hts_format_file_extension(const(htsFormat)* format);
 
-/*!
+/**!
   @abstract  Sets a specified CRAM option on the open file handle.
   @param fp  The file handle open the open file.
   @param opt The CRAM_OPT_* option.
@@ -589,7 +659,7 @@ const(char)* hts_format_file_extension(const(htsFormat)* format);
 */
 int hts_set_opt(htsFile* fp, hts_fmt_option opt, ...);
 
-/*!
+/**!
   @abstract         Read a line (and its \n or \r\n terminator) from a file
   @param fp         The file handle
   @param delimiter  Unused, but must be '\n' (or KS_SEP_LINE)
@@ -600,7 +670,7 @@ int hts_set_opt(htsFile* fp, hts_fmt_option opt, ...);
 int hts_getline(htsFile* fp, int delimiter, kstring_t* str);
 
 char** hts_readlines(const(char)* fn, int* _n);
-/*!
+/**!
     @abstract       Parse comma-separated list or read list from a file
     @param list     File name or comma-separated list
     @param is_file
@@ -610,7 +680,7 @@ char** hts_readlines(const(char)* fn, int* _n);
 */
 char** hts_readlist(const(char)* fn, int is_file, int* _n);
 
-/*!
+/**!
   @abstract  Create extra threads to aid compress/decompression for this file
   @param fp  The file handle
   @param n   The number of worker threads to create
@@ -620,7 +690,7 @@ char** hts_readlist(const(char)* fn, int is_file, int* _n);
 */
 int hts_set_threads(htsFile* fp, int n);
 
-/*!
+/**!
   @abstract  Create extra threads to aid compress/decompression for this file
   @param fp  The file handle
   @param p   A pool of worker threads, previously allocated by hts_create_threads().
@@ -628,7 +698,7 @@ int hts_set_threads(htsFile* fp, int n);
 */
 int hts_set_thread_pool(htsFile* fp, htsThreadPool* p);
 
-/*!
+/**!
   @abstract  Adds a cache of decompressed blocks, potentially speeding up seeks.
              This may not work for all file types (currently it is bgzf only).
   @param fp  The file handle
@@ -645,7 +715,7 @@ void hts_set_cache_size(htsFile* fp, int n);
 */
 int hts_set_fai_filename(htsFile* fp, const(char)* fn_aux);
 
-/*!
+/**!
   @abstract  Sets a filter expression
   @return    0 for success, negative on failure
   @discussion
@@ -653,7 +723,7 @@ int hts_set_fai_filename(htsFile* fp, const(char)* fn_aux);
 */
 int hts_set_filter_expression(htsFile* fp, const(char)* expr);
 
-/*!
+/**!
   @abstract  Determine whether a given htsFile contains a valid EOF block
   @return    3 for a non-EOF checkable filetype;
              2 for an unseekable file type where EOF cannot be checked;
@@ -669,7 +739,7 @@ int hts_check_EOF(htsFile* fp);
  * Indexing *
  ************/
 
-/*!
+/**!
 These HTS_IDX_* macros are used as special tid values for hts_itr_query()/etc,
 producing iterators operating as follows:
  - HTS_IDX_NOCOOR iterates over unmapped reads sorted at the end of the file
@@ -713,27 +783,29 @@ struct hts_pair_pos_t
 
 alias hts_pair32_t = hts_pair_pos_t; // For backwards compatibility
 
-struct hts_pair64_t
+struct hts_pair64_t // @suppress(dscanner.style.phobos_naming_convention)
 {
     ulong u;
     ulong v;
 }
 
-struct hts_pair64_max_t
+/// 64-bit start, end coordinate pair tracking max (internally used in hts.c)
+struct hts_pair64_max_t // @suppress(dscanner.style.phobos_naming_convention)
 {
     ulong u;
     ulong v;
     ulong max;
 }
 
+/// Region list used in iterators (NB: apparently confined to single contig/tid)
 struct hts_reglist_t
 {
-    const(char)* reg;
-    hts_pair_pos_t* intervals;
-    int tid;
-    uint count;
-    hts_pos_t min_beg;
-    hts_pos_t max_end;
+    const(char) *reg;   /// Region string
+    hts_pair_pos_t *intervals;  /// (start,end) intervals
+    int tid;            /// Contig id
+    uint count;         /// How many intervals
+    hts_pos_t min_beg;  /// absolute bounds
+    hts_pos_t max_end;  /// absolute bounds
 }
 
 alias hts_readrec_func = int function(BGZF* fp, void* data, void* r, int* tid, hts_pos_t* beg, hts_pos_t* end);
@@ -779,7 +851,7 @@ alias hts_tell_func = c_long function(void* fp);
  * tell       - File specific function for indicating the file offset
  */
 
-struct hts_itr_t
+struct hts_itr_t // @suppress(dscanner.style.phobos_naming_convention)
 {
     import std.bitmanip : bitfields;
 
@@ -810,26 +882,34 @@ struct hts_itr_t
     int function() seek;
     long function() tell;
 
-    struct _Anonymous_3
+    struct Bins
     {
         int n;
         int m;
         int* a;
     }
 
-    _Anonymous_3 bins;
+    Bins bins;
+}
+/// ? index key
+struct aux_key_t { // @suppress(dscanner.style.phobos_naming_convention)
+    int key;    /// ???
+    /// ???
+    ulong min_off, max_off;
 }
 
 alias hts_itr_multi_t = hts_itr_t;
 
+pragma(inline, true)
 extern (D) auto hts_bin_first(T)(auto ref T l)
 {
     return ((1 << ((l << 1) + l)) - 1) / 7;
 }
 
-extern (D) auto hts_bin_parent(T)(auto ref T l)
+pragma(inline, true)
+extern (D) auto hts_bin_parent(T)(auto ref T b)
 {
-    return (l - 1) >> 3;
+    return (b - 1) >> 3;
 }
 
 ///////////////////////////////////////////////////////////
@@ -994,11 +1074,15 @@ hts_idx_t* hts_idx_load3(
     int flags);
 
 /// Flags for hts_idx_load3() ( and also sam_idx_load3(), tbx_idx_load3() )
-enum HTS_IDX_SAVE_REMOTE = 1;
-enum HTS_IDX_SILENT_FAIL = 2;
-
+enum HTS_IDX_FLAG : int 
+{
+    HTS_IDX_SAVE_REMOTE = 1,
+    HTS_IDX_SILENT_FAIL = 2
+}
 ///////////////////////////////////////////////////////////
 // Functions for accessing meta-data stored in indexes
+
+alias hts_id2name_f = const(char)* function(void*, int);
 
 /// Get extra index meta-data
 /** @param idx    The index
@@ -1056,12 +1140,33 @@ int hts_idx_get_stat(
 */
 ulong hts_idx_get_n_no_coor(const(hts_idx_t)* idx);
 
+/// Return a list of target names from an index
+/** @param      idx    Index
+    @param[out] n      Location to store the number of targets
+    @param      getid  Callback function to get the name for a target ID
+    @param      hdr    Header from indexed file
+    @return An array of pointers to the names on success; NULL on failure
+
+    @note The names are pointers into the header data structure.  When cleaning
+    up, only the array should be freed, not the names.
+ */
+const(char *)* hts_idx_seqnames(const(hts_idx_t)* idx, int* n, hts_id2name_f getid, void* hdr); // free only the array, not the values
+
+/// Return the number of targets from an index
+/** @param      idx    Index
+    @return The number of targets
+ */
+int hts_idx_nseq(const(hts_idx_t)* idx);
+
 ///////////////////////////////////////////////////////////
 // Region parsing
 
-enum HTS_PARSE_THOUSANDS_SEP = 1; ///< Ignore ',' separators within numbers
-enum HTS_PARSE_ONE_COORD = 2; ///< chr:pos means chr:pos-pos and not chr:pos-end
-enum HTS_PARSE_LIST = 4; ///< Expect a comma separated list of regions. (Disables HTS_PARSE_THOUSANDS_SEP)
+enum HTS_PARSE_FLAGS : int 
+{
+    HTS_PARSE_THOUSANDS_SEP = 1, ///< Ignore ',' separators within numbers
+    HTS_PARSE_ONE_COORD = 2, ///< chr:pos means chr:pos-pos and not chr:pos-end
+    HTS_PARSE_LIST = 4, ///< Expect a comma separated list of regions. (Disables HTS_PARSE_THOUSANDS_SEP)
+}
 
 /// Parse a numeric string
 /** The number may be expressed in scientific notation, and optionally may
@@ -1075,10 +1180,9 @@ enum HTS_PARSE_LIST = 4; ///< Expect a comma separated list of regions. (Disable
     When @a strend is NULL, a warning will be printed (if hts_verbose is HTS_LOG_WARNING
     or more) if there are any trailing characters after the number.
 */
-long hts_parse_decimal(const(char)* str, char** strend, int flags);
+long hts_parse_decimal(const(char)* str, char** strend, HTS_PARSE_FLAGS flags);
 
-alias hts_name2id_f = int function(void*, const(char)*);
-alias hts_id2name_f = const(char)* function(void*, int);
+alias hts_name2id_f = int function(void*, const(char)*) *;
 
 /// Parse a "CHR:START-END"-style region string
 /** @param str  String to be parsed
@@ -1169,7 +1273,7 @@ const(char)* hts_parse_region(
     hts_pos_t* end,
     hts_name2id_f getid,
     void* hdr,
-    int flags);
+    HTS_PARSE_FLAGS flags);
 
 ///////////////////////////////////////////////////////////
 // Generic iterators
@@ -1197,14 +1301,14 @@ hts_itr_t* hts_itr_query(
     int tid,
     hts_pos_t beg,
     hts_pos_t end,
-    int function() readrec);
+    hts_readrec_func readrec);
 
 /// Free an iterator
 /** @param iter   Iterator to free
  */
 void hts_itr_destroy(hts_itr_t* iter);
 
-alias hts_itr_query_func = hts_itr_t* function(const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, int function() readrec);
+alias hts_itr_query_func = hts_itr_t* function(const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, hts_readrec_func readrec);
 
 /// Create a single-region iterator from a text region specification
 /** @param idx       Index
@@ -1224,8 +1328,8 @@ hts_itr_t* hts_itr_querys(
     const(char)* reg,
     hts_name2id_f getid,
     void* hdr,
-    hts_itr_t* function() itr_query,
-    int function() readrec);
+    hts_itr_query_func itr_query,
+    hts_readrec_func readrec);
 
 /// Return the next record from an iterator
 /** @param fp      Input file handle
@@ -1236,21 +1340,6 @@ hts_itr_t* hts_itr_querys(
  */
 int hts_itr_next(BGZF* fp, hts_itr_t* iter, void* r, void* data);
 
-/// Return a list of target names from an index
-/** @param      idx    Index
-    @param[out] n      Location to store the number of targets
-    @param      getid  Callback function to get the name for a target ID
-    @param      hdr    Header from indexed file
-    @return An array of pointers to the names on success; NULL on failure
-
-    @note The names are pointers into the header data structure.  When cleaning
-    up, only the array should be freed, not the names.
- */
-const(char*)* hts_idx_seqnames(
-    const(hts_idx_t)* idx,
-    int* n,
-    hts_id2name_f getid,
-    void* hdr); // free only the array, not the values
 
 /**********************************
  * Iterator with multiple regions *
@@ -1281,10 +1370,10 @@ hts_itr_t* hts_itr_regions(
     int count,
     hts_name2id_f getid,
     void* hdr,
-    int function() itr_specific,
-    int function() readrec,
-    int function() seek,
-    long function() tell);
+    hts_itr_multi_query_func itr_specific,
+    hts_readrec_func readrec,
+    hts_seek_func seek,
+    hts_tell_func tell);
 
 /// Return the next record from an iterator
 /** @param fp      Input file handle
@@ -1441,20 +1530,86 @@ void hts_md5_hex(char* hex, const(ubyte)* digest);
 /*! @abstract Deallocates any memory allocated by hts_md5_init. */
 void hts_md5_destroy(hts_md5_context* ctx);
 
-int hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls);
+pragma(inline,true)
+long hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls)
+{
+    int l, s = min_shift, t = ((1<<((n_lvls<<1) + n_lvls)) - 1) / 7;
+    for (--end, l = n_lvls; l > 0; --l, s += 3, t -= 1<<((l<<1)+l))
+        if (beg>>s == end>>s) return t + (beg>>s);
+    return 0;
+}
+
+/// Compute the level of a bin in a binning index
+pragma(inline, true)
+int hts_bin_level(int bin) {
+    int l, b;
+    for (l = 0, b = bin; b; ++l){ b = hts_bin_parent(b);}
+    return l;
+}
+
+//! Compute the corresponding entry into the linear index of a given bin from
+//! a binning index
+/*!
+ *  @param bin    The bin number
+ *  @param n_lvls The index depth (number of levels - 0 based)
+ *  @return       The integer offset into the linear index
+ *
+ *  Explanation of the return value formula:
+ *  Each bin on level l covers exp(2, (n_lvls - l)*3 + min_shift) base pairs.
+ *  A linear index entry covers exp(2, min_shift) base pairs.
+ */
 
 // compute the level of bin
-int hts_bin_bot(int bin, int n_lvls);
+pragma(inline, true)
+int hts_bin_bot(int bin, int n_lvls)
+{
+    int l = hts_bin_level(bin);
+    return (bin - hts_bin_first(l)) << (n_lvls - l) * 3;
+}
 
 /**************
  * Endianness *
  **************/
-
-int ed_is_big();
-ushort ed_swap_2(ushort v);
-void* ed_swap_2p(void* x);
-uint ed_swap_4(uint v);
-void* ed_swap_4p(void* x);
-ulong ed_swap_8(ulong v);
-void* ed_swap_8p(void* x);
+pragma(inline, true)
+int ed_is_big()
+{
+    long one= 1;
+    return !(*(cast(char *)(&one)));
+}
+pragma(inline, true)
+ushort ed_swap_2(ushort v)
+{
+    return cast(ushort)(((v & 0x00FF00FFU) << 8) | ((v & 0xFF00FF00U) >> 8));
+}
+pragma(inline, true)
+void *ed_swap_2p(void *x)
+{
+    *cast(ushort*)x = ed_swap_2(*cast(ushort*)x);
+    return x;
+}
+pragma(inline, true)
+uint ed_swap_4(uint v)
+{
+    v = ((v & 0x0000FFFFU) << 16) | (v >> 16);
+    return ((v & 0x00FF00FFU) << 8) | ((v & 0xFF00FF00U) >> 8);
+}
+pragma(inline, true)
+void *ed_swap_4p(void *x)
+{
+    *cast(uint*)x = ed_swap_4(*cast(uint*)x);
+    return x;
+}
+pragma(inline, true)
+ulong ed_swap_8(ulong v)
+{
+    v = ((v & 0x00000000FFFFFFFFLU) << 32) | (v >> 32);
+    v = ((v & 0x0000FFFF0000FFFFLU) << 16) | ((v & 0xFFFF0000FFFF0000LU) >> 16);
+    return ((v & 0x00FF00FF00FF00FFLU) << 8) | ((v & 0xFF00FF00FF00FF00LU) >> 8);
+}
+pragma(inline, true)
+void *ed_swap_8p(void *x)
+{
+    *cast(ulong*)x = ed_swap_8(*cast(ulong*)x);
+    return x;
+}
 

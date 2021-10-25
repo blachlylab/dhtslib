@@ -1,24 +1,7 @@
-25a26
-> module htslib.kfunc;
-33c34
-< double kf_lgamma(double z);
----
-> double kf_lgamma (double z);
-39c40
-< double kf_erfc(double x);
----
-> double kf_erfc (double x);
-54,55c55,56
-< double kf_gammap(double s, double z);
-< double kf_gammaq(double s, double z);
----
-> double kf_gammap (double s, double z);
-> double kf_gammaq (double s, double z);
-64c65
-< double kf_betai(double a, double b, double x);
----
-> double kf_betai (double a, double b, double x);
-72c73
-< double kt_fisher_exact(
----
-> double kt_fisher_exact (
+26d25
+< 
+27a27,30
+> 
+> @system:
+> nothrow:
+> @nogc:

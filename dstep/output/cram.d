@@ -32,8 +32,19 @@ DEALINGS IN THE SOFTWARE.  */
  * although these should not be included directly (use this file instead).
  */
 
+module htslib.cram;
+
 import core.stdc.stdio;
 import core.stdc.stdlib;
+import core.stdc.stdarg : va_list;
+
+import htslib.sam;
+import htslib.hts;
+import htslib.hfile : hFILE;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
 
@@ -56,6 +67,23 @@ extern (C):
 // compatibility with the old API, but may have no bearing on the
 // internal way htslib works.  DO NOT USE
 
+//#include <sys/types.h>
+alias off_t = size_t;
+alias ssize_t = size_t;
+
+enum cram_block_method
+{
+    BM_ERROR = -1,
+    RAW = 0,
+    GZIP = 1,
+    BZIP2 = 2,
+    LZMA = 3,
+    RANS = 4, // Generic; either order
+    RANS0 = 4,
+    RANS1 = 10, // Not externalised; stored as RANS (generic)
+    GZIP_RLE = 11 // NB: not externalised in CRAM
+}
+
 enum cram_content_type
 {
     CT_ERROR = -1,
@@ -77,8 +105,6 @@ struct cram_metrics;
 struct cram_block_slice_hdr;
 struct cram_block_compression_hdr;
 struct refs_t;
-
-struct hFILE;
 
 // Accessor functions
 
@@ -442,7 +468,7 @@ int int32_put_blk(cram_block* b, int val);
  * Header functionality is now provided by sam.h's sam_hdr_t functions.
  */
 
-alias SAM_hdr = sam_hdr_t_;
+alias SAM_hdr = sam_hdr_t;
 
 /*! Tokenises a SAM header into a hash table.
  *
@@ -452,7 +478,8 @@ alias SAM_hdr = sam_hdr_t_;
  * Returns a SAM_hdr struct on success (free with sam_hdr_free());
  *         NULL on failure
  */
-SAM_hdr* sam_hdr_parse_(const(char)* hdr, size_t len);
+pragma(inline, true)
+SAM_hdr* sam_hdr_parse_(const (char)* hdr, size_t len) { return sam_hdr_parse(len, hdr); }
 
 /*! Deallocates all storage used by a SAM_hdr struct.
  *
@@ -460,7 +487,8 @@ SAM_hdr* sam_hdr_parse_(const(char)* hdr, size_t len);
  * it is still non-zero then the header is assumed to be in use by another
  * caller and the free is not done.
  */
-void sam_hdr_free(SAM_hdr* hdr);
+pragma(inline, true)
+void sam_hdr_free(SAM_hdr* hdr) { sam_hdr_destroy(hdr); }
 
 /* sam_hdr_length() and sam_hdr_str() are now provided by sam.h. */
 
@@ -480,7 +508,7 @@ void sam_hdr_free(SAM_hdr* hdr);
  * Returns 0 on success;
  *        -1 on failure
  */
-enum sam_hdr_add_PG = sam_hdr_add_pg;
+alias sam_hdr_add_PG = sam_hdr_add_pg;
 
 /**@{ -------------------------------------------------------------------*/
 

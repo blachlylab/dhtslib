@@ -43,6 +43,11 @@ DEALINGS IN THE SOFTWARE.  */
  * To see example usage, please look at the #ifdef TEST_MAIN code in
  * thread_pool.c.
  */
+module htslib.thread_pool;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
 

@@ -26,6 +26,14 @@
    SOFTWARE.
 */
 
+module htslib.faidx;
+
+import htslib.hts : hts_pos_t;
+
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
 /** @file
@@ -57,8 +65,9 @@ extern (C):
     wrapped in the same way.
  */
 
-struct faidx_t;
+struct __faidx_t;
 /// Opaque structure representing FASTA index
+alias faidx_t = __faidx_t;
 
 /// File format to be dealing with.
 enum fai_format_options

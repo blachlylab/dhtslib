@@ -23,10 +23,21 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 */
+module htslib.kstring;
 
-import core.stdc.config;
-import core.stdc.stdio;
+@system:
+nothrow:
+@nogc:
+
+import core.stdc.config : c_long;
+import core.stdc.stdarg;
+import core.stdc.stdio : EOF;
 import core.stdc.stdlib;
+import core.stdc.string : memcpy, strlen;
+
+import htslib.kroundup;
+
+alias ssize_t = ptrdiff_t;	// should be defined in core.stdc somewhere but is not :/
 
 extern (C):
 
@@ -84,15 +95,15 @@ char* kstrtok(const(char)* str, const(char)* sep, ks_tokaux_t* aux);
  * or "\r\n"-terminated line from fp.  The line read is appended to the
  * kstring without its terminator and 0 is returned; EOF is returned at
  * EOF or on error (determined by querying fp, as per fgets()). */
-alias kgets_func = char* function(char*, int, void*);
-int kgetline(kstring_t* s, char* function() fgets_fn, void* fp);
+alias kgets_func = char* function(char*, int, void*)*;
+int kgetline(kstring_t* s, kgets_func fgets_fn, void* fp);
 
 /* kgetline2() uses the supplied hgetln()-like function to read a "\n"-
  * or "\r\n"-terminated line from fp.  The line read is appended to the
  * ksring without its terminator and 0 is returned; EOF is returned at
  * EOF or on error (determined by querying fp, as per fgets()). */
-alias kgets_func2 = c_long function(char*, size_t, void*);
-int kgetline2(kstring_t* s, ssize_t function() fgets_fn, void* fp);
+alias kgets_func2 = c_long function(char*, size_t, void*)*;
+int kgetline2(kstring_t* s, kgets_func2 fgets_fn, void* fp);
 
 /// kstring initializer for structure assignment
 
@@ -102,18 +113,42 @@ int kgetline2(kstring_t* s, ssize_t function() fgets_fn, void* fp);
    or ks_clear() instead.
 */
 
-void ks_initialize(kstring_t* s);
+void ks_initialize(kstring_t* s)
+{
+    s.l = s.m = 0;
+    s.s = null;
+}
 
 /// Resize a kstring to a given capacity
-int ks_resize(kstring_t* s, size_t size);
+int ks_resize(kstring_t* s, size_t size)
+{
+	if (s.m < size) {
+		char *tmp;
+		kroundup_size_t(size);
+		tmp = cast(char*)realloc(s.s, size);
+		if (!tmp && size)
+		    return -1;
+		s.s = tmp;
+		s.m = size;
+	}
+	return 0;
+}
 
 /// Increase kstring capacity by a given number of bytes
+int ks_expand(kstring_t* s, size_t expansion)
+{
+    size_t new_size = s.l + expansion;
 
-// Overflow check
-int ks_expand(kstring_t* s, size_t expansion);
+    if (new_size < s.l) // Overflow check
+        return -1;
+    return ks_resize(s, new_size);
+}
 
 /// Returns the kstring buffer
-char* ks_str(kstring_t* s);
+char* ks_str(kstring_t* s)
+{
+	return s.s;
+}
 
 /// Returns the kstring buffer, or an empty string if l == 0
 /**
@@ -121,9 +156,15 @@ char* ks_str(kstring_t* s);
  * empty it will return a read-only empty string.  As the returned value
  * may be read-only, the caller should not attempt to modify it.
  */
-const(char)* ks_c_str(kstring_t* s);
+const(char)* ks_c_str(kstring_t* s)
+{
+    return s.l && s.s ? s.s : "";
+}
 
-size_t ks_len(kstring_t* s);
+size_t ks_len(kstring_t* s)
+{
+	return s.l;
+}
 
 /// Reset kstring length to zero
 /**
@@ -131,31 +172,121 @@ size_t ks_len(kstring_t* s);
 
    Example use: kputsn(string, len, ks_clear(s))
 */
-kstring_t* ks_clear(kstring_t* s);
+kstring_t* ks_clear(kstring_t* s)
+{
+    s.l = 0;
+    return s;
+}
 
 // Give ownership of the underlying buffer away to something else (making
 // that something else responsible for freeing it), leaving the kstring_t
 // empty and ready to be used again, or ready to go out of scope without
 // needing  free(str.s)  to prevent a memory leak.
-char* ks_release(kstring_t* s);
+char* ks_release(kstring_t* s)
+{
+	char *ss = s.s;
+	s.l = s.m = 0;
+	s.s = null;
+	return ss;
+}
 
 /// Safely free the underlying buffer in a kstring.
-void ks_free(kstring_t* s);
+void ks_free(kstring_t* s)
+{
+    if (s) {
+        free(s.s);
+        ks_initialize(s);
+    }
+}
 
-int kputsn(const(char)* p, size_t l, kstring_t* s);
+int kputsn(const(char)* p, size_t l, kstring_t* s)
+{
+	size_t new_sz = s.l + l + 2;
+	if (new_sz <= s.l || ks_resize(s, new_sz) < 0)
+		return EOF;
+	memcpy(s.s + s.l, p, l);
+	s.l += l;
+	s.s[s.l] = 0;
+	return cast(int)l;	// no implicit down casting
+}
 
-int kputs(const(char)* p, kstring_t* s);
+int kputs(const(char)* p, kstring_t* s)
+{
+	return kputsn(p, strlen(p), s);
+}
 
-int kputc(int c, kstring_t* s);
+int kputc(int c, kstring_t* s)
+{
+	if (ks_resize(s, s.l + 2) < 0)
+		return EOF;
+	s.s[s.l++] = cast(char)c;	// no implicit down casting
+	s.s[s.l] = 0;
+	return cast(ubyte)c;
+}
 
-int kputc_(int c, kstring_t* s);
+int kputc_(int c, kstring_t* s)
+{
+	if (ks_resize(s, s.l + 1) < 0)
+		return EOF;
+	s.s[s.l++] = cast(char)c;	// no implicit down casting
+	return 1;
+}
 
-int kputsn_(const(void)* p, size_t l, kstring_t* s);
+int kputsn_(const(void)* p, size_t l, kstring_t* s)
+{
+	size_t new_sz = s.l + l;
+	if (new_sz < s.l || ks_resize(s, new_sz ? new_sz : 1) < 0)
+		return EOF;
+	memcpy(s.s + s.l, p, l);
+	s.l += l;
+	return cast(int)l;	// no implicit down casting
+}
+
+// htslib 1.10 replaced this function with a higher performance
+// version using BSR/CTLZ intrinsics . this diverges from klib's
+// kstring implementation. other functions may have also changed.
+int kputuw(T)(T x, kstring_t* s){
+	version(LDC){
+		static uint[32] kputuw_num_digits = [
+			10, 10, 10,  9,  9,  9,  8,  8,
+			8,   7,  7,  7,  7,  6,  6,  6,
+			5,   5,  5,  4,  4,  4,  4,  3,
+			3,   3,  2,  2,  2,  1,  1,  1
+		];
+		static uint[32] kputuw_thresholds = [
+			0,        0, 1000000000U, 0,       0, 100000000U,   0,      0,
+			10000000, 0,          0,  0, 1000000,         0,    0, 100000,
+			0,        0,      10000,  0,       0,         0, 1000,      0,
+			0,      100,          0,  0,      10,         0,    0,      0
+		];
+	}else{
+		ulong m;
+	}
+    static string kputuw_dig2r =
+        "00010203040506070809" ~
+        "10111213141516171819" ~
+        "20212223242526272829" ~
+        "30313233343536373839" ~
+        "40414243444546474849" ~
+        "50515253545556575859" ~
+        "60616263646566676869" ~
+        "70717273747576777879" ~
+        "80818283848586878889" ~
+        "90919293949596979899";
+    uint l, j;
+    char * cp;
 
 // Trivial case - also prevents __builtin_clz(0), which is undefined
+    if (x < 10) {
+        if (ks_resize(s, s.l + 2) < 0)
+            return EOF;
+        s.s[s.l++] = cast(char)('0'+x);
+        s.s[s.l] = 0;
+        return 0;
+    }
 
 // Find out how many digits are to be printed.
-
+	version(LDC){
 /*
  * Table method - should be quick if clz can be done in hardware.
  * Find the most significant bit of the value to print and look
@@ -164,23 +295,82 @@ int kputsn_(const(void)* p, size_t l, kstring_t* s);
  * length could vary for a given number of bits (for example,
  * a four bit number could be between 8 and 15).
  */
+		import ldc.intrinsics;
 
+		// ldc version of __builtin_clz
+		l = llvm_ctlz(x,true);
+		l = kputuw_num_digits[l] - (x < kputuw_thresholds[l]);
+	}else{
 // Fallback for when clz is not available
+		m = 1;
+		l = 0;
+		do {
+			l++;
+			m *= 10;
+		} while (x >= m);
+	}
+
+    if (ks_resize(s, s.l + l + 2) < 0)
+        return EOF;
 
 // Add digits two at a time
+    j = l;
+    cp = s.s + s.l;
+    while (x >= 10) {
+        const char *d = &kputuw_dig2r[2*(x%100)];
+        x /= 100;
+        memcpy(&cp[j-=2], d, 2);
+    }
 
 // Last one (if necessary).  We know that x < 10 by now.
-int kputuw(uint x, kstring_t* s);
+    if (j == 1)
+        cp[0] = cast(char)(x + '0');
 
-int kputw(int c, kstring_t* s);
+    s.l += l;
+    s.s[s.l] = 0;
+    return 0;
+}
 
-int kputll(long c, kstring_t* s);
+int kputw(int c, kstring_t* s)
+{
+    uint x = c;
+    if (c < 0) {
+        x = -x;
+        if (ks_resize(s, s.l + 3) < 0)
+            return EOF;
+        s.s[s.l++] = '-';
+    }
 
-int kputl(c_long c, kstring_t* s);
+    return kputuw(x, s);
+}
+
+int kputll(long c, kstring_t* s)
+{
+	char[32] buf;
+	int i, l = 0;
+	ulong x = c;
+	if (c < 0) x = -x;
+	do { buf[l++] = x%10 + '0'; x /= 10; } while (x > 0);
+	if (c < 0) buf[l++] = '-';
+	if (ks_resize(s, s.l + l + 2) < 0)
+		return EOF;
+	for (i = l - 1; i >= 0; --i) s.s[s.l++] = buf[i];
+	s.s[s.l] = 0;
+	return 0;
+}
+
+int kputl(c_long c, kstring_t* s) {
+    return kputll(c, s);
+}
 
 /*
  * Returns 's' split by delimiter, with *n being the number of components;
  *         NULL on failure.
  */
-int* ksplit(kstring_t* s, int delimiter, int* n);
-
+int* ksplit(kstring_t* s, int delimiter, int* n)
+{
+	int max = 0;
+	int* offsets = null;
+	*n = ksplit_core(s.s, delimiter, &max, &offsets);
+	return offsets;
+}
