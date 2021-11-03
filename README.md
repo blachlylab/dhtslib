@@ -1,3 +1,5 @@
+![alt text](logo/dhtslib_logo.png "dhtslib")
+
 dhtslib
 =======
 
