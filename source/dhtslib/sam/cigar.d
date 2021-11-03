@@ -6,8 +6,7 @@ module dhtslib.sam.cigar;
 import std.stdio;
 import std.bitmanip : bitfields;
 import std.array : join;
-import std.algorithm : map;
-import std.algorithm.iteration : each;
+import std.algorithm : map, each, sum;
 import std.conv : to;
 import std.range : array;
 import std.traits : isIntegral;
@@ -193,44 +192,36 @@ union CigarOp
         this.op = op;
         this.length = len;
     }
-    /// Credit to Biod for this code below
-    /// https://github.com/biod/BioD from their bam.cigar module
-    /// True iff operation is one of M, =, X, I, S
-    bool isQueryConsuming() @property const nothrow @nogc
-    {
-        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 1) != 0;
-    }
-
-    /// True iff operation is one of M, =, X, D, N
-    bool isReferenceConsuming() @property const nothrow @nogc
-    {
-        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 2) != 0;
-    }
-
-    /// True iff operation is one of M, =, X
-    bool isMatchOrMismatch() @property const nothrow @nogc
-    {
-        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 3) == 3;
-    }
-
-    /// True iff operation is one of 'S', 'H'
-    bool isClipping() @property const nothrow @nogc
-    {
-        return ((raw & 0xF) >> 1) == 2; // 4 or 5
-    }
-
-    deprecated("Use camelCase names instead")
-    alias is_query_consuming = isQueryConsuming;
-    deprecated("Use camelCase names instead")
-    alias is_reference_consuming = isReferenceConsuming;
-    deprecated("Use camelCase names instead")
-    alias is_match_or_mismatch = isMatchOrMismatch;
-    deprecated("Use camelCase names instead")
-    alias is_clipping = isClipping;
 
     string toString(){
         return this.length.to!string ~ CIGAR_STR[this.op];
     }
+}
+
+/// Credit to Biod for this code below
+/// https://github.com/biod/BioD from their bam.cigar module
+/// True iff operation is one of M, =, X, I, S
+bool isQueryConsuming(T)(T op) nothrow @nogc
+{
+    return ((CIGAR_TYPE >> ((op & 0xF) * 2)) & 1) != 0;
+}
+
+/// True iff operation is one of M, =, X, D, N
+bool isReferenceConsuming(T)(T op)nothrow @nogc
+{
+    return ((CIGAR_TYPE >> ((op & 0xF) * 2)) & 2) != 0;
+}
+
+/// True iff operation is one of M, =, X
+bool isMatchOrMismatch(T)(T op) nothrow @nogc
+{
+    return ((CIGAR_TYPE >> ((op & 0xF) * 2)) & 3) == 3;
+}
+
+/// True iff operation is one of 'S', 'H'
+bool isClipping(T)(T op)nothrow @nogc
+{
+    return ((op & 0xF) >> 1) == 2; // 4 or 5
 }
 
 /**
@@ -322,8 +313,8 @@ debug (dhtslib_unittest) unittest
     auto cig = cigarFromString(c);
     hts_log_info(__FUNCTION__, "Cigar:" ~ cig.toString());
     assert(cig.toString() == c);
-    assert(cig.ops[0].is_query_consuming && cig.ops[0].is_reference_consuming);
-    assert(!cig.ops[1].is_query_consuming && cig.ops[1].is_reference_consuming);
+    assert(cig.ops[0].op.isQueryConsuming && cig.ops[0].op.isReferenceConsuming);
+    assert(!cig.ops[1].op.isQueryConsuming && cig.ops[1].op.isReferenceConsuming);
 }
 
 /// Range-based iteration of a Cigar string
@@ -334,13 +325,15 @@ debug (dhtslib_unittest) unittest
 struct CigarItr
 {
     Cigar cigar;
+    CigarOp[] ops;
     CigarOp current;
 
     this(Cigar c)
     {
         // Copy the cigar
-        cigar = c.dup;
-        current = cigar[0];
+        cigar = c;
+        ops = cigar[];
+        current = ops[0];
         current.length = current.length - 1;
     }
 
@@ -354,12 +347,12 @@ struct CigarItr
         // import std.stdio;
         // writeln(current);
         // writeln(cigar);
-        if(cigar.length == 1 && current.length == 0)
-            cigar.length = 0;
+        if(ops.length == 1 && current.length == 0)
+            ops = [];
         else if (current.length == 0)
         {
-            cigar = cigar[1 .. $];
-            current = cigar[0];
+            ops = ops[1 .. $];
+            current = ops[0];
             current.length = current.length - 1;
         }
         else if (current.length != 0)
@@ -368,7 +361,7 @@ struct CigarItr
 
     bool empty()
     {
-        return cigar.length == 0;
+        return ops.length == 0;
     }
 }
 
