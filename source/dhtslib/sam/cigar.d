@@ -39,7 +39,7 @@ enum Ops
 /**
 string to aid in conversion from CigarOp to string
 */
-string CIGAR_STR = "MIDNSHP=XB";
+static immutable string CIGAR_STR = "MIDNSHP=XB";
 
 /// Credit to Biod for this code below
 /// https://github.com/biod/BioD from their bam.cigar module
@@ -101,7 +101,8 @@ union CigarOp
         this.length = len;
     }
 
-    string toString(){
+    string toString() const
+    {
         return this.length.to!string ~ CIGAR_STR[this.op];
     }
 }
@@ -149,9 +150,9 @@ struct Cigar
     }
 
     /// Format Cigar struct as CIGAR string in accordance with SAM spec
-    string toString()
+    string toString() const
     {
-        return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
+        return ops.map!(x => x.toString).array.join;
     }
 
     /// get length of cigar
