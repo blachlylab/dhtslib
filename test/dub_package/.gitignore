@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/dub_package
+dub_package.so
+dub_package.dylib
+dub_package.dll
+dub_package.a
+dub_package.lib
+dub_package-test-*
+*.exe
+*.o
+*.obj
+*.lst
