@@ -68,6 +68,13 @@ struct IndexedFastaFile {
         }
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.faidx = faidx;
+    }
+
     /// Enable BGZF cacheing (size: bytes)
     void setCacheSize(int size)
     {

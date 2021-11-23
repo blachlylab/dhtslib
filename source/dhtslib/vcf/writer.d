@@ -62,6 +62,15 @@ struct VCFWriter
         else static if(is(T == bcf_hdr_t*)) { this.vcfhdr = VCFHeader( bcf_hdr_dup(other) ); }
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.fp = fp;
+        this.vcfhdr = vcfhdr;
+        this.rows = rows;
+    }
+
     invariant
     {
         assert(this.vcfhdr.hdr != null);

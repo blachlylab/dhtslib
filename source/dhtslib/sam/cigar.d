@@ -143,6 +143,14 @@ struct Cigar
         this.ops = ops;
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this) nothrow
+    {
+        this.b = b;
+        this.ops = ops;   
+    }
+
     /// null CIGAR -- don't read!
     bool is_null()
     {

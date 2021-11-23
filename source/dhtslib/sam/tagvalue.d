@@ -78,6 +78,14 @@ struct TagValue
         data = bam_aux_get(b, tag);
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.data = data;
+        this.b = b;   
+    }
+
     /// check if empty/exists/null
     @property
     bool exists()
