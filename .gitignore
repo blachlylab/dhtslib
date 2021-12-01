@@ -21,12 +21,17 @@ bug_minimal
 sam_iter
 csam_iter
 dhtslib-test-unittest
+coordinates/coordinates-test-unittest
+dhtslib-test-unittest-safety
+chunkby
+cigartest
 
 # DUB
 .dub
 docs.json
 __dummy.html
 docs/
+dub.selections.json
 
 # Code coverage
 *.lst
