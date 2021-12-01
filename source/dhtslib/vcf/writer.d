@@ -5,12 +5,14 @@ import std.string: fromStringz, toStringz;
 import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 import std.conv: to, ConvException;
 import std.format: format;
+import std.parallelism : totalCPUs;
 
 import dhtslib.memory;
 import dhtslib.vcf;
 import htslib.vcf;
 import htslib.hts_log;
 import htslib.hfile;
+import htslib.hts;
 
 alias BCFWriter = VCFWriter;
 
@@ -57,7 +59,7 @@ struct VCFWriter
         this(f, hdr, t);
     }
     /// setup and copy a header from another BCF/VCF as template
-    this(T, H)(T f, H header, VCFWriterTypes t=VCFWriterTypes.DEDUCE)
+    this(T, H)(T f, H header, VCFWriterTypes t=VCFWriterTypes.DEDUCE, int extra_threads = -1)
     if((is(H == VCFHeader) || is(H == bcf_hdr_t*)) && (is(T == string) || is(T == File)))
     {
 
@@ -104,6 +106,18 @@ struct VCFWriter
             this.fp = hts_hopen(this.f, this.fn, mode.ptr);
         }
         else assert(0);
+
+        if (extra_threads == -1)
+        {
+            if ( totalCPUs > 1)
+            {
+                hts_log_info(__FUNCTION__,
+                        format("%d CPU cores detected; enabling multithreading", totalCPUs));
+                // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
+                // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
+                hts_set_threads(this.fp, totalCPUs);
+            }
+        }
 
         static if(is(H == VCFHeader*)) { this.vcfhdr      = VCFHeader( bcf_hdr_dup(header.hdr) ); }
         else static if(is(H == VCFHeader)) { this.vcfhdr      = VCFHeader( bcf_hdr_dup(header.hdr)); }
@@ -423,7 +437,7 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.vcf", vcf.vcfhdr, VCFWriterTypes.CVCF);
+        auto vcfw = VCFWriter("/tmp/test_vcf.cvcf", vcf.vcfhdr, VCFWriterTypes.CVCF);
         
         vcfw.writeHeader;
         foreach(rec;vcf) {
@@ -432,9 +446,9 @@ debug(dhtslib_unittest) unittest
         destroy(vcfw);
     }
     {
-        auto vcf = VCFReader("/tmp/test_vcf.vcf");
+        auto vcf = VCFReader("/tmp/test_vcf.cvcf");
         assert(vcf.count == 14);
-        vcf = VCFReader("/tmp/test_vcf.vcf");
+        vcf = VCFReader("/tmp/test_vcf.cvcf");
 
         VCFRecord rec = vcf.front;
         assert(rec.chrom == "1");
@@ -447,7 +461,7 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.bcf", vcf.vcfhdr, VCFWriterTypes.UBCF);
+        auto vcfw = VCFWriter("/tmp/test_vcf.ubcf", vcf.vcfhdr, VCFWriterTypes.UBCF);
         
         vcfw.writeHeader;
         foreach(rec;vcf) {
@@ -456,9 +470,9 @@ debug(dhtslib_unittest) unittest
         destroy(vcfw);
     }
     {
-        auto vcf = VCFReader("/tmp/test_vcf.bcf");
+        auto vcf = VCFReader("/tmp/test_vcf.ubcf");
         assert(vcf.count == 14);
-        vcf = VCFReader("/tmp/test_vcf.bcf");
+        vcf = VCFReader("/tmp/test_vcf.ubcf");
         
         VCFRecord rec = vcf.front;
         assert(rec.chrom == "1");
@@ -471,7 +485,7 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.vcf.gz", vcf.vcfhdr, VCFWriterTypes.VCF);
+        auto vcfw = VCFWriter("/tmp/test_vcf.txt", vcf.vcfhdr, VCFWriterTypes.VCF);
         
         vcfw.writeHeader;
         foreach(rec;vcf) {
@@ -480,9 +494,9 @@ debug(dhtslib_unittest) unittest
         destroy(vcfw);
     }
     {
-        auto vcf = VCFReader("/tmp/test_vcf.vcf.gz");
+        auto vcf = VCFReader("/tmp/test_vcf.txt");
         assert(vcf.count == 14);
-        vcf = VCFReader("/tmp/test_vcf.vcf.gz");
+        vcf = VCFReader("/tmp/test_vcf.txt");
         
         VCFRecord rec = vcf.front;
         assert(rec.chrom == "1");
