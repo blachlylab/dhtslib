@@ -292,7 +292,7 @@ struct FormatField
             auto ptr = this.data.ptr;
             for(auto i=0; i < nSamples; i++)
             {
-                ret ~= (cast(char *)ptr)[i*size .. (i+1) * size].idup;
+                ret ~= fromStringz((cast(char *)ptr)[i*size .. (i+1) * size]).idup;
             }
         }else{
             if(!(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType)))
