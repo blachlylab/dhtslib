@@ -17,7 +17,7 @@ import std.format: format;
 import std.range;
 import std.string: fromStringz, toStringz;
 import std.utf : toUTFz;
-import std.algorithm : map;
+import std.algorithm : map, filter, count;
 import std.array : array;
 import std.traits;
 import std.meta : staticIndexOf;
@@ -304,6 +304,140 @@ struct FormatField
         }
         return ret.chunks(this.n);
 
+    }
+}
+
+/// Represents individual GT values as encoded in BCF. 
+/// This is described in the VCF 4.2 spec section 6.3.3.
+/// In summary it can be an int, short, or byte and 
+/// encodes an allele value and a phased flag
+/// e.g (allele + 1) << 1 | phased
+union GT(T) 
+{
+    import std.bitmanip : bitfields;
+    T raw;
+    mixin(bitfields!(
+        bool, "phased", 1,
+        T, "allele", (T.sizeof * 8) - 1,
+        ));
+    
+    /// get allele value
+    auto getAllele() const {
+        return this.allele - 1;
+    }
+
+    /// set allele value
+    void setAllele(int val) {
+        this.allele = cast(T)(val + 1);
+    }
+
+    /// check if value is missing
+    bool isMissing() const {
+        return this.allele == 0;
+    }
+
+    /// set value as missing
+    void setMissing() {
+        this.allele = T(0);
+    }
+
+    /// check if value is padding
+    bool isPadding() {
+        static if (is(T == byte)) {
+            return cast(bool)((this.raw & 0xFE) == 0x80);
+        } else static if (is(T == short)) {
+            return cast(bool)((this.raw & 0xFFFE) == 0x8000);
+        } else static if (is(T == int)) {
+            return cast(bool)((this.raw & 0xFFFFFFFE) == 0x80000000);
+        }
+    }
+
+}
+
+/// Struct to represent VCF/BCF genotype data
+struct Genotype
+{
+    /// Type of underlying format data
+    BcfRecordType type;
+    /// Array of encoded genotypes
+    void[] data;
+
+    /// VCFRecord refct
+    Bcf1 line;
+
+    /// ctor from FormatField
+    this(FormatField gt, ulong sampleIdx)
+    {
+        this.line = gt.line;
+        this.type = gt.type;
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                this.data = gt.to!byte()[sampleIdx];
+                break;
+            case BcfRecordType.Int16:
+                this.data = gt.to!short()[sampleIdx];
+                break;
+            case BcfRecordType.Int32:
+                this.data = gt.to!int()[sampleIdx];
+                break;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
+    }
+
+    /// get genotype ploidy
+    auto getPloidy() {
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                return (cast(GT!byte[])(this.data)).filter!(x=>!x.isPadding).count;
+            case BcfRecordType.Int16:
+                return (cast(GT!short[])(this.data)).filter!(x=>!x.isPadding).count;
+            case BcfRecordType.Int32:
+                return (cast(GT!int[])(this.data)).filter!(x=>!x.isPadding).count;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
+    }
+    /// mixin for genotype printing
+    auto toString(T)() const {
+        string ret;
+        foreach(i, gt; cast(GT!T[]) this.data) {
+            if(i) {
+                ret ~= ['/','|'][gt.isMissing];
+            }
+            if(gt.isPadding) {
+                ret = ret[0..$-1];
+                break;
+            }
+            if (gt.getAllele() == -1) {
+                ret ~= '.';
+            } else { 
+                ret ~= gt.getAllele().to!string;
+            }
+        }
+        return ret;
+    }
+    /// get string representation
+    auto toString() const {
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                return this.toString!byte;
+            case BcfRecordType.Int16:
+                return this.toString!short;
+            case BcfRecordType.Int32:
+                return this.toString!int;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
     }
 }
 
@@ -995,6 +1129,33 @@ struct VCFRecord
         return fmtMap;
     }
 
+    Genotype getGenotype(int sampleIdx) {
+        Genotype ret;
+        if("GT" in this.getFormats() && sampleIdx < this.vcfheader.nsamples) {
+            ret = Genotype(this.getFormats["GT"], sampleIdx);
+        }else if (sampleIdx >= this.vcfheader.nsamples) {
+            hts_log_error(__FUNCTION__, "sample idx is larger than nsamples");
+        }else{
+            hts_log_error(__FUNCTION__, "GT doesn't exist in FORMAT fields");
+        }
+        return ret;
+    }
+
+    Genotype[] getGenotypes() {
+        Genotype[] ret;
+        FormatField gt;
+        if("GT" in this.getFormats()) {
+            gt = this.getFormats["GT"];
+        }else{
+            hts_log_error(__FUNCTION__, "GT doesn't exist in FORMAT fields");
+        }
+        for(auto i=0; i < this.vcfheader.nsamples; i++)
+        {
+            ret ~= Genotype(gt, i);
+        }
+        return ret;
+    }
+
     /// Return a string representation of the VCFRecord (i.e. as would appear in .vcf)
     ///
     /// As a bonus, there is a kstring_t memory leak
@@ -1325,6 +1486,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.getInfos["DP4"].to!string == "");
 
     assert(rec.getFormats["GT"].to!int.array == [[2, 4], [2, 4]]);
+    assert(rec.getGenotypes.map!(x => x.toString).array == ["0/1", "0/1"]);
     
 
     vcf.popFront;
@@ -1333,6 +1495,10 @@ debug(dhtslib_unittest) unittest
     auto fmts = rec.getFormats;
     auto sam = vcf.vcfhdr.getSampleId("A");
     assert(fmts["GT"].to!int[sam] == [2, 4]);
+    assert(rec.getGenotype(sam).toString == "0/1");
+    assert(rec.getGenotype(sam).getPloidy == 2);
     sam = vcf.vcfhdr.getSampleId("B");
     assert(fmts["GT"].to!int[sam] == [6, -127]);
+    assert(rec.getGenotype(sam).toString == "2");
+    assert(rec.getGenotype(sam).getPloidy == 1);
 }
