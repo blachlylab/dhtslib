@@ -1190,7 +1190,7 @@ unittest
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
 
 
-    auto vw = VCFWriter("/dev/null");
+    auto vw = VCFWriter("/dev/null", VCFWriterTypes.VCF);
 
     vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
