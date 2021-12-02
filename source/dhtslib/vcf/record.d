@@ -302,8 +302,10 @@ struct FormatField
             }
             ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
         }
-        return ret.chunks(this.n);
-
+        static if(isSomeString!T)
+            return ret.chunks(1);
+        else 
+            return ret.chunks(this.n);
     }
 }
 
