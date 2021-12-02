@@ -260,6 +260,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.allelesAsArray == ["C","T"]);
     assert(approxEqual(rec.qual, 59.2));
     assert(rec.filter == "PASS");
+    assert(vcf.vcfhdr.getSamples == ["A", "B"]);
 
     vcf.popFront;
     rec = vcf.front;

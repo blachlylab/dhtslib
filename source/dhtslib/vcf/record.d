@@ -97,7 +97,7 @@ struct InfoField
         static if(isIntegral!T){
             /// if we select the correct type just slice and return
             if(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType))
-                return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+                return (cast(T *)this.data.ptr)[0 .. this.len];
             /// if we select type that is too small log error and return
             if(RecordTypeSizes[this.type] > T.sizeof)
             {
@@ -111,13 +111,13 @@ struct InfoField
                     ret = ((cast(byte *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
                 case BcfRecordType.Int16:
-                    ret = ((cast(short *)this.data.ptr)[0 .. short.sizeof * this.len]).to!(T[]);
+                    ret = ((cast(short *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
                 case BcfRecordType.Int32:
-                    ret = ((cast(int *)this.data.ptr)[0 .. int.sizeof * this.len]).to!(T[]);
+                    ret = ((cast(int *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
                 case BcfRecordType.Int64:
-                    ret = ((cast(long *)this.data.ptr)[0 .. long.sizeof * this.len]).to!(T[]);
+                    ret = ((cast(long *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
                 default:
                     hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(this.type, T.stringof));
@@ -131,7 +131,7 @@ struct InfoField
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return [];
             }
-            return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+            return (cast(T *)this.data.ptr)[0 .. this.len];
         }
     }
 
@@ -1194,6 +1194,7 @@ unittest
 
     vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
+    vw.addHeaderLineKV("INFO", "<ID=DP2,Number=2,Type=Float,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
     vw.vcfhdr.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
     vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
@@ -1373,6 +1374,9 @@ unittest
 
     rr.addInfo("AF",0.5);
     assert(rr.getInfos["AF"].to!float == 0.5f);
+
+    rr.addInfo("DP2",[0.5f, 0.4f]);
+    assert(rr.getInfos["DP2"].to!(float[]) == [0.5f, 0.4f]);
     
     rr.removeInfo("AF");
 
@@ -1385,7 +1389,7 @@ unittest
     writeln(rr.getFormats["CH"].to!string);
     assert(rr.getFormats["CH"].to!string[0][0] == "test");
 
-    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11\tCH\ttest\n");
+    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;DP2=0.5,0.4\tCH\ttest\n");
 
     assert(rr.coordinates == ZBHO(17329,17330));
     vw.writeRecord(*r);
@@ -1472,6 +1476,19 @@ debug(dhtslib_unittest) unittest
     rec.addInfo("DP4", [2, 2, 3, 4]);
     assert(rec.getInfos["DP4"].to!(int[]) == [2, 2, 3, 4]);
 
+    rec.addInfo("DP4", [128, 128, 128, 128]);
+    assert(rec.getInfos["DP4"].to!(int[]) == [128, 128, 128, 128]);
+    assert(rec.getInfos["DP4"].to!(byte[]) == []);
+    assert(rec.getInfos["DP4"].to!(short[]) == [128, 128, 128, 128]);
+    assert(rec.getInfos["DP4"].to!(long[]) == [128, 128, 128, 128]);
+
+    rec.addInfo("DP4", [32768, 32768, 32768, 32768]);
+    assert(rec.getInfos["DP4"].to!(int[]) == [32768, 32768, 32768, 32768]);
+    assert(rec.getInfos["DP4"].to!(byte[]) == []);
+    assert(rec.getInfos["DP4"].to!(short[]) == []);
+    assert(rec.getInfos["DP4"].to!(long[]) == [32768, 32768, 32768, 32768]);
+    
+
     assert(rec.getFormats["GQ"].to!int.array == [[409], [409]]);
 
     rec.addFormat("GQ", [32768,32768]);
@@ -1479,6 +1496,8 @@ debug(dhtslib_unittest) unittest
     assert(rec.getFormats["GQ"].to!byte.array == []);
     assert(rec.getFormats["GQ"].to!short.array == []);
     assert(rec.getFormats["GQ"].to!int[0][0] == 32768);
+
+    assert(rec.getFormats["GL"].to!float[1][1] == -5.0);
     
 
     assert(rec.getInfos["STR"].to!string == "test");
