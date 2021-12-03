@@ -414,9 +414,8 @@ struct Genotype
     auto toString(T)() const {
         string ret;
         foreach(i, gt; cast(GT!T[]) this.data) {
-            if(i) {
-                ret ~= ['/','|'][gt.isMissing];
-            }
+            if(i)
+                ret ~= ['/','|'][gt.phased];
             if(gt.isPadding) {
                 ret = ret[0..$-1];
                 break;
