@@ -57,6 +57,15 @@ struct TabixIndexedFile {
                 // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
                 hts_set_threads(this.fp, totalCPUs);
             }
+        } else if (extra_threads > 0)
+        {
+            if ((extra_threads + 1) > totalCPUs)
+                hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
+            hts_set_threads(this.fp, extra_threads);
+        }
+        else if (extra_threads == 0)
+        {
+            hts_log_debug(__FUNCTION__, "Zero extra threads requested");
         }
 
         //enum htsExactFormat format = hts_get_format(fp)->format;
