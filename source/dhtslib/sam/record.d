@@ -444,7 +444,11 @@ struct SAMRecord
             case 0:
                 return;
             default:
-                throw new Exception("Something went wrong adding the bam tag.");
+                // bam_aux_update_int was failing non-deterministically 
+                // No longer throw but call recursively
+                // TODO: where is this bug coming from
+                hts_log_info(__FUNCTION__, "Undefined issue adding/updating bam tag. Trying again...");
+                return opIndexAssign!T(value, index);
         }
     }
 
