@@ -468,6 +468,11 @@ debug(dhtslib_unittest) unittest
         f.writeHeader;
         f.write(read);
 
+        f = HtslibFile("/tmp/htslibfile.test.sam.bgz", HtslibFileWriteMode.BgzippedSam);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+
     }
     {
 
@@ -490,5 +495,74 @@ debug(dhtslib_unittest) unittest
         h = f.loadHeader!BamHdr;
         read = f.readRecord!Bam1();
         assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+
+        f = HtslibFile("/tmp/htslibfile.test.sam.bgz");
+        h = f.loadHeader!BamHdr;
+        read = f.readRecord!Bam1();
+        assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+    }
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.path:buildPath,dirName;
+    auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
+    {
+        auto f = HtslibFile(fn);
+        auto h = f.loadHeader!BcfHdr;
+        auto read = f.readRecord!Bcf1();
+
+        f = HtslibFile("/tmp/htslibfile.test.vcf", HtslibFileWriteMode.Vcf);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+        
+        f = HtslibFile("/tmp/htslibfile.test.bcf", HtslibFileWriteMode.Bcf);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+
+        f = HtslibFile("/tmp/htslibfile.test.ubcf", HtslibFileWriteMode.UncompressedBcf);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+
+        f = HtslibFile("/tmp/htslibfile.test.vcf.gz", HtslibFileWriteMode.GzippedVcf);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+
+        f = HtslibFile("/tmp/htslibfile.test.vcf.bgz", HtslibFileWriteMode.BgzippedVcf);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+
+    }
+    {
+
+        auto f = HtslibFile("/tmp/htslibfile.test.vcf");
+        auto h = f.loadHeader!BcfHdr;
+        auto read = f.readRecord!Bcf1();
+        assert(read.pos == 3000149);
+        
+        f = HtslibFile("/tmp/htslibfile.test.bcf");
+        h = f.loadHeader!BcfHdr;
+        read = f.readRecord!Bcf1();
+        assert(read.pos == 3000149);
+
+        f = HtslibFile("/tmp/htslibfile.test.ubcf");
+        h = f.loadHeader!BcfHdr;
+        read = f.readRecord!Bcf1();
+        assert(read.pos == 3000149);
+
+        f = HtslibFile("/tmp/htslibfile.test.vcf.gz");
+        h = f.loadHeader!BcfHdr;
+        read = f.readRecord!Bcf1();
+        assert(read.pos == 3000149);
+
+        f = HtslibFile("/tmp/htslibfile.test.vcf.bgz");
+        h = f.loadHeader!BcfHdr;
+        read = f.readRecord!Bcf1();
+        assert(read.pos == 3000149);
     }
 }
