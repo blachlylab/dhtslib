@@ -1,25 +1,40 @@
-module dhtslib.file.Iterator;
+module dhtslib.file.iterator;
 
 import core.stdc.stdlib;
 
 import dhtslib.memory;
 import dhtslib.file.file;
-import htslib.hts;
+import dhtslib.util;
+import htslib;
 
-struct HtslibIterator(T)
-if(is(T == Bam1) || is(T == Bcf1) || is(T == Tbx))
+struct HtslibIterator(T, bool is_tbx = false)
+if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
 {
     HtslibFile f;
     HtsItr itr;
     T rec;
+    private bool is_itr;
     private bool initialized;
     private int r;
+    this(HtslibFile f)
+    {
+        this.f = f;
+        this.empty;
+        static if(is(T == Bam1)){
+            rec = Bam1(bam_init1);
+        }else static if(is(T == BcfHdr)){
+            rec = Bcf1(bcf_init);
+        }else static if(is(T == Kstring)){
+            rec = Kstring(initKstring);
+            ks_initialize(rec);
+        }
+    }
 
     this(HtslibFile f, HtsItr itr)
     {
-        this.f = f;
+        this.is_itr = true;
         this.itr = itr;
-        this.empty;
+        this(f);
     }
 
     HtslibIterator dup()
@@ -52,8 +67,25 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Tbx))
         /// initialize and copy off list
         newHtsItr.off = cast(hts_pair64_max_t *) malloc(itr.n_off * hts_pair64_max_t.sizeof);
         newHtsItr.off[0 .. newHtsItr.n_off] = itr.off[0 .. itr.n_off];
-        auto newItr = HtslibIterator(this.f, HtsItr(newHtsItr));
-        
+
+        /// Create new HtslibIterator
+        auto newItr = HtslibIterator(this.f.dup, HtsItr(newHtsItr));
+
+        /// set private values
+        newItr.r = this.r;
+        newItr.initialized = this.initialized;
+
+        /// duplicate current record
+        static if(is(T == Bam1)){
+            newItr.rec = Bam1(bam_dup1(this.rec));
+        }else static if(is(T == Bcf1)){
+            newItr.rec = Bcf1(bcf_dup(this.rec));
+        }else static if(is(T == Kstring)){
+            auto ks = Kstring(initKstring);
+            ks_initialize(ks);
+            kputs(this.rec.s, ks);
+            newItr.rec = ks;
+        }
         return newItr;
     }
 
@@ -64,10 +96,19 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Tbx))
 
     void popFront()
     {
-        if (itr.multi)
-            this.r = hts_itr_multi_next(f.fp, itr, rec.getRef);
-        else
-            this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.fp);
+        if(!is_itr){
+            this.f.readRecord!T();
+        }else{
+            if (itr.multi)
+                this.r = hts_itr_multi_next(f.fp, itr, rec.getRef);
+            else{
+                static if(is_tbx)
+                    this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.tbx);
+                else 
+                    this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.fp);
+            }
+        }
+        
     }
 
     /// InputRange interface
