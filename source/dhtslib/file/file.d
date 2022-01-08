@@ -87,7 +87,7 @@ struct HtslibFile
     /// just use kstring
     Kstring fn;
 
-    const char[] mode;
+    char[] mode;
 
     /// SAM/BAM/CRAM index 
     HtsIdx idx;
@@ -120,7 +120,7 @@ struct HtslibFile
 
     /// File or string ctor with mode
     this(T1, T2)(T1 f, T2 mode)
-    if ((is(T == string) || is(T == File)) && isSomeString!T2)
+    if ((is(T1 == string) || is(T1 == File)) && (isSomeString!T2 || is(T2 == HtslibFileWriteMode)))
     {
         this.mode = mode.dup ~ '\0';
         // open file
@@ -149,7 +149,7 @@ struct HtslibFile
     HtslibFile dup()
     {
         auto filename = fromStringz(this.fn.s).idup;
-        auto newFile = HtslibFile(filename, this.mode.dup);
+        auto newFile = HtslibFile(filename, this.mode);
         return newFile;
     }
 
@@ -198,15 +198,16 @@ struct HtslibFile
         else static assert(0);
     }
 
-    void writeHeader(T)()
-    if(is(T == BamHdr) || is(T == BcfHdr))
+    void writeHeader()
     {
+        assert(this.bamHdr.initialized || this.bcfHdr.initialized);
+        assert((this.bamHdr.initialized && this.bamHdr.getRef != null) 
+            || (this.bcfHdr.initialized && this.bcfHdr.getRef != null));
         int err;
-        static if(is(T == BamHdr))
+        if(this.bamHdr.initialized)
             err = sam_hdr_write(this.fp, this.bamHdr);
-        else static if(is(T == BcfHdr))
+        else
             err = bcf_hdr_write(this.fp, this.bcfHdr);
-        else static assert(0);
         if(err < 0) hts_log_error(__FUNCTION__, "Error writing SAM/BAM/VCF/BCF header");
     }
 
@@ -279,6 +280,12 @@ struct HtslibFile
         }else static assert(0);
     }
 
+    auto byRecord(T)()
+    if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
+    {
+        return HtslibIterator!T(this);
+    }
+
     /// Query htsFile with array of regions
     /// returns an HtslibIterator that has type T
     /// requires index and header be loaded first
@@ -335,10 +342,9 @@ struct HtslibFile
     if(isSomeString!T || is(T == Bam1) || is(T == Bcf1) || is(T == Kstring) || is(T == ubyte[]))
     {
         long err;
-        static if(is(T1 == Bam1)){
+        static if(is(T == Bam1)){
             err = sam_write1(this.fp, this.bamHdr, rec);
-        }
-        else static if(is(T1 == Bcf1)){
+        }else static if(is(T == Bcf1)){
             err = bcf_write(this.fp, this.bcfHdr, rec);
         }else static if(isSomeString!T || is(T == ubyte[])){
             if(this.fp.is_bgzf) err = bgzf_write(this.fp.fp.bgzf, rec.ptr, rec.length);
@@ -363,13 +369,13 @@ struct HtslibFile
     {
         long err;
         static if(is(T == Bam1)){
-            assert(this.bamHdr.initialized && this.bamHdr.getRef);
+            assert(this.bamHdr.initialized && this.bamHdr.getRef != null);
             auto b = bam_init1;
             err = sam_read1(this.fp, this.bamHdr, b);
             auto rec = Bam1(b);
         }
         else static if(is(T == Bcf1)){
-            assert(this.bcfHdr.initialized && this.bcfHdr.getRef);
+            assert(this.bcfHdr.initialized && this.bcfHdr.getRef != null);
             auto b = bcf_init;
             err = bcf_read(this.fp, this.bcfHdr, b);
             auto rec = Bcf1(b);
@@ -385,31 +391,51 @@ struct HtslibFile
 
 }
 
-unittest
+debug(dhtslib_unittest) unittest
 {
     {
-        auto f = HtslibFile("/tmp/test.txt", HtslibFileWriteMode.Text);
+        auto f = HtslibFile("/tmp/htslibfile.test.txt", HtslibFileWriteMode.Text);
         f.writeln("hello");
         f.writeln("test");
-    }
-    {
-        auto f = HtslibFile("/tmp/test.txt");
-        assert(f.readln == "hello");
-        assert(f.readln == "test");
-    }
-}
 
-unittest
-{
-    {
-        auto f = HtslibFile("/tmp/test.txt.gz", HtslibFileWriteMode.GzippedText);
+        f = HtslibFile("/tmp/htslibfile.test.txt.gz", HtslibFileWriteMode.GzippedText);
+        f.writeln("hello");
+        f.writeln("test");
+
+        f = HtslibFile("/tmp/htslibfile.test.txt.bgz", HtslibFileWriteMode.BgzippedText);
+        f.writeln("hello");
+        f.writeln("test");
+
+        f = HtslibFile("/tmp/htslibfile.test.txt.9gz", "w9");
         f.writeln("hello");
         f.writeln("test");
     }
     {
-        auto f = HtslibFile("/tmp/test.txt.gz");
-        assert(f.readln == "hello");
-        assert(f.readln == "test");
+        auto f = HtslibFile("/tmp/htslibfile.test.txt");
+        assert(fromStringz(f.readRecord!Kstring.s) == "hello");
+        assert(fromStringz(f.readRecord!Kstring.s) == "test");
+
+        f = HtslibFile("/tmp/htslibfile.test.txt.gz");
+        assert(fromStringz(f.readRecord!Kstring.s) == "hello");
+        assert(fromStringz(f.readRecord!Kstring.s) == "test");
+
+        f = HtslibFile("/tmp/htslibfile.test.txt.bgz");
+        assert(fromStringz(f.readRecord!Kstring.s) == "hello");
+        assert(fromStringz(f.readRecord!Kstring.s) == "test");
+
+        f = HtslibFile("/tmp/htslibfile.test.txt.9gz");
+        assert(fromStringz(f.readRecord!Kstring.s) == "hello");
+        assert(fromStringz(f.readRecord!Kstring.s) == "test");
+
+    }
+    {
+        auto f = HtslibFile("/tmp/htslibfile.test.txt.gz");
+        assert(fromStringz(f.readRecord!Kstring.s) == "hello");
+        assert(fromStringz(f.readRecord!Kstring.s) == "test");
+    }
+    {
+        auto f = HtslibFile("/tmp/htslibfile.test.txt");
+        assert(f.byRecord!Kstring.map!(x=> fromStringz(x.s).idup).array == ["hello", "test"] );
     }
 }
 
@@ -417,9 +443,52 @@ debug(dhtslib_unittest) unittest
 {
     import std.path:buildPath,dirName;
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam");
-    auto f = HtslibFile(fn);
-    f.loadHeader!BamHdr;
+    {
+        auto f = HtslibFile(fn);
+        auto h = f.loadHeader!BamHdr;
+        auto read = f.readRecord!Bam1();
 
-    auto read = f.readRecord();
-    assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+        f = HtslibFile("/tmp/htslibfile.test.sam", HtslibFileWriteMode.Sam);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+        
+        f = HtslibFile("/tmp/htslibfile.test.bam", HtslibFileWriteMode.Bam);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+
+        f = HtslibFile("/tmp/htslibfile.test.ubam", HtslibFileWriteMode.UncompressedBam);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+
+        f = HtslibFile("/tmp/htslibfile.test.sam.gz", HtslibFileWriteMode.GzippedSam);
+        f.setHeader(h);
+        f.writeHeader;
+        f.write(read);
+
+    }
+    {
+
+        auto f = HtslibFile("/tmp/htslibfile.test.sam");
+        auto h = f.loadHeader!BamHdr;
+        auto read = f.readRecord!Bam1();
+        assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+        
+        f = HtslibFile("/tmp/htslibfile.test.bam");
+        h = f.loadHeader!BamHdr;
+        read = f.readRecord!Bam1();
+        assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+
+        f = HtslibFile("/tmp/htslibfile.test.ubam");
+        h = f.loadHeader!BamHdr;
+        read = f.readRecord!Bam1();
+        assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+
+        f = HtslibFile("/tmp/htslibfile.test.sam.gz");
+        h = f.loadHeader!BamHdr;
+        read = f.readRecord!Bam1();
+        assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+    }
 }

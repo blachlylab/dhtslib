@@ -19,7 +19,6 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     this(HtslibFile f)
     {
         this.f = f;
-        this.empty;
         static if(is(T == Bam1)){
             rec = Bam1(bam_init1);
         }else static if(is(T == BcfHdr)){
@@ -28,6 +27,7 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             rec = Kstring(initKstring);
             ks_initialize(rec);
         }
+        this.empty;
     }
 
     this(HtslibFile f, HtsItr itr)
@@ -97,7 +97,16 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     void popFront()
     {
         if(!is_itr){
-            this.f.readRecord!T();
+            static if(is(T == Bam1)){
+                assert(this.f.bamHdr.initialized && this.f.bamHdr.getRef);
+                this.r = sam_read1(this.f.fp, this.f.bamHdr, rec);
+            }
+            else static if(is(T == Bcf1)){
+                assert(this.f.bcfHdr.initialized && this.f.bcfHdr.getRef);
+                this.r = bcf_read(this.f.fp, this.f.bcfHdr, rec);
+            }else static if(is(T == Kstring)){
+                this.r = hts_getline(this.f.fp, cast(int)'\n', rec);
+            }
         }else{
             if (itr.multi)
                 this.r = hts_itr_multi_next(f.fp, itr, rec.getRef);
@@ -119,7 +128,11 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             this.popFront();
             this.initialized = true;
         }
-        assert(this.itr !is null);
-        return (r < 0 || itr.finished) ? true : false;
+        if(!is_itr){
+            return r < 0 ? true : false;
+        }else{
+            assert(this.itr !is null);
+            return (r < 0 || itr.finished) ? true : false;
+        }
     }
 }
