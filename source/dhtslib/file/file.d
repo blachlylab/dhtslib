@@ -4,28 +4,15 @@ import core.stdc.stdio : SEEK_SET;
 
 import std.stdio;
 import std.string : toStringz, fromStringz;
+import std.utf : toUTFz;
 import std.traits : isSomeString;
+import std.algorithm : map;
+import std.array : array;
 
 import dhtslib.memory;
-import dhtslib : SAMHeader, VCFHeader, initKstring;
+import dhtslib.file.iterator;
+import dhtslib : initKstring;
 import htslib;
-
-struct HtslibFileMode
-{
-    char[] openMode;
-    char[] formatMode;
-
-    this(string mode, HtslibFileFormatMode[] formats ...)
-    {
-        openMode = mode.dup;
-        formatMode = cast(char[])formats;
-    }
-
-    char[] toMode()
-    {
-        return openMode ~ formatMode ~ '\0';
-    }
-}
 
 enum HtslibFileFormatMode
 {
@@ -47,6 +34,44 @@ enum HtslibFileFormatMode
 }
 
 
+/** 
+ * Some shortcut mode strings for different file types
+ * As a reminder:
+ *      b  binary format (BAM, BCF, etc) rather than text (SAM, VCF, etc)
+        c  CRAM format
+        g  gzip compressed
+        u  uncompressed
+        z  bgzf compressed
+        [0-9]  zlib compression level
+ */
+enum HtslibFileWriteMode
+{
+    Bam             = "wb",
+    Cram            = "wc",
+    Sam             = "w",
+    UncompressedBam = "wb0",
+    GzippedSam      = "wg",
+    BgzippedSam     = "wz",
+
+    Bcf             = "wb",
+    UncompressedBcf = "wb0",
+    Vcf             = "w",
+    GzippedVcf      = "wg",
+    BgzippedVcf     = "wz",
+
+    Text            = "w",
+    GzippedText     = "wg",
+    BgzippedText    = "wz",
+    
+}
+
+/** 
+ * HtslibFile is an abstraction for htslib's htsFile using dhtslib.memory for reference counting.
+ * 
+ * Ideally this struct and its methods can replace file io across dhtslib through a 
+ * standard interface. It can also centralize the ability to duplicate a file so that 
+ * it can be iterated several times. It pairs with HtslibIterator.
+ */
 
 struct HtslibFile
 {
@@ -67,6 +92,9 @@ struct HtslibFile
     /// SAM/BAM/CRAM index 
     HtsIdx idx;
 
+    BamHdr bamHdr;
+    BcfHdr bcfHdr;
+
     /// Tabix index 
     Tbx tbx;
 
@@ -83,21 +111,18 @@ struct HtslibFile
         return this.fp;
     }
 
+    /// File or string ctor
     this(T)(T f)
     if ((is(T == string) || is(T == File)))
     {
         this(f, "r");
     }
 
+    /// File or string ctor with mode
     this(T1, T2)(T1 f, T2 mode)
-    if ((is(T1 == string) || is(T1 == File)) && 
-        (isSomeString!T2 || is(T2 == HtslibFileMode)))
+    if ((is(T == string) || is(T == File)) && isSomeString!T2)
     {
-        static if(is(T2 == HtslibFileMode)){
-            this.mode = mode.toMode();
-        } else {
-            this.mode = mode.dup;
-        }
+        this.mode = mode.dup ~ '\0';
         // open file
         static if (is(T1 == string))
         {
@@ -120,6 +145,7 @@ struct HtslibFile
         this.idx = HtsIdx(null);
     }
 
+    /// Duplicate the file with the same offset
     HtslibFile dup()
     {
         auto filename = fromStringz(this.fn.s).idup;
@@ -127,17 +153,20 @@ struct HtslibFile
         return newFile;
     }
 
+    /// set extra multithreading
     void setExtraThreads(int extra)
     {
         hts_set_threads(this.fp, extra);
     }
 
+    /// get file offset
     off_t tell()
     {
         if(this.fp.is_bgzf) return bgzf_tell(this.fp.fp.bgzf);
         else return htell(this.fp.fp.hfile);
     }
 
+    /// seek to offset in file
     void seek(long loc)
     {
         long err;
@@ -146,72 +175,182 @@ struct HtslibFile
         if(err < 0) hts_log_error(__FUNCTION__, "Error seeking htsFile");
     }
 
-    auto readHeader(T)()
+    /// Read a SAM/BAM/VCF/BCF header
+    auto loadHeader(T)()
+    if(is(T == BamHdr) || is(T == BcfHdr))
     {
         static if(is(T == BamHdr)){
-            return BamHdr(sam_hdr_read(this.fp));
+            this.bamHdr = BamHdr(sam_hdr_read(this.fp));
+            return this.bamHdr;
         }else static if(is(T == BcfHdr)){
-            return BcfHdr(bcf_hdr_read(this.fp));
-        }else static assert(0);
-        
+            this.bcfHdr = BcfHdr(bcf_hdr_read(this.fp));
+            return this.bcfHdr;
+        }else static assert(0);    
     }
 
-    HtsIdx loadHtsIndex()
+    void setHeader(T)(T hdr)
+    if(is(T == BamHdr) || is(T == BcfHdr))
     {
-        this.idx = HtsIdx(sam_index_load(this.fp, this.fn.s));
+        static if(is(T == BamHdr))
+            this.bamHdr = hdr;
+        else static if(is(T == BcfHdr))
+            this.bcfHdr = hdr;
+        else static assert(0);
+    }
+
+    void writeHeader(T)()
+    if(is(T == BamHdr) || is(T == BcfHdr))
+    {
+        int err;
+        static if(is(T == BamHdr))
+            err = sam_hdr_write(this.fp, this.bamHdr);
+        else static if(is(T == BcfHdr))
+            err = bcf_hdr_write(this.fp, this.bcfHdr);
+        else static assert(0);
+        if(err < 0) hts_log_error(__FUNCTION__, "Error writing SAM/BAM/VCF/BCF header");
+    }
+
+    /// load SAM/BAM index
+    HtsIdx loadHtsIndex(T)()
+    if(is(T == Bam1) || is(T == Bcf1))
+    {
+        // TODO: investigate use of synced_bcf_reader
+        static if(is(T == Bam1))
+            this.idx = HtsIdx(sam_index_load(this.fp, this.fn.s));
+        else static if(is(T == Bcf1))
+            this.idx = HtsIdx(bcf_index_load(this.fp, this.fn.s));
         return this.idx;
     }
 
-    HtsIdx loadHtsIndex(string idxFile)
+    /// load SAM/BAM index from filename
+    HtsIdx loadHtsIndex(T)(string idxFile)
+    if(is(T == Bam1) || is(T == Bcf1))
     {
-        this.idx = HtsIdx(sam_index_load2(this.fp, this.fn.s, toStringz(idxFile)));
+        static if(is(T == Bam1))
+            this.idx = HtsIdx(sam_index_load2(this.fp, this.fn.s, toStringz(idxFile)));
+        else static if(is(T == Bcf1))
+            this.idx = HtsIdx(bcf_index_build2(this.fp, this.fn.s, toStringz(idxFile)));
         return this.idx;
     }
 
+    /// load tabix index
     Tbx loadTabixIndex()
     {
         this.tbx = Tbx(tbx_index_load(this.fn.s));
         return this.tbx;
     }
 
+    /// load tabix index from file
     Tbx loadTabixIndex(string idxFile)
     {
         this.tbx = Tbx(tbx_index_load2(this.fn.s, toStringz(idxFile)));
         return this.tbx;
     }
 
-    HtsItr getItr(int tid, hts_pos_t beg, hts_pos_t end)
+    /// Query htsFile with tid, start, and end
+    /// returns an HtslibIterator that has type T
+    /// requires index be loaded first
+    auto query(T)(int tid, long beg, long end)
+    if(is(T == Bam1) || is(T == Bcf1))
     {
-        return HtsItr(sam_itr_queryi(this.idx, tid, beg, end));
-    }
-
-    void write(T1, T2)(T1 rec, T2 header)
-    {
-        long err;
-        static if(is(T1 == Bam1) && is(T2 == BamHdr)){
-            err = sam_write1(this.fp, header, rec);
-        }
-        else static if(is(T1 == Bcf1) && is(T2 == BcfHdr)){
-            err = bcf_write(this.fp, header, rec);
+        assert(this.idx.getRef != null);
+        static if(is(T == Bam1)){
+            auto itr = HtsItr(sam_itr_queryi(this.idx, tid, beg, end));
+            return HtslibIterator!(Bam1, false)(this, itr);
+        }else static if(is(T == Bcf1)){
+            auto itr = HtsItr(bcf_itr_queryi(this.idx, tid, beg, end));
+            return HtslibIterator!(Bcf1, false)(this, itr);
         }else static assert(0);
-        if(err < 0) hts_log_error(__FUNCTION__, "Error writing BAM/BCF record");
     }
 
+    /// Query htsFile with string region
+    /// returns an HtslibIterator that has type T
+    /// requires index and header be loaded first
+    auto query(T)(string region)
+    if(is(T1 == Bam1) || is(T1 == Bcf1))
+    {
+        assert(this.idx.getRef != null);
+        static if(is(T == Bam1)){
+            auto itr = HtsItr(sam_itr_querys(this.idx, this.bamHdr, toStringz(region)));
+            return HtslibIterator!(Bam1, false)(this, itr);
+        }else static if(is(T == Bcf1)){
+            auto itr = HtsItr(bcf_itr_querys(this.idx, this.bcfHdr, toStringz(region)));
+            return HtslibIterator!(Bcf1, false)(this, itr);
+        }else static assert(0);
+    }
+
+    /// Query htsFile with array of regions
+    /// returns an HtslibIterator that has type T
+    /// requires index and header be loaded first
+    auto query(string[] regions)
+    {
+        auto cQueries = regions.map!(toUTFz!(char *)).array;
+
+        assert(this.idx.getRef != null);
+        auto itr = HtsItr(sam_itr_regarray(this.idx, this.bamHdr, cQueries.ptr, cast(int)regions.length));
+        return HtslibIterator!(Bam1, false)(this, itr);
+    }
+
+    /// Query tabix'd htsFile with tid, start, and end
+    /// returns an HtslibIterator that has type T
+    /// requires tabix be loaded first
+    auto queryTabix(T)(int tid, long beg, long end)
+    if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
+    {
+        assert(this.tbx.initialized && this.tbx.getRef);
+        static if(is(T == Bam1)){
+            auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
+            return HtslibIterator!(Bam1, true)(this, itr);
+        }else static if(is(T == Bcf1)){
+            auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
+            return HtslibIterator!(Bcf1, true)(this, itr);
+        }else static if(is(T == Kstring)){
+            auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
+            return HtslibIterator!(Kstring, true)(this, itr);
+        }static assert(0);
+    }
+
+    /// Query tabix'd htsFile with tid, start, and end
+    /// returns an HtslibIterator that has type T
+    /// requires tabix be loaded first
+    auto queryTabix(T)(string region)
+    if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
+    {
+        assert(this.tbx.initialized && this.tbx.getRef);
+        static if(is(T == Bam1)){
+            auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
+            return HtslibIterator!(Bam1, true)(this, itr);
+        }else static if(is(T == Bcf1)){
+            auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
+            return HtslibIterator!(Bcf1, true)(this, itr);
+        }else static if(is(T == Kstring)){
+            auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
+            return HtslibIterator!(Kstring, true)(this, itr);
+        }static assert(0);
+    }
+
+    /// write SAM/BAM/VCF/BCF record, string, or ubyte data
+    /// requires the header be loaded if writing SAM/BAM/VCF/BCF record
     void write(T)(T rec)
+    if(isSomeString!T || is(T == Bam1) || is(T == Bcf1) || is(T == Kstring) || is(T == ubyte[]))
     {
         long err;
-        static if(is(T == BamHdr)){
-            err = sam_hdr_write(this.fp, rec);
+        static if(is(T1 == Bam1)){
+            err = sam_write1(this.fp, this.bamHdr, rec);
         }
-        else static if(is(T == BcfHdr)){
-            err = bcf_hdr_write(this.fp, rec);
+        else static if(is(T1 == Bcf1)){
+            err = bcf_write(this.fp, this.bcfHdr, rec);
         }else static if(isSomeString!T || is(T == ubyte[])){
             if(this.fp.is_bgzf) err = bgzf_write(this.fp.fp.bgzf, rec.ptr, rec.length);
             else err = hwrite(this.fp.fp.hfile, rec.ptr, rec.length);
+        }else static if(is(T == Kstring)){
+            if(this.fp.is_bgzf) err = bgzf_write(this.fp.fp.bgzf, rec.s, rec.l);
+            else err = hwrite(this.fp.fp.hfile, rec.s, rec.l);
         }else static assert(0);
-        if(err < 0) hts_log_error(__FUNCTION__, "Error writing BamHdr/BcfHdr or string record");
+        if(err < 0) hts_log_error(__FUNCTION__, "Error writing SAM/BAM/VCF/BCF record, string, or ubyte data");
     }
 
+    /// write a string with a newline appended
     void writeln(T)(T rec)
     if(isSomeString!T)
     {
@@ -219,35 +358,29 @@ struct HtslibFile
         write(rec);
     }
 
-    auto readRecord(T)(T header)
+    /// read a BAM/SAM/BCF/VCF record
+    auto readRecord(T)()
     {
         long err;
-        static if(is(T == BamHdr)){
+        static if(is(T == Bam1)){
+            assert(this.bamHdr.initialized && this.bamHdr.getRef);
             auto b = bam_init1;
-            err = sam_read1(this.fp, header, b);
+            err = sam_read1(this.fp, this.bamHdr, b);
             auto rec = Bam1(b);
-
         }
-        else static if(is(T == BcfHdr)){
+        else static if(is(T == Bcf1)){
+            assert(this.bcfHdr.initialized && this.bcfHdr.getRef);
             auto b = bcf_init;
-            err = bcf_read(this.fp, header, b);
+            err = bcf_read(this.fp, this.bcfHdr, b);
             auto rec = Bcf1(b);
+        }else static if(is(T == Kstring)){
+            auto rec = Kstring(initKstring);
+            ks_initialize(rec);
+            err = hts_getline(this.fp, cast(int)'\n', rec);
         }
         if(err < -1) hts_log_error(__FUNCTION__, "Error reading Bam/Bcf record");
         else if(err == -1) eof = true;
         return rec;
-    }
-
-    string readln()
-    {
-        long err;
-        auto ks = Kstring(initKstring);
-        ks_initialize(ks);
-        err = hts_getline(this.fp, cast(int)'\n', ks);
-        if(err < -1) hts_log_error(__FUNCTION__, "Error reading Bam/Bcf record");
-        else if(err == -1) eof = true;
-        auto s = fromStringz(ks.s).idup;
-        return s;
     }
 
 }
@@ -255,7 +388,7 @@ struct HtslibFile
 unittest
 {
     {
-        auto f = HtslibFile("/tmp/test.txt", "wu");
+        auto f = HtslibFile("/tmp/test.txt", HtslibFileWriteMode.Text);
         f.writeln("hello");
         f.writeln("test");
     }
@@ -269,7 +402,7 @@ unittest
 unittest
 {
     {
-        auto f = HtslibFile("/tmp/test.txt.gz", "wg");
+        auto f = HtslibFile("/tmp/test.txt.gz", HtslibFileWriteMode.GzippedText);
         f.writeln("hello");
         f.writeln("test");
     }
@@ -285,8 +418,8 @@ debug(dhtslib_unittest) unittest
     import std.path:buildPath,dirName;
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam");
     auto f = HtslibFile(fn);
-    
-    auto header = f.readHeader!BamHdr();
-    auto read = f.readRecord(header);
+    f.loadHeader!BamHdr;
+
+    auto read = f.readRecord();
     assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
 }
