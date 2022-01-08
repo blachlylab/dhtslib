@@ -175,7 +175,8 @@ struct HtslibFile
         if(err < 0) hts_log_error(__FUNCTION__, "Error seeking htsFile");
     }
 
-    /// Read a SAM/BAM/VCF/BCF header
+    /// Read a SAM/BAM or VCF/BCF header
+    /// returns header and also internally stores it
     auto loadHeader(T)()
     if(is(T == BamHdr) || is(T == BcfHdr))
     {
@@ -188,6 +189,7 @@ struct HtslibFile
         }else static assert(0);    
     }
 
+    /// set header for a HtlsibFile 
     void setHeader(T)(T hdr)
     if(is(T == BamHdr) || is(T == BcfHdr))
     {
@@ -198,9 +200,11 @@ struct HtslibFile
         else static assert(0);
     }
 
+    /// write internally stored header
     void writeHeader()
     {
         assert(this.bamHdr.initialized || this.bcfHdr.initialized);
+        assert(!(this.bamHdr.initialized && this.bcfHdr.initialized));
         assert((this.bamHdr.initialized && this.bamHdr.getRef != null) 
             || (this.bcfHdr.initialized && this.bcfHdr.getRef != null));
         int err;
@@ -211,25 +215,22 @@ struct HtslibFile
         if(err < 0) hts_log_error(__FUNCTION__, "Error writing SAM/BAM/VCF/BCF header");
     }
 
-    /// load SAM/BAM index
-    HtsIdx loadHtsIndex(T)()
-    if(is(T == Bam1) || is(T == Bcf1))
+    /// load BAM/BCF index
+    HtsIdx loadHtsIndex()
     {
-        // TODO: investigate use of synced_bcf_reader
-        static if(is(T == Bam1))
+        if(this.fp.format.format == htsExactFormat.bam || this.fp.format.format == htsExactFormat.cram)
             this.idx = HtsIdx(sam_index_load(this.fp, this.fn.s));
-        else static if(is(T == Bcf1))
+        else if(this.fp.format.format == htsExactFormat.bcf)
             this.idx = HtsIdx(bcf_index_load(this.fp, this.fn.s));
         return this.idx;
     }
 
     /// load SAM/BAM index from filename
-    HtsIdx loadHtsIndex(T)(string idxFile)
-    if(is(T == Bam1) || is(T == Bcf1))
+    HtsIdx loadHtsIndex(string idxFile)
     {
-        static if(is(T == Bam1))
+        if(this.fp.format.format == htsExactFormat.bam || this.fp.format.format == htsExactFormat.cram)
             this.idx = HtsIdx(sam_index_load2(this.fp, this.fn.s, toStringz(idxFile)));
-        else static if(is(T == Bcf1))
+        else if(this.fp.format.format == htsExactFormat.bcf)
             this.idx = HtsIdx(bcf_index_build2(this.fp, this.fn.s, toStringz(idxFile)));
         return this.idx;
     }
@@ -393,6 +394,7 @@ struct HtslibFile
 
 debug(dhtslib_unittest) unittest
 {
+    hts_log_info(__FUNCTION__, "Testing HtslibFile text reading and writing");
     {
         auto f = HtslibFile("/tmp/htslibfile.test.txt", HtslibFileWriteMode.Text);
         f.writeln("hello");
@@ -441,6 +443,7 @@ debug(dhtslib_unittest) unittest
 
 debug(dhtslib_unittest) unittest
 {
+    hts_log_info(__FUNCTION__, "Testing HtslibFile SAM/BAM reading and writing");
     import std.path:buildPath,dirName;
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam");
     {
@@ -505,6 +508,7 @@ debug(dhtslib_unittest) unittest
 
 debug(dhtslib_unittest) unittest
 {
+    hts_log_info(__FUNCTION__, "Testing HtslibFile BCF reading and writing");
     import std.path:buildPath,dirName;
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
     {
