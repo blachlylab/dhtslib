@@ -94,6 +94,7 @@ struct HtslibFile
 
     BamHdr bamHdr;
     BcfHdr bcfHdr;
+    Kstring textHdr;
 
     /// Tabix index 
     Tbx tbx;
@@ -175,18 +176,41 @@ struct HtslibFile
         if(err < 0) hts_log_error(__FUNCTION__, "Error seeking htsFile");
     }
 
-    /// Read a SAM/BAM or VCF/BCF header
-    /// returns header and also internally stores it
-    auto loadHeader(T)()
-    if(is(T == BamHdr) || is(T == BcfHdr))
+    /// Read a SAM/BAM header, VCF/BCF header, or text header and internally store it
+    void loadHeader(char commentChar = '#')
     {
-        static if(is(T == BamHdr)){
-            this.bamHdr = BamHdr(sam_hdr_read(this.fp));
-            return this.bamHdr;
-        }else static if(is(T == BcfHdr)){
-            this.bcfHdr = BcfHdr(bcf_hdr_read(this.fp));
-            return this.bcfHdr;
-        }else static assert(0);    
+        switch(this.fp.format.format){
+            case htsExactFormat.sam:
+            case htsExactFormat.bam:
+            case htsExactFormat.cram:
+                this.bamHdr = BamHdr(sam_hdr_read(this.fp));
+                break;
+            case htsExactFormat.vcf:
+            case htsExactFormat.bcf:
+                this.bcfHdr = BcfHdr(bcf_hdr_read(this.fp));
+                break;
+            default:
+                this.textHdr = Kstring(initKstring);
+                ks_initialize(this.textHdr);
+                if(this.fp.is_bgzf){
+                    while(true){
+                        if(cast(char) bgzf_peek(this.fp.fp.bgzf) == commentChar)
+                            hts_getline(this.fp, cast(int)'\n', this.textHdr);
+                        else break;
+                    }
+                }else{
+                    while(true){
+                        char c;
+                        hpeek(this.fp.fp.hfile, &c, 1);
+                        if(c  == commentChar)
+                            hts_getline(this.fp, cast(int)'\n', this.textHdr);
+                        else break;
+                    }
+                }
+                
+                
+
+        }
     }
 
     /// set header for a HtlsibFile 
@@ -219,9 +243,9 @@ struct HtslibFile
     HtsIdx loadHtsIndex()
     {
         if(this.fp.format.format == htsExactFormat.bam || this.fp.format.format == htsExactFormat.cram)
-            this.idx = HtsIdx(sam_index_load(this.fp, this.fn.s));
+            this.idx = HtsIdx(sam_index_load(this.fp, cast(const(char)*)this.fn.s));
         else if(this.fp.format.format == htsExactFormat.bcf)
-            this.idx = HtsIdx(bcf_index_load(this.fp, this.fn.s));
+            this.idx = HtsIdx(bcf_index_load(cast(const(char)*)this.fn.s));
         return this.idx;
     }
 
@@ -231,7 +255,7 @@ struct HtslibFile
         if(this.fp.format.format == htsExactFormat.bam || this.fp.format.format == htsExactFormat.cram)
             this.idx = HtsIdx(sam_index_load2(this.fp, this.fn.s, toStringz(idxFile)));
         else if(this.fp.format.format == htsExactFormat.bcf)
-            this.idx = HtsIdx(bcf_index_build2(this.fp, this.fn.s, toStringz(idxFile)));
+            this.idx = HtsIdx(bcf_index_load2(this.fn.s, toStringz(idxFile)));
         return this.idx;
     }
 
@@ -448,7 +472,8 @@ debug(dhtslib_unittest) unittest
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam");
     {
         auto f = HtslibFile(fn);
-        auto h = f.loadHeader!BamHdr;
+        f.loadHeader;
+        auto h = f.bamHdr;
         auto read = f.readRecord!Bam1();
 
         f = HtslibFile("/tmp/htslibfile.test.sam", HtslibFileWriteMode.Sam);
@@ -480,27 +505,32 @@ debug(dhtslib_unittest) unittest
     {
 
         auto f = HtslibFile("/tmp/htslibfile.test.sam");
-        auto h = f.loadHeader!BamHdr;
+        f.loadHeader;
+        auto h = f.bamHdr;
         auto read = f.readRecord!Bam1();
         assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
         
         f = HtslibFile("/tmp/htslibfile.test.bam");
-        h = f.loadHeader!BamHdr;
+        f.loadHeader;
+        h = f.bamHdr;
         read = f.readRecord!Bam1();
         assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
 
         f = HtslibFile("/tmp/htslibfile.test.ubam");
-        h = f.loadHeader!BamHdr;
+        f.loadHeader;
+        h = f.bamHdr;
         read = f.readRecord!Bam1();
         assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
 
         f = HtslibFile("/tmp/htslibfile.test.sam.gz");
-        h = f.loadHeader!BamHdr;
+        f.loadHeader;
+        h = f.bamHdr;
         read = f.readRecord!Bam1();
         assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
 
         f = HtslibFile("/tmp/htslibfile.test.sam.bgz");
-        h = f.loadHeader!BamHdr;
+        f.loadHeader;
+        h = f.bamHdr;
         read = f.readRecord!Bam1();
         assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
     }
@@ -513,7 +543,8 @@ debug(dhtslib_unittest) unittest
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
     {
         auto f = HtslibFile(fn);
-        auto h = f.loadHeader!BcfHdr;
+        f.loadHeader;
+        auto h = f.bcfHdr;
         auto read = f.readRecord!Bcf1();
 
         f = HtslibFile("/tmp/htslibfile.test.vcf", HtslibFileWriteMode.Vcf);
@@ -545,27 +576,32 @@ debug(dhtslib_unittest) unittest
     {
 
         auto f = HtslibFile("/tmp/htslibfile.test.vcf");
-        auto h = f.loadHeader!BcfHdr;
+        f.loadHeader;
+        auto h = f.bcfHdr;
         auto read = f.readRecord!Bcf1();
         assert(read.pos == 3000149);
         
         f = HtslibFile("/tmp/htslibfile.test.bcf");
-        h = f.loadHeader!BcfHdr;
+        f.loadHeader;
+        h = f.bcfHdr;
         read = f.readRecord!Bcf1();
         assert(read.pos == 3000149);
 
         f = HtslibFile("/tmp/htslibfile.test.ubcf");
-        h = f.loadHeader!BcfHdr;
+        f.loadHeader;
+        h = f.bcfHdr;
         read = f.readRecord!Bcf1();
         assert(read.pos == 3000149);
 
         f = HtslibFile("/tmp/htslibfile.test.vcf.gz");
-        h = f.loadHeader!BcfHdr;
+        f.loadHeader;
+        h = f.bcfHdr;
         read = f.readRecord!Bcf1();
         assert(read.pos == 3000149);
 
         f = HtslibFile("/tmp/htslibfile.test.vcf.bgz");
-        h = f.loadHeader!BcfHdr;
+        f.loadHeader;
+        h = f.bcfHdr;
         read = f.readRecord!Bcf1();
         assert(read.pos == 3000149);
     }
