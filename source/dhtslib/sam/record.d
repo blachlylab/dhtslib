@@ -52,6 +52,13 @@ struct SAMRecord
         this.h = h;
     }
 
+    /// Construct SAMRecord from supplied bam1_t and sam_hdr_type
+    this(Bam1 b, SAMHeader h)
+    {
+        this.b = b;
+        this.h = h;
+    }
+
     /* bam1_core_t fields */
 
     /// chromosome ID, defined by sam_hdr_t

@@ -24,6 +24,7 @@ import dhtslib.sam.header;
 import dhtslib.sam : cmpInterval, cmpRegList;
 import dhtslib.memory;
 import dhtslib.util;
+import dhtslib.file;
 
 alias SAMFile = SAMReader;
 /**
@@ -34,27 +35,11 @@ If indexed, Random-access query via multidimensional slicing.
 */
 struct SAMReader
 {
-    /// filename; as usable from D
-    string filename;
-
-    /// filename \0-terminated C string; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
-    private const(char)* fn;
-
-    /// htsFile
-    private HtsFile fp;
-
-    /// hFILE if required
-    private hFILE* f;
+    /// HtslibFile
+    private HtslibFile f;
 
     /// header struct
     SAMHeader header;
-
-    private off_t header_offset;
-
-    /// SAM/BAM/CRAM index 
-    private HtsIdx idx;
-
-    private kstring_t line;
 
     /** Create a representation of SAM/BAM/CRAM file from given filename or File
 
@@ -69,22 +54,9 @@ struct SAMReader
     if (is(T == string) || is(T == File))
     {
         import std.parallelism : totalCPUs;
-
+        
         // open file
-        static if (is(T == string))
-        {
-            this.filename = f;
-            this.fn = toStringz(f);
-            this.fp = HtsFile(hts_open(this.fn, cast(immutable(char)*) "r"));
-        }
-        else static if (is(T == File))
-        {
-            this.filename = f.name();
-            this.fn = toStringz(f.name);
-            this.f = hdopen(f.fileno, cast(immutable(char)*) "r");
-            this.fp = HtsFile(hts_hopen(this.f, this.fn, cast(immutable(char)*) "r"));
-        }
-        else assert(0);
+        this.f = HtslibFile(f);
 
         if (extra_threads == -1)
         {
@@ -94,14 +66,14 @@ struct SAMReader
                         format("%d CPU cores detected; enabling multithreading", totalCPUs));
                 // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
                 // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
-                hts_set_threads(this.fp, totalCPUs);
+                this.f.setExtraThreads(totalCPUs);
             }
         }
         else if (extra_threads > 0)
         {
             if ((extra_threads + 1) > totalCPUs)
                 hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
-            hts_set_threads(this.fp, extra_threads);
+            this.f.setExtraThreads(extra_threads);
         }
         else if (extra_threads == 0)
         {
@@ -113,14 +85,8 @@ struct SAMReader
         }
 
         // read header
-        this.header = SAMHeader(sam_hdr_read(this.fp));
-
-        // collect header offset just in case it is a sam file
-        // we would like to iterate
-        if(this.fp.is_bgzf) this.header_offset = bgzf_tell(this.fp.fp.bgzf);
-        else this.header_offset = htell(this.fp.fp.hfile);
-
-        this.idx = HtsIdx(null);
+        this.f.loadHeader;
+        this.header = SAMHeader(this.f.bamHdr);
     }
 
     /// number of reference sequences; from bam_hdr_t
@@ -239,15 +205,21 @@ struct SAMReader
         auto newcoords = coords.to!(CoordSystem.zbho);
 
         /// load index
-        if(this.idx == null)
-            this.idx = HtsIdx(sam_index_load(this.fp, this.fn));
-        if (this.idx == null)
+        if(this.f.idx == null)
+            this.f.loadHtsIndex;
+        if (this.f.idx == null)
         {
-            hts_log_error(__FUNCTION__, "SAM index not found");
-            throw new Exception("SAM index not found");
+            if(this.f.tbx == null)
+                this.f.loadTabixIndex;
+            if(this.f.tbx == null){
+                hts_log_error(__FUNCTION__, "BAI/TABIX index not found");
+                throw new Exception("Cannot query");
+            }
         }
-        auto itr = HtsItr(sam_itr_queryi(this.idx, tid, newcoords.start, newcoords.end));
-        return RecordRange(this.fp, this.header, itr, this.header_offset);
+        auto newF =  this.f.dup;
+        newF.resetToFirstRecord;
+        return newF.query!Bam1(tid, newcoords.start, newcoords.end)
+                .map!(x=>SAMRecord(bam_dup1(x), header));
     }
 
 
@@ -256,14 +228,14 @@ struct SAMReader
     in (!this.header.isNull)
     {
         /// load index
-        if(this.idx == null)
-            this.idx = HtsIdx(sam_index_load(this.fp, this.fn));
-        if (this.idx == null)
+        if(this.f.idx == null)
+            this.f.loadHtsIndex;
+        if (this.f.idx == null)
         {
-            hts_log_error(__FUNCTION__, "SAM index not found");
-            throw new Exception("SAM index not found");
+            hts_log_error(__FUNCTION__, "BAI index not found");
+            throw new Exception("Cannot multi region query");
         }
-        return RecordRangeMulti(this.fp, this.idx, this.header, regions);
+        return this.f.query(regions).map!(x=>SAMRecord(x, header));
     }
 
     /// opIndex with a list of string regions
@@ -438,210 +410,14 @@ struct SAMReader
     /// Return an InputRange representing all records in the SAM/BAM/CRAM
     auto allRecords()
     {
-        return AllRecordsRange(this.fp, this.header, this.header_offset);
+        auto newf = this.f.dup;
+        newf.resetToFirstRecord;
+        return newf.byRecord!Bam1.map!(x=>SAMRecord(bam_dup1(x), header));
     }
 
     deprecated("Avoid snake_case names")
     alias all_records = allRecords;
 
-
-    /// Iterate through all records in the SAM
-    struct AllRecordsRange
-    {
-        private HtsFile    fp;     // belongs to parent; shared
-        private SAMHeader  header; // belongs to parent; shared
-        private Bam1     b;
-        private bool initialized;   // Needed to support both foreach and immediate .front()
-        private int success;        // sam_read1 return code
-
-        this(HtsFile fp, SAMHeader header, off_t offset)
-        {
-            this.fp = copyHtsFile(fp, offset);
-            assert(this.fp.format.format == htsExactFormat.sam || this.fp.format.format == htsExactFormat.bam);
-            this.header = header;
-            this.b = Bam1(bam_init1());
-            this.empty;
-        }
-
-        /// InputRange interface
-        @property bool empty() // @suppress(dscanner.suspicious.incorrect_infinite_range)
-        {
-            if (!this.initialized) {
-                this.popFront();
-                this.initialized = true;
-            }
-            if (success >= 0)
-                return false;
-            else if (success == -1)
-                return true;
-            else
-            {
-                hts_log_error(__FUNCTION__, "*** ERROR sam_read1 < -1");
-                return true;
-            }
-        }
-        /// ditto
-        void popFront()
-        {
-            success = sam_read1(this.fp, this.header.h, this.b);
-            //bam_destroy1(this.b);
-        }
-        /// ditto
-        SAMRecord front()
-        {
-            assert(this.initialized, "front called before empty");
-            return SAMRecord(bam_dup1(this.b), this.header);
-        }
-
-        AllRecordsRange save()
-        {
-            AllRecordsRange newRange;
-            newRange.fp = HtsFile(copyHtsFile(fp));
-            newRange.header = header;
-            newRange.b = Bam1(bam_dup1(this.b));
-            newRange.initialized = this.initialized;
-            newRange.success = this.success;
-
-            return newRange;
-        }
-
-    }
-
-    /// Iterate over records falling within a queried region
-    struct RecordRange
-    {
-        private HtsFile fp;
-        private SAMHeader h;
-        private HtsItr itr;
-        private Bam1 b;
-
-        private int r;  // sam_itr_next: >= 0 on success; -1 when there is no more data; < -1 on error
-        
-        private bool initialized;   // Needed to support both foreach and immediate .front()
-        private int success;        // sam_read1 return code
-
-        /// Constructor relieves caller of calling bam_init1 and simplifies first-record flow 
-        this(HtsFile fp, SAMHeader header, HtsItr itr, off_t offset)
-        {
-            this.fp = HtsFile(copyHtsFile(fp, offset));
-            this.itr = HtsItr(copyHtsItr(itr));
-            this.h = header;
-            this.b = Bam1(bam_init1);
-            this.empty;
-            assert(itr !is null, "itr was null"); 
-        }
-
-        /// InputRange interface
-        @property bool empty()
-        {
-            // TODO, itr.finished shouldn't be used
-            if (!this.initialized) {
-                this.popFront();
-                this.initialized = true;
-            }
-            assert(this.itr !is null);
-            return (r < 0 || itr.finished) ? true : false;
-        }
-        /// ditto
-        void popFront()
-        {
-            this.r = sam_itr_next(this.fp, this.itr, this.b);
-        }
-        /// ditto
-        SAMRecord front()
-        {
-            return SAMRecord(bam_dup1(b), this.h);
-        }
-
-        /// make a ForwardRange
-        RecordRange save()
-        {
-            RecordRange newRange;
-            newRange.fp = HtsFile(copyHtsFile(fp, itr.curr_off));
-            newRange.itr = HtsItr(copyHtsItr(itr));
-            newRange.h = h;
-            newRange.b = Bam1(bam_dup1(this.b));
-            newRange.initialized = this.initialized;
-            newRange.success = this.success;
-            newRange.r = this.r;
-            return newRange;
-        }
-    }
-
-    static assert(isInputRange!RecordRange);
-    static assert(is(ElementType!RecordRange == SAMRecord));
-
-    /// Iterate over records falling within queried regions using a RegionList
-    struct RecordRangeMulti
-    {
-
-        private HtsFile fp;
-        private SAMHeader h;
-        private HtsItrMulti itr;
-        private Bam1 b;
-
-        private int r;
-        private bool initialized;
-
-        ///
-        this(HtsFile fp, HtsIdx idx, SAMHeader header, string[] regions)
-        {
-            /// get reglist
-            auto cQueries = regions.map!(toUTFz!(char *)).array;
-            int count;
-            auto fnPtr = cast(hts_name2id_f) &sam_hdr_name2tid;
-
-            /// rlistPtr ends up being free'd by the hts_itr
-            auto rlistPtr = hts_reglist_create(cQueries.ptr, cast(int) cQueries.length, &count, cast(void *)header.h.getRef, fnPtr);
-
-
-            /// set header and fp
-            this.fp = HtsFile(copyHtsFile(fp));
-            this.h = header;
-
-            /// init bam1_t
-            b = Bam1(bam_init1());
-
-            /// get the itr
-            itr = sam_itr_regions(idx, this.h.h, rlistPtr, cast(uint) count);
-
-            empty();
-        }
-
-        /// InputRange interface
-        @property bool empty()
-        {
-            if(!initialized){
-                this.initialized = true;
-                popFront;
-            }
-            return (r <= 0 && itr.finished) ? true : false;
-        }
-        /// ditto
-        void popFront()
-        {
-            r = sam_itr_multi_next(this.fp, this.itr, this.b);
-        }
-        /// ditto
-        SAMRecord front()
-        {
-            return SAMRecord(bam_dup1(b), this.h);
-        }
-        /// make a ForwardRange
-        RecordRangeMulti save()
-        {
-            RecordRangeMulti newRange;
-            newRange.fp = HtsFile(copyHtsFile(fp, itr.curr_off));
-            newRange.itr = HtsItrMulti(copyHtsItr(itr));
-            newRange.h = h;
-            newRange.b = Bam1(bam_dup1(this.b));
-            newRange.initialized = this.initialized;
-            newRange.r = this.r;
-            return newRange;
-        }
-    }
-    static assert(isInputRange!RecordRangeMulti);
-    static assert(is(ElementType!RecordRangeMulti == SAMRecord));
 }
 
 ///

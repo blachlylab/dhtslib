@@ -17,38 +17,28 @@ import dhtslib.sam.header;
 import dhtslib.sam : parseSam;
 import dhtslib.memory;
 import dhtslib.util;
+import dhtslib.file;
 
 
 /// SAM/BAM/CRAM on-disk format.
 /// `DEDUCE` will attempt to auto-detect from filename or other means
 enum SAMWriterTypes
 {
-    BAM,
-    UBAM,
-    SAM,
-    CRAM,
-    DEDUCE
+    BAM = HtslibFileWriteMode.Bam,
+    UBAM = HtslibFileWriteMode.UncompressedBam,
+    SAM = HtslibFileWriteMode.Sam,
+    CRAM = HtslibFileWriteMode.Cram,
+    DEDUCE = []
 }
 
 /// Encapsulates a SAM/BAM/CRAM, but as write-only
 struct SAMWriter
 {
-    /// filename; as usable from D
-    string filename;
-
-    /// filename \0-terminated C string; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
-    private const(char)* fn;
-
     /// htsFile
-    private HtsFile fp;
-
-    /// hFILE if required
-    private hFILE* f;
+    private HtslibFile f;
 
     /// header struct
     SAMHeader header;
-
-    private kstring_t line;
 
     /// disallow copying
     @disable this(this);
@@ -66,36 +56,27 @@ struct SAMWriter
     if (is(T == string) || is(T == File))
     {
         import std.parallelism : totalCPUs;
-        char[] mode;
-        if(t == SAMWriterTypes.BAM) mode=['w','b','\0'];
-        else if(t == SAMWriterTypes.UBAM) mode=['w','b','0','\0'];
-        else if(t == SAMWriterTypes.SAM) mode=['w','\0'];
-        else if(t == SAMWriterTypes.CRAM) mode=['w','c','\0'];
+        char[] mode = cast(char[])t;
         // open file
         static if (is(T == string))
         {
             if(t == SAMWriterTypes.DEDUCE){
                 import std.path:extension;
                 auto ext=extension(f);
-                if(ext==".bam") mode=['w','b','\0'];
-                else if(ext==".sam") mode=['w','\0'];
-                else if(ext==".cram") mode=['w','c','\0'];
+                if(ext==".bam") mode=cast(char[])HtslibFileWriteMode.Bam;
+                else if(ext==".sam") mode=cast(char[])HtslibFileWriteMode.Sam;
+                else if(ext==".cram") mode=cast(char[])HtslibFileWriteMode.Cram;
                 else {
                     hts_log_error(__FUNCTION__,"extension "~ext~" not valid");
                     throw new Exception("DEDUCE SAMWriterType used with non-valid extension");
                 }
             }
-            this.filename = f;
-            this.fn = toStringz(f);
-            this.fp = hts_open(this.fn, mode.ptr);
+            this.f = HtslibFile(f, mode);
         }
         else static if (is(T == File))
         {
             assert(t!=SAMWriterTypes.DEDUCE);
-            this.filename = f.name();
-            this.fn = toStringz(f.name);
-            this.f = hdopen(f.fileno, cast(immutable(char)*) "w");
-            this.fp = hts_hopen(this.f, this.fn, mode.ptr);
+            this.f = HtslibFile(f, mode);
         }
         else assert(0);
 
@@ -107,14 +88,14 @@ struct SAMWriter
                         format("%d CPU cores detected; enabling multithreading", totalCPUs));
                 // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
                 // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
-                hts_set_threads(this.fp, totalCPUs);
+                this.f.setExtraThreads(totalCPUs);
             }
         }
         else if (extra_threads > 0)
         {
             if ((extra_threads + 1) > totalCPUs)
                 hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
-            hts_set_threads(this.fp, extra_threads);
+            this.f.setExtraThreads(extra_threads);
         }
         else if (extra_threads == 0)
         {
@@ -127,14 +108,14 @@ struct SAMWriter
 
         // read header
         this.header = header.dup;
-        sam_hdr_write(this.fp,this.header.h);
+        this.f.setHeader(this.header.h);
+        this.f.writeHeader;
     }
 
 
     /// Write a SAMRecord to disk
     void write(SAMRecord rec){
-        const auto ret = sam_write1(this.fp, this.header.h, rec.b);
-        assert(ret>=0);
+        this.f.write(rec.b);
     }
 }
 ///

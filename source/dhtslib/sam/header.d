@@ -39,6 +39,12 @@ struct SAMHeader
     BamHdr h; /// rc bam_hdr_t * wrapper
 
     /// Construct from existing pointer
+    this(BamHdr h)
+    {
+        this.h = h;
+    }
+
+    /// Construct from existing pointer
     this(bam_hdr_t * h)
     {
         this.h = BamHdr(h);
