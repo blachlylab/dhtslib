@@ -152,6 +152,11 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             return (*r < 0 || itr.finished) ? true : false;
         }
     }
+    
+    typeof(this) save()
+    {
+        return this.dup;
+    }
 }
 debug(dhtslib_unittest) unittest
 {

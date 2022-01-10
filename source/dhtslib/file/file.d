@@ -100,6 +100,7 @@ struct HtslibFile
     Tbx tbx;
 
     bool eof;
+    off_t headerOffset = -1;
 
     /// allow HtslibFile to be used as 
     /// underlying ptr type
@@ -159,6 +160,7 @@ struct HtslibFile
         newFile.textHdr = this.textHdr;
         newFile.tbx = this.tbx;
         newFile.eof = this.eof;
+        newFile.headerOffset = this.headerOffset;
         return newFile;
     }
 
@@ -182,6 +184,23 @@ struct HtslibFile
         if(this.fp.is_bgzf) err = bgzf_seek(this.fp.fp.bgzf, loc, SEEK_SET);
         else err = hseek(this.fp.fp.hfile, loc, SEEK_SET);
         if(err < 0) hts_log_error(__FUNCTION__, "Error seeking htsFile");
+    }
+
+    /// reset file reading
+    void reset()
+    {
+        this.seek(0);
+    }
+
+    /// reset file reading
+    void resetToFirstRecord()
+    {
+        if(headerOffset != -1)
+            this.seek(headerOffset);
+        else {
+            hts_log_error(__FUNCTION__, "Cannot resetToFirstRecord, header offset unknown");
+            hts_log_error(__FUNCTION__, "Has the header been loaded?");
+        }
     }
 
     /// Read a SAM/BAM header, VCF/BCF header, or text header and internally store it
@@ -225,6 +244,7 @@ struct HtslibFile
                     }
                 }
         }
+        this.headerOffset = this.tell;
     }
 
     /// set header for a HtlsibFile 
