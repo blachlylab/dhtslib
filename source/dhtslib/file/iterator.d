@@ -21,7 +21,7 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
         this.f = f;
         static if(is(T == Bam1)){
             rec = Bam1(bam_init1);
-        }else static if(is(T == BcfHdr)){
+        }else static if(is(T == Bcf1)){
             rec = Bcf1(bcf_init);
         }else static if(is(T == Kstring)){
             rec = Kstring(initKstring);
@@ -117,7 +117,6 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
                     this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.fp);
             }
         }
-        
     }
 
     /// InputRange interface
@@ -131,8 +130,68 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
         if(!is_itr){
             return r < 0 ? true : false;
         }else{
-            assert(this.itr !is null);
+            assert(this.itr.initialized && this.itr.getRef);
             return (r < 0 || itr.finished) ? true : false;
         }
     }
+}
+debug(dhtslib_unittest) unittest
+{
+    import std.path:buildPath,dirName;
+    import std.algorithm: count;
+    import std.string: fromStringz;
+    hts_log_info(__FUNCTION__, "Testing HtslibIterator SAM/BAM reading");
+    
+    auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam");
+    auto f = HtslibFile(fn);
+    f.loadHeader;
+    auto read = f.readRecord!Bam1();
+    assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+    
+    f.seek(0);
+    f.loadHeader;
+    assert(f.byRecord!Bam1.count == 112);
+
+    f.seek(0);
+    f.loadHeader;
+    f.loadHtsIndex;
+    assert(f.query!Bam1(0,913,914).count == 1);
+
+    f.seek(0);
+    f.loadHeader;
+    f.loadHtsIndex;
+    assert(f.query!Bam1(0,913,934).count == 2);
+
+    f.seek(0);
+    f.loadHeader;
+    f.loadHtsIndex;
+    assert(f.query!Bam1(0,913,934).count == 2);
+    assert(f.query!Bam1("CHROMOSOME_I:914-935").count == 2);
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.algorithm: count;
+    import std.path:buildPath,dirName;
+    hts_log_info(__FUNCTION__, "Testing HtslibIterator VCF/BCF reading");
+    auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
+    auto f = HtslibFile(fn);
+    f.loadHeader;
+    auto read = f.readRecord!Bcf1();
+    assert(read.pos == 3000149);
+
+    import std.stdio;
+    f.seek(0);
+    f.loadHeader;
+    assert(f.byRecord!Bcf1.count == 14);
+
+    f.loadTabixIndex;
+    
+    f.seek(0);
+    f.loadHeader;
+    assert(f.queryTabix!Bcf1(0, 3000149, 3000151).count == 2);
+
+    f.seek(0);
+    f.loadHeader;
+    assert(f.queryTabix!Bcf1("1:3000150-3000151").count == 2);
 }

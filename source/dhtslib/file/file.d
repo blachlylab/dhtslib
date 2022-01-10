@@ -207,9 +207,6 @@ struct HtslibFile
                         else break;
                     }
                 }
-                
-                
-
         }
     }
 
@@ -293,7 +290,7 @@ struct HtslibFile
     /// returns an HtslibIterator that has type T
     /// requires index and header be loaded first
     auto query(T)(string region)
-    if(is(T1 == Bam1) || is(T1 == Bcf1))
+    if(is(T == Bam1) || is(T == Bcf1))
     {
         assert(this.idx.getRef != null);
         static if(is(T == Bam1)){
@@ -339,7 +336,7 @@ struct HtslibFile
         }else static if(is(T == Kstring)){
             auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
             return HtslibIterator!(Kstring, true)(this, itr);
-        }static assert(0);
+        } else static assert(0);
     }
 
     /// Query tabix'd htsFile with tid, start, and end
@@ -358,7 +355,7 @@ struct HtslibFile
         }else static if(is(T == Kstring)){
             auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
             return HtslibIterator!(Kstring, true)(this, itr);
-        }static assert(0);
+        } else static assert(0);
     }
 
     /// write SAM/BAM/VCF/BCF record, string, or ubyte data
