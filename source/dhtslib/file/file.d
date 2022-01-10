@@ -151,6 +151,14 @@ struct HtslibFile
     {
         auto filename = fromStringz(this.fn.s).idup;
         auto newFile = HtslibFile(filename, this.mode);
+
+        newFile.seek(this.tell);
+        newFile.idx = this.idx;
+        newFile.bamHdr = this.bamHdr;
+        newFile.bcfHdr = this.bcfHdr;
+        newFile.textHdr = this.textHdr;
+        newFile.tbx = this.tbx;
+        newFile.eof = this.eof;
         return newFile;
     }
 
@@ -192,19 +200,28 @@ struct HtslibFile
             default:
                 this.textHdr = Kstring(initKstring);
                 ks_initialize(this.textHdr);
+
+                auto ks = Kstring(initKstring);
+                ks_initialize(ks);
+
                 if(this.fp.is_bgzf){
+                    
                     while(true){
-                        if(cast(char) bgzf_peek(this.fp.fp.bgzf) == commentChar)
-                            hts_getline(this.fp, cast(int)'\n', this.textHdr);
-                        else break;
+                        if(cast(char) bgzf_peek(this.fp.fp.bgzf) == commentChar){
+                            hts_getline(this.fp, cast(int)'\n', ks);
+                            kputs(ks.s, this.textHdr);
+                            kputc(cast(int)'\n', this.textHdr);
+                        } else break;
                     }
                 }else{
                     while(true){
                         char c;
                         hpeek(this.fp.fp.hfile, &c, 1);
-                        if(c  == commentChar)
-                            hts_getline(this.fp, cast(int)'\n', this.textHdr);
-                        else break;
+                        if(c  == commentChar){
+                            hts_getline(this.fp, cast(int)'\n', ks);
+                            kputs(ks.s, this.textHdr);
+                            kputc(cast(int)'\n', this.textHdr);
+                        } else break;
                     }
                 }
         }

@@ -1,6 +1,7 @@
 module dhtslib.file.iterator;
 
 import core.stdc.stdlib;
+import core.stdc.string;
 
 import dhtslib.memory;
 import dhtslib.file.file;
@@ -15,9 +16,11 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     T rec;
     private bool is_itr;
     private bool initialized;
-    private int r;
+    /// must be pointer to keep range updated when blitted
+    private int * r; 
     this(HtslibFile f)
     {
+        this.r = new int(0);
         this.f = f;
         static if(is(T == Bam1)){
             rec = Bam1(bam_init1);
@@ -39,41 +42,14 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
 
     HtslibIterator dup()
     {
-        /// init
-        auto newHtsItr = cast(hts_itr_t *) malloc(hts_itr_t.sizeof);
-        /// bulk copy data
-        *newHtsItr = *itr;
 
-        /// initialize and copy region list
-        /// if it is not null
-        if(newHtsItr.reg_list){
-            /// initialize the region lists
-            newHtsItr.reg_list = cast(hts_reglist_t *) malloc(itr.n_reg * hts_reglist_t.sizeof);
-            newHtsItr.reg_list[0 .. newHtsItr.n_reg] = itr.reg_list[0 .. itr.n_reg];
-            /// for each list
-            for(auto i=0; i < newHtsItr.n_reg; i++)
-            {
-                /// copy all intervals
-                newHtsItr.reg_list[i].intervals = cast(hts_pair_pos_t *) malloc(itr.reg_list[i].count * hts_pair_pos_t.sizeof);
-                newHtsItr.reg_list[i].intervals[0 .. newHtsItr.reg_list[i].count] = itr.reg_list[i].intervals[0 .. itr.reg_list[i].count];
-            }
-        }
-
-        /// initialize and copy bins list
-        newHtsItr.bins.a = cast(int *) malloc(itr.bins.m * int.sizeof);
-        assert(newHtsItr.bins.m >= newHtsItr.bins.n);
-        newHtsItr.bins.a[0 .. newHtsItr.bins.m] = itr.bins.a[0 .. itr.bins.m];
-
-        /// initialize and copy off list
-        newHtsItr.off = cast(hts_pair64_max_t *) malloc(itr.n_off * hts_pair64_max_t.sizeof);
-        newHtsItr.off[0 .. newHtsItr.n_off] = itr.off[0 .. itr.n_off];
-
-        /// Create new HtslibIterator
-        auto newItr = HtslibIterator(this.f.dup, HtsItr(newHtsItr));
-
+        HtslibIterator newItr;
+        /// dup file
+        newItr.f = this.f.dup;
         /// set private values
-        newItr.r = this.r;
+        newItr.r = new int(*this.r);
         newItr.initialized = this.initialized;
+        newItr.is_itr = this.is_itr;
 
         /// duplicate current record
         static if(is(T == Bam1)){
@@ -86,6 +62,48 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             kputs(this.rec.s, ks);
             newItr.rec = ks;
         }
+        /// if itr we need to deep copy it
+        if(this.is_itr){
+            /// init
+            auto newHtsItr = cast(hts_itr_t *) malloc(hts_itr_t.sizeof);
+            /// bulk copy data
+            *newHtsItr = *itr;
+
+            /// initialize and copy region list
+            /// if it is not null
+            if(newHtsItr.reg_list != null){
+                /// initialize the region lists
+                newHtsItr.reg_list = cast(hts_reglist_t *) malloc(itr.n_reg * hts_reglist_t.sizeof);
+                newHtsItr.reg_list[0 .. newHtsItr.n_reg] = itr.reg_list[0 .. itr.n_reg];
+                /// for each list
+                for(auto i=0; i < newHtsItr.n_reg; i++)
+                {
+                    /// copy all intervals
+                    newHtsItr.reg_list[i].intervals = cast(hts_pair_pos_t *) malloc(itr.reg_list[i].count * hts_pair_pos_t.sizeof);
+                    newHtsItr.reg_list[i].intervals[0 .. newHtsItr.reg_list[i].count] = itr.reg_list[i].intervals[0 .. itr.reg_list[i].count];
+                    /// copy region c string
+                    if(itr.reg_list[i].reg){
+                        newHtsItr.reg_list[i].reg = cast(char *) malloc(strlen(itr.reg_list[i].reg) + 1);
+                        memcpy(cast(void*)(newHtsItr.reg_list[i].reg),itr.reg_list[i].reg, strlen(itr.reg_list[i].reg) + 1);
+                    }
+                }
+            }
+
+            /// initialize and copy bins list
+            newHtsItr.bins.a = cast(int *) malloc(itr.bins.m * int.sizeof);
+            assert(newHtsItr.bins.m >= newHtsItr.bins.n);
+            newHtsItr.bins.a[0 .. newHtsItr.bins.m] = itr.bins.a[0 .. itr.bins.m];
+
+            /// initialize and copy off list
+            newHtsItr.off = cast(hts_pair64_max_t *) malloc(itr.n_off * hts_pair64_max_t.sizeof);
+            newHtsItr.off[0 .. newHtsItr.n_off] = itr.off[0 .. itr.n_off];
+            
+            /// set new itr
+            newItr.itr = HtsItr(newHtsItr);
+        }else{
+            newItr.itr = this.itr;
+        }
+        
         return newItr;
     }
 
@@ -99,22 +117,22 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
         if(!is_itr){
             static if(is(T == Bam1)){
                 assert(this.f.bamHdr.initialized && this.f.bamHdr.getRef);
-                this.r = sam_read1(this.f.fp, this.f.bamHdr, rec);
+                *this.r = sam_read1(this.f.fp, this.f.bamHdr, rec);
             }
             else static if(is(T == Bcf1)){
                 assert(this.f.bcfHdr.initialized && this.f.bcfHdr.getRef);
-                this.r = bcf_read(this.f.fp, this.f.bcfHdr, rec);
+                *this.r = bcf_read(this.f.fp, this.f.bcfHdr, rec);
             }else static if(is(T == Kstring)){
-                this.r = hts_getline(this.f.fp, cast(int)'\n', rec);
+                *this.r = hts_getline(this.f.fp, cast(int)'\n', rec);
             }
         }else{
             if (itr.multi)
-                this.r = hts_itr_multi_next(f.fp, itr, rec.getRef);
+                *this.r = hts_itr_multi_next(f.fp, itr, rec.getRef);
             else{
                 static if(is_tbx)
-                    this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.tbx);
+                    *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.tbx);
                 else 
-                    this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.fp);
+                    *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.fp);
             }
         }
     }
@@ -128,10 +146,10 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             this.initialized = true;
         }
         if(!is_itr){
-            return r < 0 ? true : false;
+            return *r < 0 ? true : false;
         }else{
             assert(this.itr.initialized && this.itr.getRef);
-            return (r < 0 || itr.finished) ? true : false;
+            return (*r < 0 || itr.finished) ? true : false;
         }
     }
 }
@@ -167,6 +185,11 @@ debug(dhtslib_unittest) unittest
     f.loadHtsIndex;
     assert(f.query!Bam1(0,913,934).count == 2);
     assert(f.query!Bam1("CHROMOSOME_I:914-935").count == 2);
+
+    f.seek(0);
+    f.loadHeader;
+    string[] regions = ["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"];
+    assert(f.query(regions).count == 33);
 }
 
 debug(dhtslib_unittest) unittest
@@ -194,4 +217,104 @@ debug(dhtslib_unittest) unittest
     f.seek(0);
     f.loadHeader;
     assert(f.queryTabix!Bcf1("1:3000150-3000151").count == 2);
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.algorithm: count;
+    import std.path:buildPath,dirName;
+    import std.string : fromStringz;
+    hts_log_info(__FUNCTION__, "Testing HtslibIterator dup");
+
+    auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","range.bam");
+    auto f = HtslibFile(fn);
+    f.loadHeader;
+    f.loadHtsIndex;
+    auto read = f.readRecord!Bam1();
+    assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+
+    auto range1 = f.query!Bam1(0,900,2000);
+    auto range2 = range1.dup;
+    import std.stdio;
+
+    assert(range1.count == 14);
+    assert(range1.empty == true);
+    assert(range2.count == 14);
+
+    f.seek(0);
+    f.loadHeader;
+
+    range1 = f.query!Bam1(0,900,2000);
+    range1.popFront;
+    range2 = range1.dup;
+    range2.popFront;
+
+    assert(range1.count == 13);
+    assert(range1.empty == true);
+    assert(range2.count == 12);
+
+    f.seek(0);
+    f.loadHeader;
+
+    range1 = f.byRecord!Bam1();
+    range1.popFront;
+    range2 = range1.dup;
+    range2.popFront;
+
+    assert(range1.count == 111);
+    assert(range1.count == 0);
+    assert(range1.empty == true);
+    assert(range2.count == 110);
+
+    f.seek(0);
+    f.loadHeader;
+    string[] regions = ["CHROMOSOME_I:900-2000","CHROMOSOME_II:900-2000"];
+    range1 = f.query(regions);
+    range2 = range1.dup;
+    range2.popFront;
+    assert(range1.count == 33);
+    assert(range2.count == 32);
+
+    f.seek(0);
+    f.loadHeader;
+    auto f2 =  f.dup;
+    read = f.readRecord!Bam1();
+    assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+    read = f2.readRecord!Bam1();
+    assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
+
+
+    fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf");
+    f = HtslibFile(fn);
+    f.loadHeader;
+    auto vrange1 = f.byRecord!Bcf1();
+    vrange1.popFront;
+    auto vrange2 = vrange1.dup;
+    vrange2.popFront;
+
+    assert(vrange1.count == 13);
+    assert(vrange2.count == 12);
+
+    fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","bed_file.bed");
+    f = HtslibFile(fn);
+    f.loadHeader;
+    auto trange1 = f.byRecord!Kstring();
+    trange1.popFront;
+    auto trange2 = trange1.dup;
+    trange2.popFront;
+
+    assert(trange1.count == 14);
+    assert(trange2.count == 13);
+
+    fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","bed_file.bed.gz");
+    f = HtslibFile(fn);
+    f.loadHeader;
+    trange1 = f.byRecord!Kstring();
+    trange1.popFront;
+    trange2 = trange1.dup;
+    trange2.popFront;
+
+    assert(trange1.count == 14);
+    assert(trange2.count == 13);
+
 }
