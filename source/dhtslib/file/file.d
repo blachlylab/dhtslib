@@ -438,27 +438,26 @@ struct HtslibFile
 
     /// read a BAM/SAM/BCF/VCF record
     auto readRecord(T)()
+    if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     {
         long err;
         static if(is(T == Bam1)){
             assert(this.bamHdr.initialized && this.bamHdr.getRef != null);
-            auto b = bam_init1;
-            err = sam_read1(this.fp, this.bamHdr, b);
-            auto rec = Bam1(b);
+            auto rec = bam_init1;
+            err = sam_read1(this.fp, this.bamHdr, rec);
         }
         else static if(is(T == Bcf1)){
             assert(this.bcfHdr.initialized && this.bcfHdr.getRef != null);
-            auto b = bcf_init;
-            err = bcf_read(this.fp, this.bcfHdr, b);
-            auto rec = Bcf1(b);
+            auto rec = bcf_init;
+            err = bcf_read(this.fp, this.bcfHdr, rec);
         }else static if(is(T == Kstring)){
-            auto rec = Kstring(initKstring);
+            auto rec = initKstring;
             ks_initialize(rec);
             err = hts_getline(this.fp, cast(int)'\n', rec);
         }
         if(err < -1) hts_log_error(__FUNCTION__, "Error reading Bam/Bcf record");
         else if(err == -1) eof = true;
-        return rec;
+        return T(rec);
     }
 
 }
