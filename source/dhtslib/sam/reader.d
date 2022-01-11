@@ -235,7 +235,7 @@ struct SAMReader
             hts_log_error(__FUNCTION__, "BAI index not found");
             throw new Exception("Cannot multi region query");
         }
-        return this.f.query(regions).map!(x=>SAMRecord(x, header));
+        return this.f.query(regions).map!(x=>SAMRecord(bam_dup1(x), header));
     }
 
     /// opIndex with a list of string regions
