@@ -8,6 +8,7 @@ module dhtslib.bgzf;
 
 import core.stdc.stdlib : malloc, free;
 import std.zlib;
+import std.algorithm : map;
 import core.stdc.stdio : SEEK_SET;
 import std.parallelism : totalCPUs;
 import std.stdio : writeln, writefln;
@@ -16,6 +17,8 @@ import std.range : inputRangeObject, InputRangeObject;
 import std.traits : ReturnType;
 
 import dhtslib.memory;
+import dhtslib.file;
+
 import dhtslib.util;
 
 import htslib.bgzf;
@@ -203,7 +206,7 @@ debug(dhtslib_unittest) unittest
 struct RecordReader(RecType)
 {
     /// file reader
-    BGZFile file;
+    HtslibFile file;
     /// file reader range
     ReturnType!(this.initializeRange) range;
     /// keep the header
@@ -214,20 +217,20 @@ struct RecordReader(RecType)
     /// string filename ctor
     this(string fn)
     {
-        this.file = BGZFile(fn);
+        this.file = HtslibFile(fn);
+        this.file.loadHeader!Kstring('#');
+        this.header = fromStringz(this.file.textHdr.s).idup;
+        writeln(header);
         this.range = this.initializeRange;
-        while(!this.range.empty && this.range.front.length > 0 && this.range.front[0] == '#')
-        {
-            header ~= this.range.front ~ "\n";
-            this.range.popFront;
-        }
-        if(this.header.length > 0) this.header = this.header[0 .. $-1];
+        
+        
+
     }
 
     /// copy the BGZFile.byLineCopy range
     auto initializeRange()
     {
-        return this.file.byLineCopy.inputRangeObject;
+        return this.file.byRecord!Kstring.map!(x=>fromStringz(x.s).idup);
     }
 
     /// returns RecType
@@ -240,7 +243,7 @@ struct RecordReader(RecType)
     void popFront()
     {
         this.range.popFront;
-        if(this.range.front == "") this.emptyLine = true;
+        if(!this.empty && this.range.front == "") this.emptyLine = true;
     }
 
     /// is range done

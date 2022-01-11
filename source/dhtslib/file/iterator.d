@@ -22,6 +22,7 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     HtslibFile f;               /// HtslibFile
     HtsItr itr;                 /// refcounted hts_itr_t
     T rec;                      /// refcounted bam1_t, bcf1_t, or kstring_t
+    private Kstring line;
     private bool is_itr;        /// Using an Itr or just calling *_read functions
     private bool initialized;   /// Is the range initialized
     /// htslib read function return value
@@ -43,6 +44,8 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             rec = Kstring(initKstring);
             ks_initialize(rec);
         }
+        this.line = Kstring(initKstring);
+        ks_initialize(this.line);
         this.empty;
     }
 
@@ -79,6 +82,10 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             kputs(this.rec.s, ks);
             newItr.rec = ks;
         }
+        auto ks2 = Kstring(initKstring);
+        ks_initialize(ks2);
+        kputs(ks_c_str(this.line), ks2);
+        newItr.line = ks2;
 
         // if itr we need to deep copy it
         if(this.is_itr){
@@ -159,8 +166,19 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             else{
                 if(f.idx != null)
                     *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.fp);
-                else if(f.tbx != null)
-                    *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.tbx);
+                else if(f.tbx != null){
+                    static if(is(T == Kstring))
+                        *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.tbx);
+                    else {
+                        *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, this.line.getRef, f.tbx);
+                        static if(is(T == Bam1))
+                            *this.r = sam_parse1(this.line, this.f.bamHdr, this.rec);
+                        else static if(is(T == Bcf1))
+                            *this.r = vcf_parse(this.line, this.f.bcfHdr, this.rec);
+                        ks_clear(this.line);
+                    }
+                    
+                }
                 else{
                     *r = -2;
                     hts_log_error(__FUNCTION__, "Neither tabix nor bai/csi index are loaded");

@@ -1252,12 +1252,13 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing VCFReader");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
-    auto tbx = TabixIndexedFile(fn);
+    
     auto reg = getIntervalFromString("1:3000151-3062916");
-    auto vcf = VCFReader(tbx, reg.contig, reg.interval);
-    assert(!vcf.empty);
+    auto vcf = VCFReader(fn);
+    auto range = vcf.query(reg.contig, reg.interval);
+    assert(!range.empty);
 
-    VCFRecord rec = vcf.front;
+    VCFRecord rec = range.front;
     assert(rec.getInfos["AN"].to!int == 4);
     rec.addInfo("AN", rec.getInfos["AN"].to!int + 1);
     assert(rec.getInfos["AN"].to!int == 5);
@@ -1292,8 +1293,8 @@ debug(dhtslib_unittest) unittest
     // assert(rec.getInfos["AN"].to!short == 0);
     // assert(rec.getInfos["AN"].to!long == 2147483648);
 
-    vcf.popFront;
-    rec = vcf.front;
+    range.popFront;
+    rec = range.front;
     assert(rec.refAllele == "GTTT");
     assert(rec.getInfos["INDEL"].to!bool == true);
 
@@ -1327,8 +1328,8 @@ debug(dhtslib_unittest) unittest
     assert(rec.getFormats["GT"].to!int.array == [[2, 4], [2, 4]]);
     
 
-    vcf.popFront;
-    rec = vcf.front;
+    range.popFront;
+    rec = range.front;
 
     auto fmts = rec.getFormats;
     auto sam = vcf.vcfhdr.getSampleId("A");

@@ -282,6 +282,12 @@ struct VCFHeader
     {
         this.hdr = BcfHdr(h);
     }
+    
+    /// refcounted pointer ctor
+    this(BcfHdr h)
+    {
+        this.hdr = h;
+    }
 
     /// copy this header
     auto dup(){

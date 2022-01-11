@@ -11,7 +11,7 @@ module dhtslib.tabix;
 import std.stdio;
 import std.string;
 import std.traits : ReturnType;
-import std.range : inputRangeObject, InputRangeObject;
+import std.algorithm : map;
 import core.stdc.stdlib : malloc, free;
 
 import htslib.hts;
@@ -20,6 +20,7 @@ import htslib.tbx;
 import dhtslib.coordinates;
 import dhtslib.memory;
 import dhtslib.util;
+import dhtslib.file;
 //import htslib.regidx;
 
 /** Encapsulates a position-sorted record-oriented NGS flat file,
@@ -29,45 +30,33 @@ import dhtslib.util;
  */
 struct TabixIndexedFile {
 
-    HtsFile fp;    /// rc wrapper around htsFile ptr
+    HtslibFile f;    /// HtslibFile 
     Tbx   tbx;   /// rc wrapper around tabix ptr
-
-    string header;  /// NGS flat file's header (if any; e.g. BED may not have one)
+    string header;
 
     /// Initialize with a complete file path name to the tabix-indexed file
     /// The tabix index (.tbi) must already exist alongside
     this(const(char)[] fn, const(char)[] fntbi = "")
     {
         debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
-        this.fp = HtsFile(hts_open( toStringz(fn), "r"));
-        if ( !this.fp ) {
-            writefln("Could not read %s\n", fn);
+        this.f = HtslibFile(fn);
+        if ( !this.f.fp ) {
+            stderr.writefln("Could not read %s\n", fn);
             throw new Exception("Couldn't read file");
         }
         //enum htsExactFormat format = hts_get_format(fp)->format;
-        if(fntbi!="") this.tbx = Tbx(tbx_index_load2( toStringz(fn), toStringz(fntbi) ));
-        else this.tbx = Tbx(tbx_index_load( toStringz(fn) ));
+        if(fntbi!="") this.f.loadTabixIndex(fntbi);
+        else this.f.loadTabixIndex;
+        this.tbx = this.f.tbx;
         if (!this.tbx) { 
-            writefln("Could not load .tbi index of %s\n", fn );
+            stderr.writefln("Could not load .tbi index of %s\n", fn );
             throw new Exception("Couldn't load tabix index file");
         }
 
-        loadHeader();
+        this.f.loadHeader!Kstring('#');
+        this.header = fromStringz(this.f.textHdr.s).idup;
     }
 
-    private void loadHeader()
-    {
-        kstring_t str;
-        scope(exit) { free(str.s); }
-
-        while ( hts_getline(this.fp, '\n', &str) >= 0 )
-        {
-            if ( !str.l || str.s[0] != this.tbx.conf.meta_char ) break;
-            this.header ~= fromStringz(str.s) ~ '\n';
-        }
-
-        debug(dhtslib_debug) { writeln("end loadHeader"); }
-    }
 
     /// tbx.d: const(char **) tbx_seqnames(tbx_t *tbx, int *n);  // free the array but not the values
     @property string[] sequenceNames()
@@ -92,80 +81,11 @@ struct TabixIndexedFile {
     auto region(CoordSystem cs)(string chrom, Interval!cs coords)
     {
         auto newCoords = coords.to!(CoordSystem.zbho);
-        struct Region
-        {
-
-            /** TODO: determine how thread-(un)safe this is (i.e., using a potentially shared *fp and *tbx) */
-            private HtsFile fp;
-            private Tbx tbx;
-
-            private HtsItr itr;
-            private string next;
-
-            // necessary because the alternative strategy of preloading the first row
-            // leads to problems when Struct inst is blitted ->
-            // re-iterating always returns first row only (since *itr is expended 
-            // but first row was preloaded in this.next)
-            private bool active;
-            private string chrom;
-
-            this(HtsFile fp, Tbx tbx,  string chrom, Interval!(CoordSystem.zbho) coords)
-            {
-                this.fp = fp;
-                this.tbx = tbx;
-                this.chrom = chrom;
-                this.itr = HtsItr(tbx_itr_queryi(tbx, tbx_name2id(tbx, toStringz(this.chrom)), coords.start, coords.end));
-                this.empty;
-                debug(dhtslib_debug) { writeln("Region ctor // this.itr: ", this.itr); }
-            }
-
-            // had to remove "const" property from empty() due to manipulation of this.active
-            @property bool empty() {
-
-                if (!this.active) {
-                    // this is the first call to empty() (and use of the range)
-                    // Let's make it active and attempt to load the first record, if one exists
-                    this.active = true;
-                    this.popFront();
-                }
-
-                if (!this.next) return true;
-                else return false;
-            }
-
-            @property string front() const {
-                return this.next;
-            }
-
-            void popFront() {
-                // closure over fp and tbx? (i.e. potentially unsafe?)
-
-                // Get next entry
-                kstring_t kstr;
-                immutable res = tbx_itr_next(this.fp, this.tbx, this.itr, &kstr);
-                if (res < 0) {
-                    // we are done
-                    this.next = null;
-                } else {
-                    // Otherwise load into next
-                    this.next = fromStringz(kstr.s).idup;
-                    free(kstr.s);
-                }
-            }
-            Region save()
-            {
-                Region newRange;
-                newRange.fp = HtsFile(copyHtsFile(fp));
-                newRange.itr = HtsItr(copyHtsItr(itr));
-                newRange.tbx = tbx;
-                newRange.next = next;
-                newRange.active = active;
-                newRange.chrom = chrom;
-                return newRange;
-            }
-        }
-
-        return Region(this.fp, this.tbx, chrom, newCoords);
+        auto tid = tbx_name2id(tbx, toStringz(chrom));
+        auto newF = this.f.dup;
+        newF.resetToFirstRecord;
+        return newF.query!Kstring(tid,newCoords.start, newCoords.end)
+                    .map!(x => fromStringz(x.s).idup);
     }
 
 }
@@ -216,7 +136,6 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
         this.coords = coords;
         this.header = this.file.header;
         this.range = this.initializeRange;
-        this.range.empty;
     }
 
     /// copy the TabixIndexedFile.region range
@@ -235,7 +154,7 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     void popFront()
     {
         this.range.popFront;
-        if(this.range.front == "") this.emptyLine = true;
+        if(!this.range.empty && this.range.front == "") this.emptyLine = true;
     }
 
     /// is the range done

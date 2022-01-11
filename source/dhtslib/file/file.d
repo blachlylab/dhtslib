@@ -121,18 +121,18 @@ struct HtslibFile
 
     /// File or string ctor
     this(T)(T f)
-    if ((is(T == string) || is(T == File)))
+    if ((isSomeString!T || is(T == File)))
     {
         this(f, "r");
     }
 
     /// File or string ctor with mode
     this(T1, T2)(T1 f, T2 mode)
-    if ((is(T1 == string) || is(T1 == File)) && (isSomeString!T2 || is(T2 == HtslibFileWriteMode)))
+    if ((isSomeString!T1 || is(T1 == File)) && (isSomeString!T2 || is(T2 == HtslibFileWriteMode)))
     {
         this.mode = mode.dup ~ '\0';
         // open file
-        static if (is(T1 == string))
+        static if (isSomeString!T1)
         {
             this.fn = Kstring(initKstring());
             ks_initialize(this.fn);
@@ -149,8 +149,6 @@ struct HtslibFile
             this.fp = HtsFile(hts_hopen(hf, this.fn.s, m.ptr));
         }
         else static assert(0);
-
-        this.idx = HtsIdx(null);
     }
 
     /// Duplicate the file with the same offset
@@ -220,42 +218,59 @@ struct HtslibFile
             case htsExactFormat.sam:
             case htsExactFormat.bam:
             case htsExactFormat.cram:
-                this.bamHdr = BamHdr(sam_hdr_read(this.fp));
+                this.loadHeader!BamHdr(commentChar);
                 break;
             case htsExactFormat.vcf:
             case htsExactFormat.bcf:
-                this.bcfHdr = BcfHdr(bcf_hdr_read(this.fp));
+                this.loadHeader!BcfHdr(commentChar);    
                 break;
             default:
-                // parse header from a text file
-                this.textHdr = Kstring(initKstring);
-                ks_initialize(this.textHdr);
+                this.loadHeader!Kstring(commentChar);
+        }
+    }
 
-                auto ks = Kstring(initKstring);
-                ks_initialize(ks);
+    /// Read a SAM/BAM header, VCF/BCF header, or text header and internally store it
+    void loadHeader(T)(char commentChar)
+    if(is(T == BamHdr) || is(T == BcfHdr) || is(T == Kstring))
+    {
+        static if(is(T == BamHdr)){
+            this.bamHdr = BamHdr(sam_hdr_read(this.fp));
+        }
+        else static if(is(T == BcfHdr)){
+            this.bcfHdr = BcfHdr(bcf_hdr_read(this.fp));
+        }
+        else static if(is(T == Kstring)){
+            // parse header from a text file
+            this.textHdr = Kstring(initKstring);
+            ks_initialize(this.textHdr);
 
-                // peek at first char, if commentChar (#)
-                // save the line and repeat
-                if(this.fp.is_bgzf){
-                    
-                    while(true){
-                        if(cast(char) bgzf_peek(this.fp.fp.bgzf) == commentChar){
-                            hts_getline(this.fp, cast(int)'\n', ks);
-                            kputs(ks.s, this.textHdr);
-                            kputc(cast(int)'\n', this.textHdr);
-                        } else break;
-                    }
-                }else{
-                    while(true){
-                        char c;
-                        hpeek(this.fp.fp.hfile, &c, 1);
-                        if(c  == commentChar){
-                            hts_getline(this.fp, cast(int)'\n', ks);
-                            kputs(ks.s, this.textHdr);
-                            kputc(cast(int)'\n', this.textHdr);
-                        } else break;
-                    }
+            auto ks = Kstring(initKstring);
+            ks_initialize(ks);
+
+            // peek at first char, if commentChar (#)
+            // save the line and repeat
+            if(this.fp.is_bgzf){
+                
+                while(true){
+                    if(cast(char) bgzf_peek(this.fp.fp.bgzf) == commentChar){
+                        hts_getline(this.fp, cast(int)'\n', ks);
+                        kputs(ks.s, this.textHdr);
+                        kputc(cast(int)'\n', this.textHdr);
+                    } else break;
                 }
+            }else{
+                while(true){
+                    char c;
+                    hpeek(this.fp.fp.hfile, &c, 1);
+                    if(c  == commentChar){
+                        hts_getline(this.fp, cast(int)'\n', ks);
+                        kputs(ks.s, this.textHdr);
+                        kputc(cast(int)'\n', this.textHdr);
+                    } else break;
+                }
+                this.textHdr.l--;
+                kputc(cast(int)'\0', this.textHdr);
+            }
         }
         // set header offset
         this.headerOffset = this.tell;
@@ -315,7 +330,8 @@ struct HtslibFile
     }
 
     /// load tabix index from file
-    Tbx loadTabixIndex(string idxFile)
+    Tbx loadTabixIndex(T)(T idxFile)
+    if(isSomeString!T)
     {
         this.tbx = Tbx(tbx_index_load2(this.fn.s, toStringz(idxFile)));
         return this.tbx;
@@ -328,30 +344,39 @@ struct HtslibFile
     auto query(T)(int tid, long beg, long end)
     if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     {
-        // BAI/CSI Index
-        if(this.idx != null){
-            static if(is(T == Bam1)){
-                auto itr = HtsItr(sam_itr_queryi(this.idx, tid, beg, end));
-                return HtslibIterator!Bam1(this, itr);
-            }else static if(is(T == Bcf1)){
-                auto itr = HtsItr(hts_itr_query(this.idx, tid, beg, end, &bcf_readrec));
-                return HtslibIterator!Bcf1(this, itr);
-            }
-        // Tabix Index
-        }else if(this.tbx != null){
-            static if(is(T == Bam1)){
-                auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
-                return HtslibIterator!Bam1(this, itr);
-            }else static if(is(T == Bcf1)){
-                auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
-                return HtslibIterator!Bcf1(this, itr);
-            }else static if(is(T == Kstring)){
+        // if T == Kstring
+        // we assume using tabix index
+        static if(is(T == Kstring)){
+            if(this.tbx != null){
                 auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
                 return HtslibIterator!Kstring(this, itr);
-            } 
+            }else{
+                throw new Exception("No TABIX index is loaded");
+            }
         }else{
-            throw new Exception("No TABIX/BAI/CSI index is loaded");
+            // BAI/CSI Index
+            if(this.idx != null){
+                static if(is(T == Bam1)){
+                    auto itr = HtsItr(sam_itr_queryi(this.idx, tid, beg, end));
+                    return HtslibIterator!Bam1(this, itr);
+                }else static if(is(T == Bcf1)){
+                    auto itr = HtsItr(hts_itr_query(this.idx, tid, beg, end, &bcf_readrec));
+                    return HtslibIterator!Bcf1(this, itr);
+                }
+            // Tabix Index
+            }else if(this.tbx != null){
+                static if(is(T == Bam1)){
+                    auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
+                    return HtslibIterator!Bam1(this, itr);
+                }else static if(is(T == Bcf1)){
+                    auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
+                    return HtslibIterator!Bcf1(this, itr);
+                }
+            }else{
+                throw new Exception("No TABIX/BAI/CSI index is loaded");
+            }
         }
+        
         
     }
 

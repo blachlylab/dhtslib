@@ -42,6 +42,10 @@ if(!isPointer!T && isSomeFunction!destroyFun)
     /// initialized?
     bool initialized;
 
+    invariant{
+        assert(!this.initialized || (this.ptr && this.refct && *this.refct > 0));
+    }
+
     /// ctor that respects scope
     this(T * rawPtr) @trusted return scope
     {
