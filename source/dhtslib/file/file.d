@@ -72,7 +72,6 @@ enum HtslibFileWriteMode
  * standard interface. It can also centralize the ability to duplicate a file so that 
  * it can be iterated several times. It pairs with HtslibIterator.
  */
-
 struct HtslibFile
 {
     /// dhtslib.memory htsFile* rc wrapper
@@ -92,14 +91,21 @@ struct HtslibFile
     /// SAM/BAM/CRAM index 
     HtsIdx idx;
 
+    /// SAM/BAM/CRAM header
     BamHdr bamHdr;
+    /// BCF/VCF header
     BcfHdr bcfHdr;
+    /// text header
     Kstring textHdr;
 
     /// Tabix index 
     Tbx tbx;
 
+    /// is file end reached?
     bool eof;
+
+    /// offset of file after header
+    /// if it has been loaded 
     off_t headerOffset = -1;
 
     /// allow HtslibFile to be used as 
@@ -150,10 +156,14 @@ struct HtslibFile
     /// Duplicate the file with the same offset
     HtslibFile dup()
     {
+        // open a new file
         auto filename = fromStringz(this.fn.s).idup;
         auto newFile = HtslibFile(filename, this.mode);
 
+        // seek to the current offset
         newFile.seek(this.tell);
+
+        // copy internal fields
         newFile.idx = this.idx;
         newFile.bamHdr = this.bamHdr;
         newFile.bcfHdr = this.bcfHdr;
@@ -217,12 +227,15 @@ struct HtslibFile
                 this.bcfHdr = BcfHdr(bcf_hdr_read(this.fp));
                 break;
             default:
+                // parse header from a text file
                 this.textHdr = Kstring(initKstring);
                 ks_initialize(this.textHdr);
 
                 auto ks = Kstring(initKstring);
                 ks_initialize(ks);
 
+                // peek at first char, if commentChar (#)
+                // save the line and repeat
                 if(this.fp.is_bgzf){
                     
                     while(true){
@@ -244,6 +257,7 @@ struct HtslibFile
                     }
                 }
         }
+        // set header offset
         this.headerOffset = this.tell;
     }
 
@@ -339,6 +353,8 @@ struct HtslibFile
         }else static assert(0);
     }
 
+    /// iterate over all records in a file
+    /// returns a HtslibIterator
     auto byRecord(T)()
     if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     {

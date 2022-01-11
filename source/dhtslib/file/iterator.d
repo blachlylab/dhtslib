@@ -8,16 +8,29 @@ import dhtslib.file.file;
 import dhtslib.util;
 import htslib;
 
+/** 
+ * HtslibIterator is an abstraction for htslib's hts_itr_t using dhtslib.memory for reference counting.
+ * HtslibIterator can be used to iterate VCF/BCF/SAM/BAM/Text files using a BAI/CSI/TBX index
+ * or by simply iterating the file.
+ * 
+ * This struct adapts htslib's iterators into ForwardRange. It is paired with 
+ * and relies on HtslibFile. 
+ */
 struct HtslibIterator(T, bool is_tbx = false)
 if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
 {
-    HtslibFile f;
-    HtsItr itr;
-    T rec;
-    private bool is_itr;
-    private bool initialized;
+    HtslibFile f;               /// HtslibFile
+    HtsItr itr;                 /// refcounted hts_itr_t
+    T rec;                      /// refcounted bam1_t, bcf1_t, or kstring_t
+    private bool is_itr;        /// Using an Itr or just calling *_read functions
+    private bool initialized;   /// Is the range initialized
+    /// htslib read function return value
+    /// -1 on eof, < -1 on err
     /// must be pointer to keep range updated when blitted
     private int * r; 
+
+    /// ctor using only HtslibFile
+    /// without an iterator
     this(HtslibFile f)
     {
         this.r = new int(0);
@@ -33,6 +46,7 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
         this.empty;
     }
 
+    /// ctor using an HtslibFile and an iterator
     this(HtslibFile f, HtsItr itr)
     {
         this.is_itr = true;
@@ -40,18 +54,21 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
         this(f);
     }
 
+    /// Duplicate the iterator
+    /// must fully duplicate hts_itr_t
     HtslibIterator dup()
     {
 
         HtslibIterator newItr;
-        /// dup file
+        // dup file
         newItr.f = this.f.dup;
-        /// set private values
+
+        // set private values
         newItr.r = new int(*this.r);
         newItr.initialized = this.initialized;
         newItr.is_itr = this.is_itr;
 
-        /// duplicate current record
+        // duplicate current record
         static if(is(T == Bam1)){
             newItr.rec = Bam1(bam_dup1(this.rec));
         }else static if(is(T == Bcf1)){
@@ -62,26 +79,32 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             kputs(this.rec.s, ks);
             newItr.rec = ks;
         }
-        /// if itr we need to deep copy it
+
+        // if itr we need to deep copy it
         if(this.is_itr){
-            /// init
+            // init
             auto newHtsItr = cast(hts_itr_t *) malloc(hts_itr_t.sizeof);
-            /// bulk copy data
+
+            // bulk copy data
             *newHtsItr = *itr;
 
-            /// initialize and copy region list
-            /// if it is not null
+            // initialize and copy region list
+            // if it is not null
             if(newHtsItr.reg_list != null){
-                /// initialize the region lists
+
+                // initialize the region lists
                 newHtsItr.reg_list = cast(hts_reglist_t *) malloc(itr.n_reg * hts_reglist_t.sizeof);
                 newHtsItr.reg_list[0 .. newHtsItr.n_reg] = itr.reg_list[0 .. itr.n_reg];
-                /// for each list
+
+                // for each list
                 for(auto i=0; i < newHtsItr.n_reg; i++)
                 {
-                    /// copy all intervals
+                    // copy all intervals
                     newHtsItr.reg_list[i].intervals = cast(hts_pair_pos_t *) malloc(itr.reg_list[i].count * hts_pair_pos_t.sizeof);
                     newHtsItr.reg_list[i].intervals[0 .. newHtsItr.reg_list[i].count] = itr.reg_list[i].intervals[0 .. itr.reg_list[i].count];
-                    /// copy region c string
+
+                    // copy region c string
+                    // if not null
                     if(itr.reg_list[i].reg){
                         newHtsItr.reg_list[i].reg = cast(char *) malloc(strlen(itr.reg_list[i].reg) + 1);
                         memcpy(cast(void*)(newHtsItr.reg_list[i].reg),itr.reg_list[i].reg, strlen(itr.reg_list[i].reg) + 1);
@@ -89,16 +112,16 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
                 }
             }
 
-            /// initialize and copy bins list
+            // initialize and copy bins list
             newHtsItr.bins.a = cast(int *) malloc(itr.bins.m * int.sizeof);
             assert(newHtsItr.bins.m >= newHtsItr.bins.n);
             newHtsItr.bins.a[0 .. newHtsItr.bins.m] = itr.bins.a[0 .. itr.bins.m];
 
-            /// initialize and copy off list
+            // initialize and copy off list
             newHtsItr.off = cast(hts_pair64_max_t *) malloc(itr.n_off * hts_pair64_max_t.sizeof);
             newHtsItr.off[0 .. newHtsItr.n_off] = itr.off[0 .. itr.n_off];
             
-            /// set new itr
+            // set new itr
             newItr.itr = HtsItr(newHtsItr);
         }else{
             newItr.itr = this.itr;
@@ -107,11 +130,16 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
         return newItr;
     }
 
+    /// Get front of the iterator, returns  Bam1, Bcf1, or Kstring
+    /// Backing bam1_t, bcf1_t, kstring_t is re-used 
+    /// If you keep the result around it should be duplicated
     T front()
     {
         return rec;
     }
 
+    /// popFront to move range forward
+    /// is destructive
     void popFront()
     {
         if(!is_itr){
@@ -153,6 +181,7 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
         }
     }
     
+    /// Needed to be ForwardRange
     typeof(this) save()
     {
         return this.dup;
