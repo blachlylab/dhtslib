@@ -16,7 +16,7 @@ import htslib;
  * This struct adapts htslib's iterators into ForwardRange. It is paired with 
  * and relies on HtslibFile. 
  */
-struct HtslibIterator(T, bool is_tbx = false)
+struct HtslibIterator(T)
 if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
 {
     HtslibFile f;               /// HtslibFile
@@ -157,10 +157,15 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
             if (itr.multi)
                 *this.r = hts_itr_multi_next(f.fp, itr, rec.getRef);
             else{
-                static if(is_tbx)
-                    *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.tbx);
-                else 
+                if(f.idx != null)
                     *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.fp);
+                else if(f.tbx != null)
+                    *this.r = hts_itr_next(f.fp.is_bgzf ? f.fp.fp.bgzf : null, itr, rec.getRef, f.tbx);
+                else{
+                    *r = -2;
+                    hts_log_error(__FUNCTION__, "Neither tabix nor bai/csi index are loaded");
+                }
+                    
             }
         }
     }
@@ -246,11 +251,11 @@ debug(dhtslib_unittest) unittest
     
     f.seek(0);
     f.loadHeader;
-    assert(f.queryTabix!Bcf1(0, 3000149, 3000151).count == 2);
+    assert(f.query!Bcf1(0, 3000149, 3000151).count == 2);
 
     f.seek(0);
     f.loadHeader;
-    assert(f.queryTabix!Bcf1("1:3000150-3000151").count == 2);
+    assert(f.query!Bcf1("1:3000150-3000151").count == 2);
 }
 
 debug(dhtslib_unittest) unittest

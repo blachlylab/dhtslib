@@ -324,33 +324,80 @@ struct HtslibFile
     /// Query htsFile with tid, start, and end
     /// returns an HtslibIterator that has type T
     /// requires index be loaded first
+    /// can use Tabix index or BAI/CSI index
     auto query(T)(int tid, long beg, long end)
-    if(is(T == Bam1) || is(T == Bcf1))
+    if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     {
-        assert(this.idx.getRef != null);
-        static if(is(T == Bam1)){
-            auto itr = HtsItr(sam_itr_queryi(this.idx, tid, beg, end));
-            return HtslibIterator!(Bam1, false)(this, itr);
-        }else static if(is(T == Bcf1)){
-            auto itr = HtsItr(bcf_itr_queryi(this.idx, tid, beg, end));
-            return HtslibIterator!(Bcf1, false)(this, itr);
-        }else static assert(0);
+        // BAI/CSI Index
+        if(this.idx != null){
+            static if(is(T == Bam1)){
+                auto itr = HtsItr(sam_itr_queryi(this.idx, tid, beg, end));
+                return HtslibIterator!Bam1(this, itr);
+            }else static if(is(T == Bcf1)){
+                auto itr = HtsItr(hts_itr_query(this.idx, tid, beg, end, &bcf_readrec));
+                return HtslibIterator!Bcf1(this, itr);
+            }
+        // Tabix Index
+        }else if(this.tbx != null){
+            static if(is(T == Bam1)){
+                auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
+                return HtslibIterator!Bam1(this, itr);
+            }else static if(is(T == Bcf1)){
+                auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
+                return HtslibIterator!Bcf1(this, itr);
+            }else static if(is(T == Kstring)){
+                auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
+                return HtslibIterator!Kstring(this, itr);
+            } 
+        }else{
+            throw new Exception("No TABIX/BAI/CSI index is loaded");
+        }
+        
     }
 
     /// Query htsFile with string region
     /// returns an HtslibIterator that has type T
     /// requires index and header be loaded first
+    /// can use Tabix index or BAI/CSI index
     auto query(T)(string region)
     if(is(T == Bam1) || is(T == Bcf1))
     {
+        // BAI/CSI Index
+        if(this.idx != null){
+            static if(is(T == Bam1)){
+                auto itr = HtsItr(sam_itr_querys(this.idx, this.bamHdr, toStringz(region)));
+                return HtslibIterator!Bam1(this, itr);
+            }else static if(is(T == Bcf1)){
+                auto itr = HtsItr(bcf_itr_querys(this.idx, this.bcfHdr, toStringz(region)));
+                return HtslibIterator!Bcf1(this, itr);
+            }
+        // Tabix Index
+        }else if(this.tbx != null){
+            static if(is(T == Bam1)){
+                auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
+                return HtslibIterator!Bam1(this, itr);
+            }else static if(is(T == Bcf1)){
+                auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
+                return HtslibIterator!Bcf1(this, itr);
+            }else static if(is(T == Kstring)){
+                auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
+                return HtslibIterator!Kstring(this, itr);
+            }
+        }else{
+            throw new Exception("No TABIX/BAI/CSI index is loaded");
+        }
+    }
+
+    /// Query htsFile with array of regions
+    /// returns an HtslibIterator that has type Bam1
+    /// requires index and header be loaded first
+    auto query(string[] regions)
+    {
+        auto cQueries = regions.map!(toUTFz!(char *)).array;
+
         assert(this.idx.getRef != null);
-        static if(is(T == Bam1)){
-            auto itr = HtsItr(sam_itr_querys(this.idx, this.bamHdr, toStringz(region)));
-            return HtslibIterator!(Bam1, false)(this, itr);
-        }else static if(is(T == Bcf1)){
-            auto itr = HtsItr(bcf_itr_querys(this.idx, this.bcfHdr, toStringz(region)));
-            return HtslibIterator!(Bcf1, false)(this, itr);
-        }else static assert(0);
+        auto itr = HtsItr(sam_itr_regarray(this.idx, this.bamHdr, cQueries.ptr, cast(int)regions.length));
+        return HtslibIterator!Bam1(this, itr);
     }
 
     /// iterate over all records in a file
@@ -359,56 +406,6 @@ struct HtslibFile
     if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     {
         return HtslibIterator!T(this);
-    }
-
-    /// Query htsFile with array of regions
-    /// returns an HtslibIterator that has type T
-    /// requires index and header be loaded first
-    auto query(string[] regions)
-    {
-        auto cQueries = regions.map!(toUTFz!(char *)).array;
-
-        assert(this.idx.getRef != null);
-        auto itr = HtsItr(sam_itr_regarray(this.idx, this.bamHdr, cQueries.ptr, cast(int)regions.length));
-        return HtslibIterator!(Bam1, false)(this, itr);
-    }
-
-    /// Query tabix'd htsFile with tid, start, and end
-    /// returns an HtslibIterator that has type T
-    /// requires tabix be loaded first
-    auto queryTabix(T)(int tid, long beg, long end)
-    if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
-    {
-        assert(this.tbx.initialized && this.tbx.getRef);
-        static if(is(T == Bam1)){
-            auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
-            return HtslibIterator!(Bam1, true)(this, itr);
-        }else static if(is(T == Bcf1)){
-            auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
-            return HtslibIterator!(Bcf1, true)(this, itr);
-        }else static if(is(T == Kstring)){
-            auto itr = HtsItr(tbx_itr_queryi(this.tbx, tid, beg, end));
-            return HtslibIterator!(Kstring, true)(this, itr);
-        } else static assert(0);
-    }
-
-    /// Query tabix'd htsFile with tid, start, and end
-    /// returns an HtslibIterator that has type T
-    /// requires tabix be loaded first
-    auto queryTabix(T)(string region)
-    if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
-    {
-        assert(this.tbx.initialized && this.tbx.getRef);
-        static if(is(T == Bam1)){
-            auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
-            return HtslibIterator!(Bam1, true)(this, itr);
-        }else static if(is(T == Bcf1)){
-            auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
-            return HtslibIterator!(Bcf1, true)(this, itr);
-        }else static if(is(T == Kstring)){
-            auto itr = HtsItr(tbx_itr_querys(this.tbx, toStringz(region)));
-            return HtslibIterator!(Kstring, true)(this, itr);
-        } else static assert(0);
     }
 
     /// write SAM/BAM/VCF/BCF record, string, or ubyte data
