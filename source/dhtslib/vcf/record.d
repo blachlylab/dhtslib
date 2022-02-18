@@ -393,6 +393,23 @@ struct Genotype
                 assert(0);
         }
     }
+    
+    bool isNull()
+    {
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                return (cast(GT!byte[])(this.data)).filter!(x=>!x.isMissing).empty;
+            case BcfRecordType.Int16:
+                return (cast(GT!short[])(this.data)).filter!(x=>!x.isMissing).empty;
+            case BcfRecordType.Int32:
+                return (cast(GT!int[])(this.data)).filter!(x=>!x.isMissing).empty;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
+    }
 
     /// get genotype ploidy
     auto getPloidy() {
