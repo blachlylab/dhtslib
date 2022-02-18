@@ -14,9 +14,9 @@ auto GFF3Reader(string fn)
 }
 
 /// ditto
-auto GFF3Reader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+auto GFF3Reader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, int extra_threads = -1, string fnIdx = "")
 {
-    return RecordReaderRegion!(GFF3Record, cs)(fn, chrom, coords, fnIdx);
+    return RecordReaderRegion!(GFF3Record, cs)(fn, chrom, coords, extra_threads, fnIdx);
 }
 
 /// Returns a RecordReader range for a GTF file
@@ -26,9 +26,9 @@ auto GTFReader(string fn)
 }
 
 /// ditto
-auto GTFReader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+auto GTFReader(CoordSystem cs)(string fn, string chrom, Interval!cs coords, int extra_threads = -1, string fnIdx = "")
 {
-    return RecordReaderRegion!(GTFRecord, cs)(fn, chrom, coords, fnIdx);
+    return RecordReaderRegion!(GTFRecord, cs)(fn, chrom, coords, extra_threads, fnIdx);
 }
 
 /// Returns a RecordReader range for a GFF2 file

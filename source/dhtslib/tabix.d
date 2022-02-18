@@ -12,9 +12,11 @@ import std.stdio;
 import std.string;
 import std.traits : ReturnType;
 import std.range : inputRangeObject, InputRangeObject;
+import std.parallelism : totalCPUs;
 import core.stdc.stdlib : malloc, free;
 
 import htslib.hts;
+import htslib.hts_log;
 import htslib.kstring;
 import htslib.tbx;
 import dhtslib.coordinates;
@@ -36,7 +38,7 @@ struct TabixIndexedFile {
 
     /// Initialize with a complete file path name to the tabix-indexed file
     /// The tabix index (.tbi) must already exist alongside
-    this(const(char)[] fn, const(char)[] fntbi = "")
+    this(const(char)[] fn, int extra_threads = -1, const(char)[] fntbi = "")
     {
         debug(dhtslib_debug) { writeln("TabixIndexedFile ctor"); }
         this.fp = HtsFile(hts_open( toStringz(fn), "r"));
@@ -44,6 +46,28 @@ struct TabixIndexedFile {
             writefln("Could not read %s\n", fn);
             throw new Exception("Couldn't read file");
         }
+
+        if (extra_threads == -1)
+        {
+            if ( totalCPUs > 1)
+            {
+                hts_log_info(__FUNCTION__,
+                        format("%d CPU cores detected; enabling multithreading", totalCPUs));
+                // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
+                // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
+                hts_set_threads(this.fp, totalCPUs);
+            }
+        } else if (extra_threads > 0)
+        {
+            if ((extra_threads + 1) > totalCPUs)
+                hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
+            hts_set_threads(this.fp, extra_threads);
+        }
+        else if (extra_threads == 0)
+        {
+            hts_log_debug(__FUNCTION__, "Zero extra threads requested");
+        }
+
         //enum htsExactFormat format = hts_get_format(fp)->format;
         if(fntbi!="") this.tbx = Tbx(tbx_index_load2( toStringz(fn), toStringz(fntbi) ));
         else this.tbx = Tbx(tbx_index_load( toStringz(fn) ));
@@ -209,9 +233,9 @@ struct RecordReaderRegion(RecType, CoordSystem cs)
     bool emptyLine = false;
     
     /// string chrom and Interval ctor
-    this(string fn, string chrom, Interval!cs coords, string fnIdx = "")
+    this(string fn, string chrom, Interval!cs coords, int extra_threads = -1, string fnIdx = "")
     {
-        this.file = TabixIndexedFile(fn, fnIdx);
+        this.file = TabixIndexedFile(fn, extra_threads, fnIdx);
         this.chrom = chrom;
         this.coords = coords;
         this.header = this.file.header;
