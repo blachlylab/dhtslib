@@ -304,7 +304,7 @@ struct FormatField
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return ret.chunks(this.n);
             }
-            ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
+            ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples];
         }
         static if(isSomeString!T)
             return ret.chunks(1);
