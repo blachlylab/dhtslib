@@ -224,6 +224,16 @@ struct RecordReader(RecType)
         if(this.header.length > 0) this.header = this.header[0 .. $-1];
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.file = file;
+        this.range = range;
+        this.header = header;
+        this.emptyLine = emptyLine;
+    }
+
     /// copy the BGZFile.byLineCopy range
     auto initializeRange()
     {

@@ -132,8 +132,15 @@ struct VCFWriter
         else static if(is(H == VCFHeader)) { this.vcfhdr      = VCFHeader( bcf_hdr_dup(header.hdr)); }
         else static if(is(H == bcf_hdr_t*)) { this.vcfhdr = VCFHeader( bcf_hdr_dup(header) ); }
         else assert(0);
+    }
 
-        assert(this.vcfhdr.hdr != null);
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.fp = fp;
+        this.vcfhdr = vcfhdr;
+        this.rows = rows;
     }
 
     VCFHeader getHeader()

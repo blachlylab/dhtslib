@@ -112,6 +112,16 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         }
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.fp = fp;
+        this.vcfhdr = vcfhdr;
+        this.b = b;
+        this.MAX_UNPACK = MAX_UNPACK;
+    }
+
     invariant
     {
         assert(this.vcfhdr.hdr != null);

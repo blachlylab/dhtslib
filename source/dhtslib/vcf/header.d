@@ -283,6 +283,13 @@ struct VCFHeader
         this.hdr = BcfHdr(h);
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.hdr = hdr;
+    }
+
     /// copy this header
     auto dup(){
         return VCFHeader(bcf_hdr_dup(this.hdr));

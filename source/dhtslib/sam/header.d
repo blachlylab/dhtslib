@@ -44,6 +44,13 @@ struct SAMHeader
         this.h = BamHdr(h);
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.h = h;   
+    }
+
     bool isNull(){
         return this.h is null;
     }

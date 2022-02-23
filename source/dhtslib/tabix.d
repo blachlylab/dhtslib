@@ -79,6 +79,15 @@ struct TabixIndexedFile {
         loadHeader();
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.fp = fp;
+        this.tbx = tbx;
+        this.header = header;
+    }
+
     private void loadHeader()
     {
         kstring_t str;

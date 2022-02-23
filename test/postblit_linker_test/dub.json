@@ -1,0 +1,14 @@
+{
+	"authors": [
+		"Thomas"
+	],
+	"copyright": "Copyright © 2021, Thomas",
+	"description": "A minimal D application.",
+	"license": "MIT",
+	"name": "postblit_linker_test",
+	"dependencies": {
+		"dhtslib" : {
+			"path": "../../"
+		}
+	}
+}

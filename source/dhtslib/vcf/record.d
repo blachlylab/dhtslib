@@ -54,6 +54,16 @@ struct InfoField
         this(key, info);
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.line = line;
+        this.key = key;
+        this.type = type;
+        this.data = data;
+    }
+
     /// string, info field ctor
     this(string key, bcf_info_t * info)
     {
@@ -210,6 +220,19 @@ struct FormatField
     {
         this.line = line;
         this(key, fmt);
+    }
+
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.line = line;
+        this.key = key;
+        this.type = type;
+        this.nSamples = nSamples;
+        this.n = n;
+        this.size = size;
+        this.data = data;
     }
 
     /// string and format ctor
@@ -392,6 +415,15 @@ struct Genotype
             case BcfRecordType.Null:
                 assert(0);
         }
+    }
+
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.type = type;
+        this.data = data;
+        this.line = line;
     }
     
     bool isNull()
@@ -582,6 +614,14 @@ struct VCFRecord
         } else {
             ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
         }
+    }
+
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.line = line;
+        this.vcfheader = vcfheader;
     }
 
     /// ensure that vcf variable length data is unpacked to at least desired level

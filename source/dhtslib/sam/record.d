@@ -52,6 +52,14 @@ struct SAMRecord
         this.h = h;
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.b = b;
+        this.h = h;   
+    }
+
     /* bam1_core_t fields */
 
     /// chromosome ID, defined by sam_hdr_t
