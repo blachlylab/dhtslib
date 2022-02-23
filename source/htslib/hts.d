@@ -199,6 +199,7 @@ enum htsExactFormat // @suppress(dscanner.style.phobos_naming_convention)
     fai_format = 18,
     fqi_format = 19,
     hts_crypt4gh_format = 20,
+    d4_format = 21,
     format_maximum = 32_767
 }
 
@@ -211,6 +212,8 @@ enum htsCompression // @suppress(dscanner.style.phobos_naming_convention)
     custom = 3,
     bzip2_compression = 4,
     razf_compression = 5,
+    xz_compression = 6,
+    zstd_compression = 7,
     compression_maximum = 32_767
 }
 
@@ -377,6 +380,11 @@ enum hts_fmt_option
     // Two character string.
     // Barcode aux tag for CASAVA; defaults to "BC".
     FASTQ_OPT_BARCODE = 1003,
+
+    // Process SRA and ENA read names which pointlessly move the original
+    // name to the second field and insert a constructed <run>.<number>
+    // name in its place.
+    FASTQ_OPT_NAME2 = 1004
 }
 
 /// Profile options for encoding; primarily used at present in CRAM
@@ -517,7 +525,7 @@ const(char)* hts_version();
 // Immediately after release, bump ZZ to 90 to distinguish in-development
 // Git repository builds from the release; you may wish to increment this
 // further when significant features are merged.
-enum HTS_VERSION = 101300;
+enum HTS_VERSION = 101400;
 
 /**! @abstract Introspection on the features enabled in htslib
  *
@@ -585,6 +593,8 @@ char* hts_format_description(const(htsFormat)* format);
       specifier letters:
         b  binary format (BAM, BCF, etc) rather than text (SAM, VCF, etc)
         c  CRAM format
+        f  FASTQ format
+        F  FASTA format
         g  gzip compressed
         u  uncompressed
         z  bgzf compressed
@@ -621,6 +631,14 @@ htsFile* hts_open_format(
     const(char)* fn,
     const(char)* mode,
     const(htsFormat)* fmt);
+
+/**!
+  @abstract  For output streams, flush any buffered data
+  @param fp  The file handle to be flushed
+  @return    0 for success, or negative if an error occurred.
+  @since     1.14
+*/
+int hts_flush(htsFile* fp);
 
 /**!
   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file

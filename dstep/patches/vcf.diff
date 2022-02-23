@@ -347,25 +347,25 @@
 < alias vcfFile = htsFile_;
 ---
 > alias vcfFile = htsFile;
-532a555
+533a556
 > deprecated("Please use bcf_hdr_merge instead")
-578a602
+579a603
 > deprecated("use bcf_hdr_format() instead")
-617a642,644
+618a643,645
 >  /// NOTE: char *const* samples really exmplifies what I hate about C pointers
 > /// My interpretation of this is it is equivalent to char **samples, but that the outer pointer is const
 > /// which in D would be const(char *)*samples. I don't know what it implies about constancy of *samples or samples.
-621c648
+622c649
 <     char** samples,
 ---
 >     const(char*)* samples,
-628c655
+629c656
 < extern (D) auto bcf_hdr_nsamples(T)(auto ref T hdr)
 ---
 > pragma(inline, true) auto bcf_hdr_nsamples (bcf_hdr_t *hdr)
-723a751
+724a752
 > /// Lookup header record by key
-839,857c867,876
+840,858c868,877
 < extern (D) auto bcf_update_info_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_info(hdr, line, key, values, n, BCF_HT_INT);
@@ -396,11 +396,11 @@
 >     auto bcf_update_info_string(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(void) *values) // @suppress(dscanner.style.undocumented_declaration)
 >         { return bcf_update_info(hdr, line, key, values, 1, BCF_HT_STR); }
 >     }
-859c878
+860c879
 < int bcf_update_info(
 ---
 > int bcf_update_info (
-883,888c902,908
+884,889c903,909
 < int bcf_update_info_int64(
 <     const(bcf_hdr_t)* hdr,
 <     bcf1_t* line,
@@ -415,23 +415,23 @@
 > {
 >     return bcf_update_info(hdr, line, key, values, n, BCF_HT_LONG);
 > }
-890c910
+891c911
 < /*
 ---
 > /**
-906,909d925
+907,910d926
 < extern (D) auto bcf_update_format_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_format(hdr, line, key, values, n, BCF_HT_INT);
 < }
-911,914c927
+912,915c928
 < extern (D) auto bcf_update_format_float(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_format(hdr, line, key, values, n, BCF_HT_REAL);
 < }
 ---
 > }/// closing @nogc nothrow
-916,918c929,938
+917,919c930,939
 < extern (D) auto bcf_update_format_char(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_format(hdr, line, key, values, n, BCF_HT_STR);
@@ -446,18 +446,18 @@
 >     auto bcf_update_genotypes(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) **gts, int n) // @suppress(dscanner.style.undocumented_declaration)
 >         { return bcf_update_format(hdr, line, toStringz("GT"c), gts, n, BCF_HT_INT); 
 >     }
-921,924c941
+922,925c942
 < extern (D) auto bcf_update_genotypes(T0, T1, T2, T3)(auto ref T0 hdr, auto ref T1 line, auto ref T2 gts, auto ref T3 n)
 < {
 <     return bcf_update_format(hdr, line, "GT", gts, n, BCF_HT_INT);
 < } // See bcf_gt_ macros below
 ---
 > @nogc nothrow {
-926c943
+927c944
 < int bcf_update_format_string(
 ---
 > int bcf_update_format_string (
-941,968c958,971
+942,969c959,972
 < // Macros for setting genotypes correctly, for use with bcf_update_genotypes only; idx corresponds
 < // to VCF's GT (1-based index to ALT or 0 for the reference allele) and val is the opposite, obtained
 < // from bcf_get_genotypes() below.
@@ -501,10 +501,10 @@
 >     auto bcf_gt_is_phased(int idx)  { return ((idx)&1);         }
 >     /// ditto
 >     auto bcf_gt_allele(int val)     { return (((val)>>1)-1);    }
-969a973,974
+970a974,975
 > /// ditto
 >     enum int bcf_gt_missing = 0;
-972,977c977,986
+973,978c978,987
 < extern (D) auto bcf_alleles2gt(T0, T1)(auto ref T0 a, auto ref T1 b)
 < {
 <     return a > b ? (a * (a + 1) / 2 + b) : (b * (b + 1) / 2 + a);
@@ -522,7 +522,7 @@
 >             *b = dk - 1; *a = igt - k + *b;
 >         }
 >     }
-1026,1044c1035,1044
+1027,1045c1036,1045
 < extern (D) auto bcf_get_info_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_INT);
@@ -553,11 +553,11 @@
 >     auto bcf_get_info_flag(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *tag, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration)
 >         { return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_FLAG); }
 >     }
-1046c1046
+1047c1047
 < int bcf_get_info_values(
 ---
 > int bcf_get_info_values (
-1073,1078c1073,1080
+1074,1079c1074,1081
 < int bcf_get_info_int64(
 <     const(bcf_hdr_t)* hdr,
 <     bcf1_t* line,
@@ -573,19 +573,19 @@
 >     return bcf_get_info_values(hdr, line, tag,
 >                                 cast(void **) dst, ndst, BCF_HT_LONG);
 > }
-1132,1135d1133
+1133,1136d1134
 < extern (D) auto bcf_get_format_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_INT);
 < }
-1137,1140c1135
+1138,1141c1136
 < extern (D) auto bcf_get_format_float(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_REAL);
 < }
 ---
 > }/// closing @nogc nothrow from line 928
-1142,1144c1137,1145
+1143,1145c1138,1146
 < extern (D) auto bcf_get_format_char(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_STR);
@@ -599,14 +599,14 @@
 >         { return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_STR); }
 >     auto bcf_get_genotypes(const(bcf_hdr_t) *hdr, bcf1_t *line, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration) // @suppress(dscanner.style.long_line)
 >         { return bcf_get_format_values(hdr, line, toStringz("GT"c), cast(void**) dst, ndst, BCF_HT_INT); }
-1147,1150c1148
+1148,1151c1149
 < extern (D) auto bcf_get_genotypes(T0, T1, T2, T3)(auto ref T0 hdr, auto ref T1 line, auto ref T2 dst, auto ref T3 ndst)
 < {
 <     return bcf_get_format_values(hdr, line, "GT", cast(void**) dst, ndst, BCF_HT_INT);
 < }
 ---
 > @nogc nothrow {
-1182,1185c1180,1182
+1183,1186c1181,1183
 < extern (D) auto bcf_hdr_int2id(T0, T1, T2)(auto ref T0 hdr, auto ref T1 type, auto ref T2 int_id)
 < {
 <     return hdr.id[type][int_id].key;
@@ -615,7 +615,7 @@
 > pragma(inline, true)
 > auto bcf_hdr_int2id(const(bcf_hdr_t) *hdr, int type, int int_id)
 >     { return hdr.id[type][int_id].key; }
-1191,1193c1188,1192
+1192,1194c1189,1193
 < int bcf_hdr_name2id(const(bcf_hdr_t)* hdr, const(char)* id);
 < const(char)* bcf_hdr_id2name(const(bcf_hdr_t)* hdr, int rid);
 < const(char)* bcf_seqname(const(bcf_hdr_t)* hdr, const(bcf1_t)* rec);
@@ -625,7 +625,7 @@
 >     pragma(inline, true) const(char) *bcf_hdr_id2name(const(bcf_hdr_t) *hdr, int rid) { return hdr.id[BCF_DT_CTG][rid].key; } // @suppress(dscanner.style.long_line)
 >     /// ditto
 >     pragma(inline, true) const(char) *bcf_seqname(const(bcf_hdr_t) *hdr, bcf1_t *rec) { return hdr.id[BCF_DT_CTG][rec.rid].key; } // @suppress(dscanner.style.long_line)
-1218,1247c1217,1232
+1219,1248c1218,1233
 < extern (D) auto bcf_hdr_id2length(T0, T1, T2)(auto ref T0 hdr, auto ref T1 type, auto ref T2 int_id)
 < {
 <     return hdr.id[BCF_DT_ID][int_id].val.info[type] >> 8 & 0xf;
@@ -673,14 +673,14 @@
 >         { return ((hdr).id[(dict_type)==BCF_DT_CTG?BCF_DT_CTG:BCF_DT_ID][int_id].val.hrec[(dict_type)==BCF_DT_CTG?0:(col_type)]); // @suppress(dscanner.style.long_line)
 >     }
 > } 
-1300,1303c1285
+1301,1304c1286
 < extern (D) auto bcf_itr_queryi(T0, T1, T2, T3)(auto ref T0 idx, auto ref T1 tid, auto ref T2 beg, auto ref T3 end)
 < {
 <     return hts_itr_query(idx, tid, beg, end, bcf_readrec);
 < }
 ---
 > } /// closing @nogc nothrow from line 1136
-1305,1308c1287,1309
+1306,1309c1288,1310
 < extern (D) auto bcf_itr_querys(T0, T1, T2)(auto ref T0 idx, auto ref T1 hdr, auto ref T2 s)
 < {
 <     return hts_itr_querys(idx, s, cast(hts_name2id_f) bcf_hdr_name2id, hdr, hts_itr_query, bcf_readrec);
@@ -709,16 +709,16 @@
 >     }
 > 
 > @nogc nothrow:
-1310d1310
+1311d1311
 < int bcf_itr_next(htsFile* htsfp, hts_itr_t* itr, void* r);
-1317,1320c1317
+1318,1321c1318
 < extern (D) auto bcf_index_load(T)(auto ref T fn)
 < {
 <     return hts_idx_load(fn, HTS_FMT_CSI);
 < }
 ---
 > auto bcf_index_load(const(char) *fn) { return hts_idx_load(fn, HTS_FMT_CSI); }
-1322,1324c1319,1321
+1323,1325c1320,1322
 < extern (D) auto bcf_index_seqnames(T0, T1, T2)(auto ref T0 idx, auto ref T1 hdr, auto ref T2 nptr)
 < {
 <     return hts_idx_seqnames(idx, nptr, cast(hts_id2name_f) bcf_hdr_id2name, hdr);
@@ -726,11 +726,11 @@
 > /// Get a list (char **) of sequence names from the index -- free only the array, not the values
 > auto bcf_index_seqnames(const(hts_idx_t) *idx, const(bcf_hdr_t) *hdr, int *nptr)
 >     { return hts_idx_seqnames(idx, nptr, cast(hts_id2name_f) &bcf_hdr_id2name, cast(void *) hdr); }
-1433c1430
+1434c1431
 < /*
 ---
 > /**
-1447,1449c1444,1446
+1448,1450c1445,1447
 < enum bcf_int16_vector_end = -32767; /* INT16_MIN + 1 */
 < enum bcf_int32_vector_end = -2147483647; /* INT32_MIN + 1 */
 < enum bcf_int64_vector_end = -9223372036854775807LL; /* INT64_MIN + 1 */
@@ -738,7 +738,7 @@
 > enum bcf_int16_vector_end = -32_767; /* INT16_MIN + 1 */
 > enum bcf_int32_vector_end = -2_147_483_647; /* INT32_MIN + 1 */
 > enum bcf_int64_vector_end = -9_223_372_036_854_775_807L; /* INT64_MIN + 1 */
-1452,1454c1449,1451
+1453,1455c1450,1452
 < enum bcf_int16_missing = -32767 - 1; /* INT16_MIN */
 < enum bcf_int32_missing = -2147483647 - 1; /* INT32_MIN */
 < enum bcf_int64_missing = -9223372036854775807LL - 1LL; /* INT64_MIN */
@@ -746,13 +746,13 @@
 > enum bcf_int16_missing = -32_767 - 1; /* INT16_MIN */
 > enum bcf_int32_missing = -2_147_483_647 - 1; /* INT32_MIN */
 > enum bcf_int64_missing = -9_223_372_036_854_775_807L - 1L; /* INT64_MIN */
-1464,1465c1461,1462
+1465,1466c1462,1463
 < enum BCF_MIN_BT_INT16 = -32760; /* INT16_MIN + 8 */
 < enum BCF_MIN_BT_INT32 = -2147483640; /* INT32_MIN + 8 */
 ---
 > enum BCF_MIN_BT_INT16 = -32_760; /* INT16_MIN + 8 */
 > enum BCF_MIN_BT_INT32 = -2_147_483_640; /* INT32_MIN + 8 */
-1469c1466,1531
+1470c1467,1532
 < void bcf_float_set(float* ptr, uint value);
 ---
 > version(LDC) pragma(inline, true):
@@ -821,19 +821,19 @@
 >         case BCF_BT_NULL:  e |= kputc('.', str) < 0; break;
 >         default: hts_log_error("Unexpected type %d", fmt.type); return -2;
 >     }
-1471,1473c1533
+1472,1474c1534
 < extern (D) auto bcf_float_set_vector_end(T)(auto ref T x)
 < {
 <     return bcf_float_set(&x, bcf_float_vector_end);
 ---
 >     return e == 0 ? 0 : -1;
-1476c1536,1538
+1477c1537,1539
 < extern (D) auto bcf_float_set_missing(T)(auto ref T x)
 ---
 > 
 > pragma(inline, true)
 > int bcf_enc_size(kstring_t *s, int size, int type)
-1478c1540,1558
+1479c1541,1559
 <     return bcf_float_set(&x, bcf_float_missing);
 ---
 >     uint32_t e = 0;
@@ -855,7 +855,7 @@
 >         }
 >     } else e |= kputc(size<<4|type, s) < 0;
 >     return e == 0 ? 0 : -1;
-1481,1490d1560
+1482,1491d1561
 < int bcf_float_is_missing(float f);
 < int bcf_float_is_vector_end(float f);
 < 
@@ -866,7 +866,7 @@
 < int bcf_enc_inttype(c_long x);
 < 
 < int bcf_enc_int1(kstring_t* s, int x);
-1491a1562,1595
+1492a1563,1596
 > /// Undocumented Encode integer type?
 > pragma(inline, true)
 > int bcf_enc_inttype(long x)
@@ -901,7 +901,7 @@
 >     }
 >     return e == 0 ? 0 : -1;
 > }
-1506,1508c1610,1628
+1507,1509c1611,1629
 < 
 < // Invalid type.
 < long bcf_dec_int1(const(ubyte)* p, int type, ubyte** q);
@@ -925,7 +925,7 @@
 >         return 0;
 >     }
 > }
-1526,1528c1646,1650
+1527,1529c1647,1651
 < long bcf_dec_typed_int1(const(ubyte)* p, ubyte** q);
 < 
 < int bcf_dec_size(const(ubyte)* p, ubyte** q, int* type);
@@ -935,7 +935,7 @@
 > {
 >     return bcf_dec_int1(p + 1, *p&0xf, q);
 > }
-1529a1652,1660
+1530a1653,1661
 > pragma(inline, true)
 > int bcf_dec_size (const(ubyte)* p, ubyte** q, int* type)
 > {

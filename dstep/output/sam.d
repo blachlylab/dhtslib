@@ -1496,9 +1496,17 @@ const(char)* sam_parse_region(
  *** SAM I/O ***
  ***************/
 
-alias sam_open = hts_open;
-alias sam_open_format = hts_open_format;
+extern (D) auto sam_open(T0, T1)(auto ref T0 fn, auto ref T1 mode)
+{
+    return hts_open(fn, mode);
+}
 
+extern (D) auto sam_open_format(T0, T1, T2)(auto ref T0 fn, auto ref T1 mode, auto ref T2 fmt)
+{
+    return hts_open_format(fn, mode, fmt);
+}
+
+alias sam_flush = hts_flush;
 alias sam_close = hts_close;
 
 int sam_open_mode(char* mode, const(char)* fn, const(char)* format);
@@ -1930,10 +1938,13 @@ void bam_plp_reset(bam_plp_t iter);
 /**
  *  bam_plp_constructor() - sets a callback to initialise any per-pileup1_t fields.
  *  @plp:       The bam_plp_t initialised using bam_plp_init.
- *  @func:      The callback function itself.  When called, it is given the
- *              data argument (specified in bam_plp_init), the bam structure and
- *              a pointer to a locally allocated bam_pileup_cd union.  This union
- *              will also be present in each bam_pileup1_t created.
+ *  @func:      The callback function itself.  When called, it is given
+ *              the data argument (specified in bam_plp_init), the bam
+ *              structure and a pointer to a locally allocated
+ *              bam_pileup_cd union.  This union will also be present in
+ *              each bam_pileup1_t created.
+ *              The callback function should have a negative return
+ *              value to indicate an error. (Similarly for destructor.)
  */
 void bam_plp_constructor(
     bam_plp_t plp,
@@ -1956,6 +1967,37 @@ void bam_plp_destructor(
  * any deletion immediately following the insertion, or zero if none.
  */
 int bam_plp_insertion(const(bam_pileup1_t)* p, kstring_t* ins, int* del_len);
+
+/**! @typedef
+ @abstract An opaque type used for caching base modification state between
+ successive calls to bam_mods_* functions.
+*/
+struct hts_base_mod_state;
+
+/// Get pileup padded insertion sequence, including base modifications
+/**
+ * @param p       pileup data
+ * @param m       state data for the base modification finder
+ * @param ins     the kstring where the insertion sequence will be written
+ * @param del_len location for deletion length
+ * @return the number of insertion string on success, with string length
+ *         being accessable via ins->l; -1 on failure.
+ *
+ * Fills out the kstring with the padded insertion sequence for the current
+ * location in 'p'.  If this is not an insertion site, the string is blank.
+ *
+ * The modification state needs to have been previously initialised using
+ * bam_parse_basemod.  It is permitted to be passed in as NULL, in which
+ * case this function outputs identically to bam_plp_insertion.
+ *
+ * If del_len is not NULL, the location pointed to is set to the length of
+ * any deletion immediately following the insertion, or zero if none.
+ */
+int bam_plp_insertion_mod(
+    const(bam_pileup1_t)* p,
+    hts_base_mod_state* m,
+    kstring_t* ins,
+    int* del_len);
 
 /// Create a new bam_mplp_t structure
 /** The struct returned by a successful call should be freed
@@ -2020,12 +2062,12 @@ enum htsRealnFlags {
     BAQ_REDO = 4,
 
     // Platform subfield, in bit position 3 onwards
-    BAQ_AUTO = 0<<3,
-    BAQ_ILLUMINA = 1<<3,
-    BAQ_PACBIOCCS = 2<<3,
-    BAQ_PACBIO = 3<<3,
-    BAQ_ONT = 4<<3,
-    BAQ_GENAPSYS = 5<<3
+    BAQ_AUTO = 0 << 3,
+    BAQ_ILLUMINA = 1 << 3,
+    BAQ_PACBIOCCS = 2 << 3,
+    BAQ_PACBIO = 3 << 3,
+    BAQ_ONT = 4 << 3,
+    BAQ_GENAPSYS = 5 << 3
 }
 
 /// Calculate BAQ scores
@@ -2085,3 +2127,132 @@ correct thing to do.  It would be wise to avoid this situation if possible.
 
 int sam_prob_realn(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int flag);
 
+// ---------------------------
+// Base modification retrieval
+
+/**! @typedef
+ @abstract Holds a single base modification.
+ @field modified_base     The short base code (m, h, etc) or -ChEBI (negative)
+ @field canonical_base    The canonical base referred to in the MM tag.
+                          One of A, C, G, T or N.  Note this may not be the
+                          explicit base recorded in the SEQ column (esp. if N).
+ @field stran             0 or 1, indicating + or - strand from MM tag.
+ @field qual              Quality code (256*probability), or -1 if unknown
+
+ @discussion
+ Note this doesn't hold any location data or information on which other
+ modifications may be possible at this site.
+*/
+struct hts_base_mod
+{
+    int modified_base;
+    int canonical_base;
+    int strand;
+    int qual;
+}
+
+/// Allocates an hts_base_mode_state.
+/**
+ * @return An hts_base_mode_state pointer on success,
+ *         NULL on failure.
+ *
+ * This just allocates the memory.  The initialisation of the contents is
+ * done using bam_parse_basemod.  Successive calls may be made to that
+ * without the need to free and allocate a new state.
+ *
+ * The state be destroyed using the hts_base_mode_state_free function.
+ */
+hts_base_mod_state* hts_base_mod_state_alloc();
+
+/// Destroys an  hts_base_mode_state.
+/**
+ * @param state    The base modification state pointer.
+ *
+ * The should have previously been created by hts_base_mode_state_alloc.
+ */
+void hts_base_mod_state_free(hts_base_mod_state* state);
+
+/// Parses the Mm and Ml tags out of a bam record.
+/**
+ * @param b        BAM alignment record
+ * @param state    The base modification state pointer.
+ * @return 0 on success,
+ *         -1 on failure.
+ *
+ * This fills out the contents of the modification state, resetting the
+ * iterator location to the first sequence base.
+ */
+int bam_parse_basemod(const(bam1_t)* b, hts_base_mod_state* state);
+
+/// Returns modification status for the next base position in the query seq.
+/**
+ * @param b        BAM alignment record
+ * @param state    The base modification state pointer.
+ * @param mods     A supplied array for returning base modifications
+ * @param n_mods   The size of the mods array
+ * @return The number of modifications found on success,
+ *         -1 on failure.
+ *
+ * This is intended to be used as an iterator, with one call per location
+ * along the query sequence.
+ *
+ * If no modifications are found, the returned value is zero.
+ * If more than n_mods modifications are found, the total found is returned.
+ * Note this means the caller needs to check whether this is higher than
+ * n_mods.
+ */
+int bam_mods_at_next_pos(
+    const(bam1_t)* b,
+    hts_base_mod_state* state,
+    hts_base_mod* mods,
+    int n_mods);
+
+/// Finds the next location containing base modifications and returns them
+/**
+ * @param b        BAM alignment record
+ * @param state    The base modification state pointer.
+ * @param mods     A supplied array for returning base modifications
+ * @param n_mods   The size of the mods array
+ * @return The number of modifications found on success,
+ *         0 if no more modifications are present,
+ *         -1 on failure.
+ *
+ * Unlike bam_mods_at_next_pos this skips ahead to the next site
+ * with modifications.
+ *
+ * If more than n_mods modifications are found, the total found is returned.
+ * Note this means the caller needs to check whether this is higher than
+ * n_mods.
+ */
+int bam_next_basemod(
+    const(bam1_t)* b,
+    hts_base_mod_state* state,
+    hts_base_mod* mods,
+    int n_mods,
+    int* pos);
+
+/// Returns modification status for a specific query position.
+/**
+ * @param b        BAM alignment record
+ * @param state    The base modification state pointer.
+ * @param mods     A supplied array for returning base modifications
+ * @param n_mods   The size of the mods array
+ * @return The number of modifications found on success,
+ *         -1 on failure.
+ *
+ * Note if called multipled times, qpos must be higher than the previous call.
+ * Hence this is suitable for use from a pileup iterator.  If more random
+ * access is required, bam_parse_basemod must be called each time to reset
+ * the state although this has an efficiency cost.
+ *
+ * If no modifications are found, the returned value is zero.
+ * If more than n_mods modifications are found, the total found is returned.
+ * Note this means the caller needs to check whether this is higher than
+ * n_mods.
+ */
+int bam_mods_at_qpos(
+    const(bam1_t)* b,
+    int qpos,
+    hts_base_mod_state* state,
+    hts_base_mod* mods,
+    int n_mods);

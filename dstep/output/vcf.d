@@ -354,6 +354,7 @@ void bcf_clear(bcf1_t* v);
 alias vcfFile = htsFile;
 alias bcf_open = hts_open;
 alias vcf_open = hts_open;
+alias bcf_flush = hts_flush;
 alias bcf_close = hts_close;
 alias vcf_close = hts_close;
 
