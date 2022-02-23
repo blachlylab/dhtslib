@@ -2,8 +2,8 @@ name: unittests
 on: [push, pull_request]
 
 jobs:
-  linux-unittests:
-    name: Dub Tests
+  linux-unittests-ldc:
+    name: Dub Tests LDC
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -73,3 +73,141 @@ jobs:
 
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash)
+
+  linux-unittests-dmd:
+    name: Dub Tests DMD
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        dc: [dmd-latest]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Install D compiler
+        uses: dlang-community/setup-dlang@v1
+        with:
+          compiler: ${{ matrix.dc }}
+
+      - name: Install htslib deps
+        run: |
+            sudo apt-get update && sudo apt-get install -y build-essential autoconf zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev libssl-dev
+
+      - name: Get htslib commit
+        id: get-htslib-commit
+        run: echo "::set-output name=sha_short::$(git rev-parse --short :htslib)"
+
+      - name: Cache htslib
+        id: cache-htslib
+        uses: actions/cache@v2
+        with:
+          path: htslib
+          key: ${{ runner.os}}-htslib-${{ steps.get-htslib-commit.outputs.sha_short }}
+
+      - name: Build htslib
+        if: steps.cache-htslib.outputs.cache-hit != 'true'
+        run: |
+            cd htslib
+            autoreconf -i
+            ./configure
+            make
+
+      - name: Install htslib
+        run: |
+            cd htslib
+            sudo make install
+            sudo ldconfig
+
+      - name: Setup additional test files
+        run: |
+            cd htslib
+            cd test
+            cd tabix
+            bgzip -c gff_file.gff > gff_file.gff.gz
+            tabix gff_file.gff.gz
+            bgzip -c bed_file.bed > bed_file.bed.gz
+            tabix bed_file.bed.gz
+            bgzip -c vcf_file.vcf > vcf_file.vcf.gz
+            tabix vcf_file.vcf.gz
+
+      - name: Run tests
+        run: dub -q test -b=unittest-cov
+        env:
+          LIBRARY_PATH: /usr/local/lib
+
+      - name: Run safety tests
+        run: dub -q test -c=unittest-safety
+        env:
+          LIBRARY_PATH: /usr/local/lib
+        
+  macos-unittests-dmd:
+    name: Dub Tests DMD
+    strategy:
+      matrix:
+        os: [macos-latest]
+        dc: [dmd-latest]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Install D compiler
+        uses: dlang-community/setup-dlang@v1
+        with:
+          compiler: ${{ matrix.dc }}
+
+      - name: Install htslib deps
+        run: |
+            sudo apt-get update && sudo apt-get install -y build-essential autoconf zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev libssl-dev
+
+      - name: Get htslib commit
+        id: get-htslib-commit
+        run: echo "::set-output name=sha_short::$(git rev-parse --short :htslib)"
+
+      - name: Cache htslib
+        id: cache-htslib
+        uses: actions/cache@v2
+        with:
+          path: htslib
+          key: ${{ runner.os}}-htslib-${{ steps.get-htslib-commit.outputs.sha_short }}
+
+      - name: Build htslib
+        if: steps.cache-htslib.outputs.cache-hit != 'true'
+        run: |
+            cd htslib
+            autoreconf -i
+            ./configure
+            make
+
+      - name: Install htslib
+        run: |
+            cd htslib
+            sudo make install
+            sudo ldconfig
+
+      - name: Setup additional test files
+        run: |
+            cd htslib
+            cd test
+            cd tabix
+            bgzip -c gff_file.gff > gff_file.gff.gz
+            tabix gff_file.gff.gz
+            bgzip -c bed_file.bed > bed_file.bed.gz
+            tabix bed_file.bed.gz
+            bgzip -c vcf_file.vcf > vcf_file.vcf.gz
+            tabix vcf_file.vcf.gz
+
+      - name: Run tests
+        run: dub -q test -b=unittest-cov
+        env:
+          LIBRARY_PATH: /usr/local/lib
+
+      - name: Run safety tests
+        run: dub -q test -c=unittest-safety
+        env:
+          LIBRARY_PATH: /usr/local/lib
