@@ -1,14 +1,15 @@
 31a32
 > import core.stdc.stdio;
-33a35,51
+34c35,40
+< extern (C):
+---
 > import htslib.hfile : hFILE;
 > import htslib.kstring;
 > 
 > @system:
 > nothrow:
 > @nogc:
-> 
-> 
+36a43,50
 > version(Windows){
 >     version(Win32){
 >         alias ssize_t = int;
@@ -17,15 +18,16 @@
 >         alias ssize_t = long;
 >     }
 > }
-> 
-46d63
+37a52
+> extern (C):
+49d63
 < struct hFILE;
-48d64
+51d64
 < struct kstring_t;
-50c66,67
+53c66,67
 < struct bgzidx_t;
 ---
 > struct __bgzidx_t;
 > alias bgzidx_t = __bgzidx_t;
-209a227
+212a227
 > pragma(inline, true)

@@ -33,7 +33,9 @@ import std.format: format;
 import htslib.hts;
 import htslib.hts_log;
 import htslib.bgzf : BGZF;
-import htslib.kstring : kstring_t, ssize_t;
+import htslib.kstring;
+import htslib.hts_endian;
+import core.stdc.errno : EINVAL, ENOMEM, errno;
 
 @system:
 extern (C):
@@ -1553,9 +1555,9 @@ int sam_passes_filter(
     const(bam1_t)* b,
     hts_filter_t* filt);
 
-/*************************************
- *** Manipulating auxiliary fields ***
- *************************************/
+    /*************************************
+     *** Manipulating auxiliary fields ***
+     *************************************/
 
 /// Converts a BAM aux tag to SAM format
 /*
@@ -2090,7 +2092,6 @@ of the enum could be this, equivalent to flag 19:
 
     sam_prob_realn(b, ref, len, BAQ_APPLY | BAQ_EXTEND | BAQ_PACBIOCCS);
 
-
 The following @param flag bits can be used:
 
 Bit 0 (BAQ_APPLY): Adjust the quality values using the BAQ values
@@ -2118,13 +2119,11 @@ Bits 3-10: Choose parameters tailored to a specific instrument type.
  at the time of writing mainly consist of Illumina vs long-read technology
  adjustments.
 
-
 @bug
 If the input read has both BQ:Z and ZQ:Z tags, the ZQ:Z one will be removed.
 Depending on what previous processing happened, this may or may not be the
 correct thing to do.  It would be wise to avoid this situation if possible.
 */
-
 int sam_prob_realn(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int flag);
 
 // ---------------------------

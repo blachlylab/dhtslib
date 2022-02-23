@@ -11,25 +11,34 @@
 > import core.stdc.config : c_long;
 > import core.stdc.stdarg;
 > import core.stdc.stdio : EOF;
-31a36,40
+31a36
 > import core.stdc.string : memcpy, strlen;
-> 
+33,34c38
+< extern (C):
+< 
+---
 > import htslib.kroundup;
-> 
+35a40
 > alias ssize_t = ptrdiff_t;	
-89,90c98,99
+37c42
+< enum HAVE___BUILTIN_CLZ = 1;
+---
+> extern (C):
+40a46
+> enum HAVE___BUILTIN_CLZ = 1;
+92,93c98,99
 < alias kgets_func = char* function(char*, int, void*);
 < int kgetline(kstring_t* s, char* function() fgets_fn, void* fp);
 ---
 > alias kgets_func = char* function(char*, int, void*)*;
 > int kgetline(kstring_t* s, kgets_func fgets_fn, void* fp);
-96,97c105,106
+99,100c105,106
 < alias kgets_func2 = c_long function(char*, size_t, void*);
 < int kgetline2(kstring_t* s, ssize_t function() fgets_fn, void* fp);
 ---
 > alias kgets_func2 = c_long function(char*, size_t, void*)*;
 > int kgetline2(kstring_t* s, kgets_func2 fgets_fn, void* fp);
-107,108c116,120
+110,111c116,120
 < void ks_initialize(kstring_t* s);
 < 
 ---
@@ -38,9 +47,9 @@
 >     s.l = s.m = 0;
 >     s.s = null;
 > }
-110d121
+113d121
 < int ks_resize(kstring_t* s, size_t size);
-111a123,135
+114a123,135
 > int ks_resize(kstring_t* s, size_t size)
 > {
 > 	if (s.m < size) {
@@ -54,39 +63,39 @@
 > 	}
 > 	return 0;
 > }
-113a138,140
+116a138,140
 > int ks_expand(kstring_t* s, size_t expansion)
 > {
 >     size_t new_size = s.l + expansion;
-115c142,145
+118c142,145
 < int ks_expand(kstring_t* s, size_t expansion);
 ---
 >     if (new_size < s.l) 
 >         return -1;
 >     return ks_resize(s, new_size);
 > }
-118c148,151
+121c148,151
 < char* ks_str(kstring_t* s);
 ---
 > char* ks_str(kstring_t* s)
 > {
 > 	return s.s;
 > }
-126c159,162
+129c159,162
 < const(char)* ks_c_str(kstring_t* s);
 ---
 > const(char)* ks_c_str(kstring_t* s)
 > {
 >     return s.l && s.s ? s.s : "";
 > }
-128c164,167
+131c164,167
 < size_t ks_len(kstring_t* s);
 ---
 > size_t ks_len(kstring_t* s)
 > {
 > 	return s.l;
 > }
-136c175,179
+139c175,179
 < kstring_t* ks_clear(kstring_t* s);
 ---
 > kstring_t* ks_clear(kstring_t* s)
@@ -94,7 +103,7 @@
 >     s.l = 0;
 >     return s;
 > }
-142c185,192
+145c185,191
 < char* ks_release(kstring_t* s);
 ---
 > char* ks_release(kstring_t* s)
@@ -104,8 +113,9 @@
 > 	s.s = null;
 > 	return ss;
 > }
-> 
-143a194,200
+148c194,200
+< void ks_free(kstring_t* s);
+---
 > void ks_free(kstring_t* s)
 > {
 >     if (s) {
@@ -113,8 +123,8 @@
 >         ks_initialize(s);
 >     }
 > }
-145c202,211
-< void ks_free(kstring_t* s);
+150c202,211
+< int kputsn(const(char)* p, size_t l, kstring_t* s);
 ---
 > int kputsn(const(char)* p, size_t l, kstring_t* s)
 > {
@@ -126,15 +136,15 @@
 > 	s.s[s.l] = 0;
 > 	return cast(int)l;	
 > }
-147c213,216
-< int kputsn(const(char)* p, size_t l, kstring_t* s);
+152c213,216
+< int kputs(const(char)* p, kstring_t* s);
 ---
 > int kputs(const(char)* p, kstring_t* s)
 > {
 > 	return kputsn(p, strlen(p), s);
 > }
-149c218,225
-< int kputs(const(char)* p, kstring_t* s);
+154c218,233
+< int kputc(int c, kstring_t* s);
 ---
 > int kputc(int c, kstring_t* s)
 > {
@@ -144,9 +154,7 @@
 > 	s.s[s.l] = 0;
 > 	return cast(ubyte)c;
 > }
-151c227,233
-< int kputc(int c, kstring_t* s);
----
+> 
 > int kputc_(int c, kstring_t* s)
 > {
 > 	if (ks_resize(s, s.l + 1) < 0)
@@ -154,7 +162,7 @@
 > 	s.s[s.l++] = cast(char)c;	
 > 	return 1;
 > }
-153c235,243
+156c235,243
 < int kputc_(int c, kstring_t* s);
 ---
 > int kputsn_(const(void)* p, size_t l, kstring_t* s)
@@ -166,9 +174,9 @@
 > 	s.l += l;
 > 	return cast(int)l;	
 > }
-155d244
+158d244
 < int kputsn_(const(void)* p, size_t l, kstring_t* s);
-158a248,286
+161a248,286
 > int kputuw(T)(T x, kstring_t* s){
 > 	version(LDC){
 > 		static uint[32] kputuw_num_digits = [
@@ -208,12 +216,11 @@
 >         s.s[s.l] = 0;
 >         return 0;
 >     }
-160a289
+163a289
 > 	version(LDC){
-168a298,311
+171a298
 > 		import ldc.intrinsics;
-> 
-> 		
+173a301,311
 > 		l = llvm_ctlz(x,true);
 > 		l = kputuw_num_digits[l] - (x < kputuw_thresholds[l]);
 > 	}else{
@@ -225,10 +232,10 @@
 > 			m *= 10;
 > 		} while (x >= m);
 > 	}
-169a313,314
+174a313,314
 >     if (ks_resize(s, s.l + l + 2) < 0)
 >         return EOF;
-171a317,323
+176a317,323
 >     j = l;
 >     cp = s.s + s.l;
 >     while (x >= 10) {
@@ -236,18 +243,22 @@
 >         x /= 100;
 >         memcpy(&cp[j-=2], d, 2);
 >     }
-173a326,327
+178d324
+< int kputuw(uint x, kstring_t* s);
+180c326,327
+< int kputw(int c, kstring_t* s);
+---
 >     if (j == 1)
 >         cp[0] = cast(char)(x + '0');
-175c329,332
-< int kputuw(uint x, kstring_t* s);
+182c329,332
+< int kputll(long c, kstring_t* s);
 ---
 >     s.l += l;
 >     s.s[s.l] = 0;
 >     return 0;
 > }
-177c334,342
-< int kputw(int c, kstring_t* s);
+184c334,364
+< int kputl(c_long c, kstring_t* s);
 ---
 > int kputw(int c, kstring_t* s)
 > {
@@ -258,14 +269,10 @@
 >             return EOF;
 >         s.s[s.l++] = '-';
 >     }
-179c344,345
-< int kputll(long c, kstring_t* s);
----
+> 
 >     return kputuw(x, s);
 > }
-181c347,364
-< int kputl(c_long c, kstring_t* s);
----
+> 
 > int kputll(long c, kstring_t* s)
 > {
 > 	char[32] buf;
@@ -284,7 +291,7 @@
 > int kputl(c_long c, kstring_t* s) {
 >     return kputll(c, s);
 > }
-187,188c370,376
+190,191c370,376
 < int* ksplit(kstring_t* s, int delimiter, int* n);
 < 
 ---
