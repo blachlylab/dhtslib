@@ -1,0 +1,49 @@
+38a39,47
+> import core.stdc.stdarg : va_list;
+> 
+> import htslib.sam;
+> import htslib.hts;
+> import htslib.hfile : hFILE;
+> 
+> @system:
+> nothrow:
+> @nogc:
+60a70,86
+> 
+> alias off_t = size_t;
+> alias ssize_t = size_t;
+> 
+> enum cram_block_method
+> {
+>     BM_ERROR = -1,
+>     RAW = 0,
+>     GZIP = 1,
+>     BZIP2 = 2,
+>     LZMA = 3,
+>     RANS = 4, 
+>     RANS0 = 4,
+>     RANS1 = 10, 
+>     GZIP_RLE = 11 
+> }
+> 
+83,84d108
+< struct hFILE;
+< 
+447c471
+< alias SAM_hdr = sam_hdr_t_;
+---
+> alias SAM_hdr = sam_hdr_t;
+457c481,482
+< SAM_hdr* sam_hdr_parse_(const(char)* hdr, size_t len);
+---
+> pragma(inline, true)
+> SAM_hdr* sam_hdr_parse_(const (char)* hdr, size_t len) { return sam_hdr_parse(len, hdr); }
+465c490,491
+< void sam_hdr_free(SAM_hdr* hdr);
+---
+> pragma(inline, true)
+> void sam_hdr_free(SAM_hdr* hdr) { sam_hdr_destroy(hdr); }
+485c511
+< enum sam_hdr_add_PG = sam_hdr_add_pg;
+---
+> alias sam_hdr_add_PG = sam_hdr_add_pg;

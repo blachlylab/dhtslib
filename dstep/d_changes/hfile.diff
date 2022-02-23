@@ -1,0 +1,141 @@
+4c4
+<     Copyright (C) 2013-2021 Genome Research Ltd.
+---
+>     Copyright (C) 2013-2020 Genome Research Ltd.
+25d24
+< 
+28a28,34
+> import core.stdc.string : memcpy, strlen;
+> 
+> import htslib.kstring : kstring_t;
+> 
+> @system:
+> nothrow:
+> @nogc:
+31a38,42
+> 
+> alias off_t = size_t;
+> alias ssize_t = size_t;
+> 
+> 
+33d43
+< struct kstring_t;
+97c107
+<     @return  The modified filename (i.e., `buffer->s`), or NULL on error.
+---
+>     @return  The modified filename (i.e., `buffer.s`), or NULL on error.
+125c135,139
+< int herrno(hFILE* fp);
+---
+> pragma(inline, true)
+> int herrno(hFILE* fp)
+> {
+>     return fp.has_errno;
+> }
+128c142,146
+< void hclearerr(hFILE* fp);
+---
+> pragma(inline, true)
+> void hclearerr(hFILE* fp)
+> {
+>     fp.has_errno = 0;
+> }
+139c157,161
+< off_t htell(hFILE* fp);
+---
+> pragma(inline, true)
+> off_t htell(hFILE* fp)
+> {
+>     return fp.offset + (fp.begin - fp.buffer);
+> }
+144c166,173
+< int hgetc(hFILE* fp);
+---
+> pragma(inline, true)
+> int hgetc(hFILE* fp)
+> {
+>     
+>     return (fp.end > fp.begin)? cast(ubyte) *(fp.begin++) : hgetc2(fp);
+> }
+> 
+> int hgetc2(hFILE* );
+169c198,202
+< ssize_t hgetln(char* buffer, size_t size, hFILE* fp);
+---
+> pragma(inline, true)
+> ssize_t hgetln(char* buffer, size_t size, hFILE* fp)
+> {
+>     return hgetdelim(buffer, size, '\n', fp);
+> }
+202c235,245
+< ssize_t hread(hFILE* fp, void* buffer, size_t nbytes);
+---
+> pragma(inline, true)
+> ssize_t hread(hFILE* fp, void* buffer, size_t nbytes)
+> {
+>     size_t n = fp.end - fp.begin;
+>     if (n > nbytes) n = nbytes;
+>     memcpy(buffer, fp.begin, n);
+>     fp.begin += n;
+>     return (n == nbytes || !fp.mobile)? cast(ssize_t) n : hread2(fp, buffer, nbytes, n);
+> }
+> 
+> ssize_t hread2(hFILE* , void* , size_t, size_t);
+207c250,258
+< int hputc(int c, hFILE* fp);
+---
+> pragma(inline, true)
+> int hputc(int c, hFILE* fp)
+> {
+>     if (fp.begin < fp.limit) *(fp.begin++) = cast(char) c;
+>     else c = hputc2(c, fp);
+>     return c;
+> }
+> 
+> int hputc2(int, hFILE* );
+212c263,274
+< int hputs(const(char)* text, hFILE* fp);
+---
+> pragma(inline, true)
+> int hputs(const(char)* text, hFILE* fp)
+> {
+> 
+>     size_t nbytes = strlen(text), n = fp.limit - fp.begin;
+>     if (n > nbytes) n = nbytes;
+>     memcpy(fp.begin, text, n);
+>     fp.begin += n;
+>     return (n == nbytes)? 0 : hputs2(text, nbytes, n, fp);
+> }
+> 
+> int hputs2(const (char)*, size_t, size_t, hFILE* );
+222c284,311
+< ssize_t hwrite(hFILE* fp, const(void)* buffer, size_t nbytes);
+---
+> pragma(inline, true)
+> ssize_t hwrite(hFILE* fp, const(void)* buffer, size_t nbytes)
+> {
+> 
+>     if (!fp.mobile) {
+>         size_t n = fp.limit - fp.begin;
+>         if (n < nbytes) {
+>             hfile_set_blksize(fp, fp.limit - fp.buffer + nbytes);
+>             fp.end = fp.limit;
+>         }
+>     }
+> 
+>     size_t n = fp.limit - fp.begin;
+>     if (nbytes >= n && fp.begin == fp.buffer) {
+>         
+>         
+>         return hwrite2(fp, buffer, nbytes, 0);
+>     }
+> 
+>     if (n > nbytes) n = nbytes;
+>     memcpy(fp.begin, buffer, n);
+>     fp.begin += n;
+>     return (n==nbytes)? cast(ssize_t) n : hwrite2(fp, buffer, nbytes, n);
+> }
+> 
+> ssize_t hwrite2(hFILE* , const(void)* , size_t, size_t);
+> 
+> int hfile_set_blksize(hFILE* fp, size_t bufsiz);

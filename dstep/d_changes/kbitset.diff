@@ -1,0 +1,155 @@
+25d24
+< 
+29a29,34
+> import core.stdc.stdlib;
+> import core.stdc.string;
+> 
+> @system:
+> nothrow:
+> @nogc:
+68c73
+<     return 1UL << (i % KBS_ELTBITS);
+---
+>     return 1U << (i % KBS_ELTBITS);
+77a83
+> pragma(inline, true):
+80c86,90
+< c_ulong kbs_last_mask(size_t ni);
+---
+> c_ulong kbs_last_mask (size_t ni)
+> {
+> 	uint mask = KBS_MASK(ni) - 1;
+> 	return mask? mask : ~0UL;
+> }
+86c96,109
+< kbitset_t* kbs_init2(size_t ni, int fill);
+---
+> kbitset_t* kbs_init2 (size_t ni, int fill)
+> {
+> 	size_t n = (ni + KBS_ELTBITS-1) / KBS_ELTBITS;
+> 	kbitset_t *bs =
+> 		cast(kbitset_t *) malloc(kbitset_t.sizeof + n * uint.sizeof);
+> 	if (bs == null) return null;
+> 	bs.n = bs.n_max = n;
+> 	memset(cast(void*)bs.b, fill? ~0 : 0, n * uint.sizeof);
+> 	
+> 	bs.b[n] = kbs_last_mask(ni);
+> 	if (fill) bs.b[n-1] &= bs.b[n];
+> 	return bs;
+> }
+> 
+87a111,114
+> kbitset_t* kbs_init (size_t ni)
+> {
+> 	return kbs_init2(ni, 0);
+> }
+89d115
+< kbitset_t* kbs_init(size_t ni);
+93a120,128
+> int kbs_resize2 (kbitset_t** bsp, size_t ni_new, int fill)
+> {
+> 	kbitset_t *bs = *bsp;
+> 	size_t n = bs? bs.n : 0;
+> 	size_t n_new = (ni_new + KBS_ELTBITS-1) / KBS_ELTBITS;
+> 	if (bs == null || n_new > bs.n_max) {
+> 		bs = cast(kbitset_t *)
+> 			realloc(*bsp, kbitset_t.sizeof + n_new * uint.sizeof);
+> 		if (bs == null) return -1;
+95c130,132
+< int kbs_resize2(kbitset_t** bsp, size_t ni_new, int fill);
+---
+> 		bs.n_max = n_new;
+> 		*bsp = bs;
+> 	}
+96a134,137
+> 	bs.n = n_new;
+> 	if (n_new >= n)
+> 		memset(&bs.b[n], fill? ~0 : 0, (n_new - n) * uint.sizeof);
+> 	bs.b[n_new] = kbs_last_mask(ni_new);
+97a139,141
+> 	bs.b[n_new-1] &= bs.b[n_new];
+> 	return 0;
+> }
+99d142
+< int kbs_resize(kbitset_t** bsp, size_t ni_new);
+100a144,147
+> int kbs_resize (kbitset_t** bsp, size_t ni_new)
+> {
+> 	return kbs_resize2(bsp, ni_new, 0);
+> }
+102c149,152
+< void kbs_destroy(kbitset_t* bs);
+---
+> void kbs_destroy (kbitset_t* bs)
+> {
+> 	free(bs);
+> }
+105c155,158
+< void kbs_clear(kbitset_t* bs);
+---
+> void kbs_clear (kbitset_t* bs)
+> {
+> 	memset(cast(void*)bs.b, 0, bs.n * uint.sizeof);
+> }
+108c161,165
+< void kbs_insert_all(kbitset_t* bs);
+---
+> void kbs_insert_all (kbitset_t* bs)
+> {
+> 	memset(cast(void*)bs.b, ~0, bs.n * uint.sizeof);
+> 	bs.b[bs.n-1] &= bs.b[bs.n];
+> }
+111c168,171
+< void kbs_insert(kbitset_t* bs, int i);
+---
+> void kbs_insert (kbitset_t* bs, int i)
+> {
+> 	bs.b[KBS_ELT(i)] |= KBS_MASK(i);
+> }
+114c174,177
+< void kbs_delete(kbitset_t* bs, int i);
+---
+> void kbs_delete (kbitset_t* bs, int i)
+> {
+> 	bs.b[KBS_ELT(i)] &= ~KBS_MASK(i);
+> }
+117c180,183
+< int kbs_exists(const(kbitset_t)* bs, int i);
+---
+> int kbs_exists (const(kbitset_t)* bs, int i)
+> {
+> 	return (bs.b[KBS_ELT(i)] & KBS_MASK(i)) != 0;
+> }
+127c193,203
+< void kbs_start(kbitset_iter_t* itr);
+---
+> void kbs_start (kbitset_iter_t* itr)
+> {
+> 	itr.mask = 1;
+> 	itr.elt = 0;
+> 	itr.i = 0;
+> }
+> 
+> 
+> int kbs_next (const(kbitset_t)* bs, kbitset_iter_t* itr)
+> {
+> 	size_t b = bs.b[itr.elt];
+128a205,210
+> 	for (;;) {
+> 		if (itr.mask == 0) {
+> 			while ((b = bs.b[++itr.elt]) == 0) itr.i += KBS_ELTBITS;
+> 			if (itr.elt == bs.n) return -1;
+> 			itr.mask = 1;
+> 		}
+130c212,220
+< int kbs_next(const(kbitset_t)* bs, kbitset_iter_t* itr);
+---
+> 		if (b & itr.mask) break;
+> 
+> 		itr.i++;
+> 		itr.mask <<= 1;
+> 	}
+> 
+> 	itr.mask <<= 1;
+> 	return itr.i++;
+> }

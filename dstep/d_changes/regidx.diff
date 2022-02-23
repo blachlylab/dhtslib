@@ -1,0 +1,13 @@
+63d62
+< 
+65a65,70
+> import htslib.hts: hts_pos_t;
+> 
+> @system:
+> nothrow:
+> @nogc:
+> 
+75c80
+< enum REGIDX_MAX = 1ULL << 35;
+---
+> enum REGIDX_MAX = 1UL << 35;

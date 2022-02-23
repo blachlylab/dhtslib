@@ -1,0 +1,320 @@
+4c4
+<     Copyright (C) 2012-2021 Genome Research Ltd.
+---
+>     Copyright (C) 2012-2020 Genome Research Ltd.
+27d26
+< 
+34a34,44
+> import htslib.bgzf : BGZF;
+> import htslib.cram : cram_fd;
+> import htslib.hfile : hFILE;
+> import htslib.thread_pool : hts_tpool;
+> import htslib.sam : sam_hdr_t;
+> import htslib.kstring : kstring_t;
+> 
+> @system:
+> nothrow:
+> @nogc:
+> 
+38a49,55
+> version(Windows)
+> {
+>     enum HTS_PATH_SEPARATOR_CHAR = ';';
+>     enum HTS_PATH_SEPARATOR_STR = ";";
+> }
+> else
+> {
+40a58
+> }
+42,47d59
+< struct BGZF;
+< 
+< struct cram_fd;
+< struct hFILE;
+< struct hts_tpool;
+< struct sam_hdr_t;
+121a134,141
+> pragma(inline,true)
+> int hts_resize(T)(size_t num, ref size_t size, T* ptr, int flags)
+> {
+>     return (num > size)
+>         ? hts_resize_array_(T.sizeof, num, size_t.sizeof, &size, cast(void **)&ptr, flags, __FUNCTION__)
+>         : 0;
+> }
+> 
+145a166
+> 
+153c174
+<     category_maximum = 32767
+---
+>     category_maximum = 32_767
+155a177
+> 
+180c202
+<     format_maximum = 32767
+---
+>     format_maximum = 32_767
+182a205
+> 
+191c214
+<     compression_maximum = 32767
+---
+>     compression_maximum = 32_767
+199,205c222,223
+<     struct _Anonymous_0
+<     {
+<         short major;
+<         short minor;
+<     }
+< 
+<     _Anonymous_0 version_;
+---
+>     struct Vers { short major, minor; } 
+>     Vers v; 
+241d258
+< 
+247,248c264
+<     union _Anonymous_1
+<     {
+---
+>     union FP {
+253,254c269
+< 
+<     _Anonymous_1 fp;
+---
+>     FP fp;              
+364c379
+<     FASTQ_OPT_BARCODE = 1003
+---
+>     FASTQ_OPT_BARCODE = 1003,
+379a395
+> 
+385,386c401
+<     union _Anonymous_2
+<     {
+---
+>     union VAL {         
+390,391c405
+< 
+<     _Anonymous_2 val;
+---
+>     VAL val;            
+453d466
+< extern __gshared const(ubyte)[256] seq_nt16_table;
+454a468,490
+> version(Windows){
+>     __gshared const(ubyte)[256] seq_nt16_table = [
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         1, 2, 4, 8, 15,15,15,15, 15,15,15,15, 15, 0 /*=*/,15,15,
+>         15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+>         15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+>         15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+>         15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+> 
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+>         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
+>     ];
+> }else{
+>     extern __gshared const(ubyte)[256] seq_nt16_table;
+> }
+458c494,496
+< extern __gshared const(char)[] seq_nt16_str;
+---
+> 
+> version(Windows) __gshared const(char)[16] seq_nt16_str = ['=','A','C','M','G','R','S','V','T','W','Y','H','K','D','B','N'];
+> else extern __gshared const(char)[16] seq_nt16_str;
+463,464c501,502
+< extern __gshared const(int)[] seq_nt16_int;
+< 
+---
+> version(Windows) __gshared const(int)[16] seq_nt16_int = [ 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 ];
+> else extern __gshared const(int)[16] seq_nt16_int;
+550,551d587
+<         f  FASTQ format
+<         F  FASTA format
+755a792
+> 
+762a800
+> 
+847c885
+<     struct _Anonymous_3
+---
+>     struct Bins
+854c892
+<     _Anonymous_3 bins;
+---
+>     Bins bins;
+857c895,899
+< alias hts_itr_multi_t = hts_itr_t;
+---
+> struct aux_key_t { 
+>     int key;    
+>     
+>     ulong min_off, max_off;
+> }
+858a901
+> alias hts_itr_multi_t = hts_itr_t;
+859a903
+> pragma(inline, true)
+865c909
+< 
+---
+> pragma(inline, true)
+1033,1035c1077,1081
+< enum HTS_IDX_SAVE_REMOTE = 1;
+< enum HTS_IDX_SILENT_FAIL = 2;
+< 
+---
+> enum HTS_IDX_FLAG : int 
+> {
+>     HTS_IDX_SAVE_REMOTE = 1,
+>     HTS_IDX_SILENT_FAIL = 2
+> }
+1107,1111c1153
+< const(char*)* hts_idx_seqnames(
+<     const(hts_idx_t)* idx,
+<     int* n,
+<     hts_id2name_f getid,
+<     void* hdr); 
+---
+> const(char *)* hts_idx_seqnames(const(hts_idx_t)* idx, int* n, hts_id2name_f getid, void* hdr); 
+1122,1124c1164,1169
+< enum HTS_PARSE_THOUSANDS_SEP = 1; 
+< enum HTS_PARSE_ONE_COORD = 2; 
+< enum HTS_PARSE_LIST = 4; 
+---
+> enum HTS_PARSE_FLAGS : int 
+> {
+>     HTS_PARSE_THOUSANDS_SEP = 1, 
+>     HTS_PARSE_ONE_COORD = 2, 
+>     HTS_PARSE_LIST = 4, 
+> }
+1138c1183
+< long hts_parse_decimal(const(char)* str, char** strend, int flags);
+---
+> long hts_parse_decimal(const(char)* str, char** strend, HTS_PARSE_FLAGS flags);
+1140c1185
+< alias hts_name2id_f = int function(void*, const(char)*);
+---
+> alias hts_name2id_f = int function(void*, const(char)*) *;
+1231c1276
+<     int flags);
+---
+>     HTS_PARSE_FLAGS flags);
+1259c1304
+<     int function() readrec);
+---
+>     hts_readrec_func readrec);
+1266c1311
+< alias hts_itr_query_func = hts_itr_t* function(const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, int function() readrec);
+---
+> alias hts_itr_query_func = hts_itr_t* function(const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, hts_readrec_func readrec);
+1286,1287c1331,1332
+<     hts_itr_t* function() itr_query,
+<     int function() readrec);
+---
+>     hts_itr_query_func itr_query,
+>     hts_readrec_func readrec);
+1297a1343
+> 
+1327,1330c1373,1376
+<     int function() itr_specific,
+<     int function() readrec,
+<     int function() seek,
+<     long function() tell);
+---
+>     hts_itr_multi_query_func itr_specific,
+>     hts_readrec_func readrec,
+>     hts_seek_func seek,
+>     hts_tell_func tell);
+1487c1533,1540
+< int hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls);
+---
+> pragma(inline,true)
+> long hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls)
+> {
+>     int l, s = min_shift, t = ((1<<((n_lvls<<1) + n_lvls)) - 1) / 7;
+>     for (--end, l = n_lvls; l > 0; --l, s += 3, t -= 1<<((l<<1)+l))
+>         if (beg>>s == end>>s) return t + (beg>>s);
+>     return 0;
+> }
+1490c1543,1548
+< int hts_bin_level(int bin);
+---
+> pragma(inline, true)
+> int hts_bin_level(int bin) {
+>     int l, b;
+>     for (l = 0, b = bin; b; ++l){ b = hts_bin_parent(b);}
+>     return l;
+> }
+1503c1561,1568
+< int hts_bin_bot(int bin, int n_lvls);
+---
+> 
+> 
+> pragma(inline, true)
+> int hts_bin_bot(int bin, int n_lvls)
+> {
+>     int l = hts_bin_level(bin);
+>     return (bin - hts_bin_first(l)) << (n_lvls - l) * 3;
+> }
+1508,1515c1573,1614
+< 
+< int ed_is_big();
+< ushort ed_swap_2(ushort v);
+< void* ed_swap_2p(void* x);
+< uint ed_swap_4(uint v);
+< void* ed_swap_4p(void* x);
+< ulong ed_swap_8(ulong v);
+< void* ed_swap_8p(void* x);
+---
+> pragma(inline, true)
+> int ed_is_big()
+> {
+>     long one= 1;
+>     return !(*(cast(char *)(&one)));
+> }
+> pragma(inline, true)
+> ushort ed_swap_2(ushort v)
+> {
+>     return cast(ushort)(((v & 0x00FF00FFU) << 8) | ((v & 0xFF00FF00U) >> 8));
+> }
+> pragma(inline, true)
+> void *ed_swap_2p(void *x)
+> {
+>     *cast(ushort*)x = ed_swap_2(*cast(ushort*)x);
+>     return x;
+> }
+> pragma(inline, true)
+> uint ed_swap_4(uint v)
+> {
+>     v = ((v & 0x0000FFFFU) << 16) | (v >> 16);
+>     return ((v & 0x00FF00FFU) << 8) | ((v & 0xFF00FF00U) >> 8);
+> }
+> pragma(inline, true)
+> void *ed_swap_4p(void *x)
+> {
+>     *cast(uint*)x = ed_swap_4(*cast(uint*)x);
+>     return x;
+> }
+> pragma(inline, true)
+> ulong ed_swap_8(ulong v)
+> {
+>     v = ((v & 0x00000000FFFFFFFFLU) << 32) | (v >> 32);
+>     v = ((v & 0x0000FFFF0000FFFFLU) << 16) | ((v & 0xFFFF0000FFFF0000LU) >> 16);
+>     return ((v & 0x00FF00FF00FF00FFLU) << 8) | ((v & 0xFF00FF00FF00FF00LU) >> 8);
+> }
+> pragma(inline, true)
+> void *ed_swap_8p(void *x)
+> {
+>     *cast(ulong*)x = ed_swap_8(*cast(ulong*)x);
+>     return x;
+> }

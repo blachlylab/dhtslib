@@ -1,0 +1,22 @@
+25d24
+< 
+27a27,32
+> import htslib.vcf;
+> 
+> @system:
+> nothrow:
+> @nogc:
+> 
+111c116,125
+< int bcf_acgt2int(char c);
+---
+> pragma(inline, true)
+> int bcf_acgt2int(char c)
+> {
+>     if ( cast(int)c>96 ) c -= 32;
+>     if ( c=='A' ) return 0;
+>     if ( c=='C' ) return 1;
+>     if ( c=='G' ) return 2;
+>     if ( c=='T' ) return 3;
+>     return -1;
+> }

@@ -1,0 +1,13 @@
+30a31,36
+> import htslib.hts : hts_pos_t;
+> 
+> @system:
+> nothrow:
+> @nogc:
+> 
+62c68
+< struct faidx_t;
+---
+> struct __faidx_t;
+63a70
+> alias faidx_t = __faidx_t;

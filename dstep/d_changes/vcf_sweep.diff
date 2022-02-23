@@ -1,0 +1,9 @@
+25d24
+< 
+26a26,31
+> 
+> import htslib.vcf;
+> 
+> @system:
+> nothrow:
+> @nogc:
