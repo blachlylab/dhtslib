@@ -188,7 +188,6 @@ jobs:
         run: |
             cd htslib
             sudo make install
-            sudo ldconfig
 
       - name: Setup additional test files
         run: |
