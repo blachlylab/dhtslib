@@ -1,36 +1,38 @@
-30a31
+28a29
+> import core.stdc.stddef;
+29a31
 > import std.format: format;
-31a33,38
+30a33,38
 > import htslib.hts;
 > import htslib.hts_log;
 > import htslib.bgzf : BGZF;
 > import htslib.kstring : kstring_t, ssize_t;
 > 
 > @system:
-32a40
+31a40
 > @nogc nothrow {
-311c319
+310c319
 < extern (D) auto bam_get_cigar(T)(auto ref T b)
 ---
 > extern (D) auto bam_get_cigar(bam1_t * b)
-313c321
+312c321
 <     return cast(uint*) b.data + b.core.l_qname;
 ---
 >     return cast(uint*) ((*b).data + (*b).core.l_qname);
-378a387,391
+377a387,391
 > extern (D) void bam_set_seqi(T0, T1, T3)(auto ref T0 s, auto ref T1 i, auto ref T3 b)
 > {
 >     s[i >> 1] = (s[i >> 1] & (0xf0 >> ((~i & 1) << 2))) | cast(ubyte)(b << ((~i & 1) << 2));
 > }
 > 
-440,442c453,454
+439,441c453,454
 < sam_hdr_t* bam_hdr_init();
 < void bam_hdr_destroy(sam_hdr_t* h);
 < sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0);
 ---
 > pragma(inline,true) 
 > sam_hdr_t* bam_hdr_init() { return sam_hdr_init(); }
-444c456,462
+443c456,462
 < alias samFile = htsFile_;
 ---
 > pragma(inline,true) 
@@ -40,12 +42,12 @@
 > sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0) { return sam_hdr_dup(h0); }
 > 
 > alias samFile = htsFile;
-835c853,854
+834c853,854
 < int bam_name2id(sam_hdr_t* h, const(char)* ref_);
 ---
 > pragma(inline,true)
 > int bam_name2id(sam_hdr_t* h, const(char)* ref_) { return sam_hdr_name2tid(h, ref_); }
-899a919,925
+898a919,925
 > extern (D) auto sam_hdr_update_hd(T, A...)(auto ref T h, auto ref A a)
 > {
 >     // NOTE: This macro was dropped by dstep due to variadic args
@@ -53,21 +55,21 @@
 >     return sam_hdr_update_line(h, "HD", null, null, a, null);
 > }
 > 
-1014c1040,1043
+1013c1040,1043
 < void bam_set_mempolicy(bam1_t* b, uint policy);
 ---
 > pragma(inline,true)
 > void bam_set_mempolicy(bam1_t* b, uint policy) {
 >     b.mempolicy = policy;
 > }
-1021c1050,1053
+1020c1050,1053
 < uint bam_get_mempolicy(bam1_t* b);
 ---
 > pragma(inline,true)
 > uint bam_get_mempolicy(bam1_t* b) {
 >     return b.mempolicy;
 > }
-1203c1235,1240
+1202c1235,1240
 < alias bam_itr_next = sam_itr_next;
 ---
 > 
@@ -76,10 +78,10 @@
 > {
 >     return hts_itr_next(htsfp.fp.bgzf, itr, r, 0);
 > }
-1414a1452,1453
+1413a1452,1453
 > } /// closing @nogc
 > 
-1421c1460,1477
+1420c1460,1477
 < int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r);
 ---
 > pragma(inline,true)
@@ -100,7 +102,7 @@
 > }
 > 
 > @nogc nothrow:
-1443,1451c1499,1500
+1442,1450c1499,1500
 < extern (D) auto sam_open(T0, T1)(auto ref T0 fn, auto ref T1 mode)
 < {
 <     return hts_open(fn, mode);
@@ -113,14 +115,14 @@
 ---
 > alias sam_open = hts_open;
 > alias sam_open_format = hts_open_format;
-1967,1969c2016,2017
+1966,1968c2016,2017
 < // Used as flag parameter in sam_prob_realn.
 < enum htsRealnFlags
 < {
 ---
 > /// Used as flag parameter in sam_prob_realn.
 > enum htsRealnFlags {
-1975,1980c2023,2028
+1974,1979c2023,2028
 <     BAQ_AUTO = 0 << 3,
 <     BAQ_ILLUMINA = 1 << 3,
 <     BAQ_PACBIOCCS = 2 << 3,
@@ -134,9 +136,9 @@
 >     BAQ_PACBIO = 3<<3,
 >     BAQ_ONT = 4<<3,
 >     BAQ_GENAPSYS = 5<<3
-2002a2051
+2001a2051
 > 
-2029a2079
+2028a2079
 > 
-2034a2085
+2033a2085
 > 
