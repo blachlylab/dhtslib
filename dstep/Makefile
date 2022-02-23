@@ -10,8 +10,8 @@ SHELL=bash
 	--global-attribute nothrow \
 	--global-attribute @nogc
 
-
-DSTEP=dstep --package htslib --space-after-function-name=false 
+DSTEP_PATH=dstep
+DSTEP=${DSTEP_PATH} --package htslib --space-after-function-name=false 
 outputfiles = \
 	output/bgzf.d \
 	output/cram.d \
