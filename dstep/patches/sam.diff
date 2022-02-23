@@ -1,175 +1,51 @@
-26a27,28
-> module htslib.sam;
-> 
-28a31,35
-> import htslib.bgzf: BGZF;
-> import htslib.kstring: kstring_t, ssize_t;
+30a31
+> import std.format: format;
+31a33,38
 > import htslib.hts;
 > import htslib.hts_log;
-> import std.format: format;
-309c316
+> import htslib.bgzf : BGZF;
+> import htslib.kstring : kstring_t, ssize_t;
+> 
+> @system:
+32a40
+> @nogc nothrow {
+311c319
 < extern (D) auto bam_get_cigar(T)(auto ref T b)
 ---
 > extern (D) auto bam_get_cigar(bam1_t * b)
-311c318
+313c321
 <     return cast(uint*) b.data + b.core.l_qname;
 ---
 >     return cast(uint*) ((*b).data + (*b).core.l_qname);
-395c402
-< sam_hdr_t* sam_hdr_init();
----
-> sam_hdr_t* sam_hdr_init ();
-408c415
-< sam_hdr_t* bam_hdr_read(BGZF* fp);
----
-> sam_hdr_t* bam_hdr_read (BGZF* fp);
-419c426
-< int bam_hdr_write(BGZF* fp, const(sam_hdr_t)* h);
----
-> int bam_hdr_write (BGZF* fp, const(sam_hdr_t)* h);
-424c431
-< void sam_hdr_destroy(sam_hdr_t* h);
----
-> void sam_hdr_destroy (sam_hdr_t* h);
-433c440
-< sam_hdr_t* sam_hdr_dup(const(sam_hdr_t)* h0);
----
-> sam_hdr_t* sam_hdr_dup (const(sam_hdr_t)* h0);
-438,440c445,452
+378a387,391
+> extern (D) void bam_set_seqi(T0, T1, T3)(auto ref T0 s, auto ref T1 i, auto ref T3 b)
+> {
+>     s[i >> 1] = (s[i >> 1] & (0xf0 >> ((~i & 1) << 2))) | cast(ubyte)(b << ((~i & 1) << 2));
+> }
+> 
+440,442c453,454
 < sam_hdr_t* bam_hdr_init();
 < void bam_hdr_destroy(sam_hdr_t* h);
 < sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0);
 ---
 > pragma(inline,true) 
 > sam_hdr_t* bam_hdr_init() { return sam_hdr_init(); }
-> 
+444c456,462
+< alias samFile = htsFile_;
+---
 > pragma(inline,true) 
 > void bam_hdr_destroy(sam_hdr_t* h) { sam_hdr_destroy(h); }
 > 
 > pragma(inline,true) 
 > sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0) { return sam_hdr_dup(h0); }
-442c454
-< alias samFile = htsFile_;
----
+> 
 > alias samFile = htsFile;
-455c467
-< sam_hdr_t* sam_hdr_parse(size_t l_text, const(char)* text);
----
-> sam_hdr_t* sam_hdr_parse (size_t l_text, const(char)* text);
-465c477
-< sam_hdr_t* sam_hdr_read(samFile* fp);
----
-> sam_hdr_t* sam_hdr_read (samFile* fp);
-473c485
-< int sam_hdr_write(samFile* fp, const(sam_hdr_t)* h);
----
-> int sam_hdr_write (samFile* fp, const(sam_hdr_t)* h);
-479c491
-< size_t sam_hdr_length(sam_hdr_t* h);
----
-> size_t sam_hdr_length (sam_hdr_t* h);
-491c503
-< const(char)* sam_hdr_str(sam_hdr_t* h);
----
-> const(char)* sam_hdr_str (sam_hdr_t* h);
-497c509
-< int sam_hdr_nref(const(sam_hdr_t)* h);
----
-> int sam_hdr_nref (const(sam_hdr_t)* h);
-514c526
-< int sam_hdr_add_lines(sam_hdr_t* h, const(char)* lines, size_t len);
----
-> int sam_hdr_add_lines (sam_hdr_t* h, const(char)* lines, size_t len);
-529c541
-< int sam_hdr_add_line(sam_hdr_t* h, const(char)* type, ...);
----
-> int sam_hdr_add_line (sam_hdr_t* h, const(char)* type, ...);
-547c559
-< int sam_hdr_find_line_id(
----
-> int sam_hdr_find_line_id (
-568c580
-< int sam_hdr_find_line_pos(
----
-> int sam_hdr_find_line_pos (
-595c607
-< int sam_hdr_remove_line_id(
----
-> int sam_hdr_remove_line_id (
-610c622
-< int sam_hdr_remove_line_pos(sam_hdr_t* h, const(char)* type, int position);
----
-> int sam_hdr_remove_line_pos (sam_hdr_t* h, const(char)* type, int position);
-636c648
-< int sam_hdr_update_line(
----
-> int sam_hdr_update_line (
-656c668
-< int sam_hdr_remove_except(
----
-> int sam_hdr_remove_except (
-699c711
-< int sam_hdr_remove_lines(
----
-> int sam_hdr_remove_lines (
-711c723
-< int sam_hdr_count_lines(sam_hdr_t* h, const(char)* type);
----
-> int sam_hdr_count_lines (sam_hdr_t* h, const(char)* type);
-720c732
-< int sam_hdr_line_index(sam_hdr_t* bh, const(char)* type, const(char)* key);
----
-> int sam_hdr_line_index (sam_hdr_t* bh, const(char)* type, const(char)* key);
-729c741
-< const(char)* sam_hdr_line_name(sam_hdr_t* bh, const(char)* type, int pos);
----
-> const(char)* sam_hdr_line_name (sam_hdr_t* bh, const(char)* type, int pos);
-749c761
-< int sam_hdr_find_tag_id(
----
-> int sam_hdr_find_tag_id (
-772c784
-< int sam_hdr_find_tag_pos(
----
-> int sam_hdr_find_tag_pos (
-787c799
-< int sam_hdr_remove_tag_id(
----
-> int sam_hdr_remove_tag_id (
-804c816
-< int sam_hdr_name2tid(sam_hdr_t* h, const(char)* ref_);
----
-> int sam_hdr_name2tid (sam_hdr_t* h, const(char)* ref_);
-814c826
-< const(char)* sam_hdr_tid2name(const(sam_hdr_t)* h, int tid);
----
-> const(char)* sam_hdr_tid2name (const(sam_hdr_t)* h, int tid);
-824c836
-< hts_pos_t sam_hdr_tid2len(const(sam_hdr_t)* h, int tid);
----
-> hts_pos_t sam_hdr_tid2len (const(sam_hdr_t)* h, int tid);
-833c845,846
+835c853,854
 < int bam_name2id(sam_hdr_t* h, const(char)* ref_);
 ---
 > pragma(inline,true)
 > int bam_name2id(sam_hdr_t* h, const(char)* ref_) { return sam_hdr_name2tid(h, ref_); }
-844c857
-< const(char)* sam_hdr_pg_id(sam_hdr_t* h, const(char)* name);
----
-> const(char)* sam_hdr_pg_id (sam_hdr_t* h, const(char)* name);
-861c874
-< int sam_hdr_add_pg(sam_hdr_t* h, const(char)* name, ...);
----
-> int sam_hdr_add_pg (sam_hdr_t* h, const(char)* name, ...);
-872c885
-< char* stringify_argv(int argc, char** argv);
----
-> char* stringify_argv (int argc, char** argv);
-879c892
-< void sam_hdr_incr_ref(sam_hdr_t* h);
----
-> void sam_hdr_incr_ref (sam_hdr_t* h);
-897a911,917
+899a919,925
 > extern (D) auto sam_hdr_update_hd(T, A...)(auto ref T h, auto ref A a)
 > {
 >     // NOTE: This macro was dropped by dstep due to variadic args
@@ -177,79 +53,21 @@
 >     return sam_hdr_update_line(h, "HD", null, null, a, null);
 > }
 > 
-913c933
-< bam1_t* bam_init1();
----
-> bam1_t* bam_init1 ();
-923c943
-< void bam_destroy1(bam1_t* b);
----
-> void bam_destroy1 (bam1_t* b);
-1012c1032,1034
+1014c1040,1043
 < void bam_set_mempolicy(bam1_t* b, uint policy);
 ---
+> pragma(inline,true)
 > void bam_set_mempolicy(bam1_t* b, uint policy) {
 >     b.mempolicy = policy;
 > }
-1019c1041,1043
+1021c1050,1053
 < uint bam_get_mempolicy(bam1_t* b);
 ---
+> pragma(inline,true)
 > uint bam_get_mempolicy(bam1_t* b) {
 >     return b.mempolicy;
 > }
-1032c1056
-< int bam_read1(BGZF* fp, bam1_t* b);
----
-> int bam_read1 (BGZF* fp, bam1_t* b);
-1044c1068
-< int bam_write1(BGZF* fp, const(bam1_t)* b);
----
-> int bam_write1 (BGZF* fp, const(bam1_t)* b);
-1052c1076
-< bam1_t* bam_copy1(bam1_t* bdst, const(bam1_t)* bsrc);
----
-> bam1_t* bam_copy1 (bam1_t* bdst, const(bam1_t)* bsrc);
-1062c1086
-< bam1_t* bam_dup1(const(bam1_t)* bsrc);
----
-> bam1_t* bam_dup1 (const(bam1_t)* bsrc);
-1086c1110
-< int bam_set1(
----
-> int bam_set1 (
-1124c1148
-< hts_pos_t bam_cigar2qlen(int n_cigar, const(uint)* cigar);
----
-> hts_pos_t bam_cigar2qlen (int n_cigar, const(uint)* cigar);
-1140c1164
-< hts_pos_t bam_cigar2rlen(int n_cigar, const(uint)* cigar);
----
-> hts_pos_t bam_cigar2rlen (int n_cigar, const(uint)* cigar);
-1154c1178
-< hts_pos_t bam_endpos(const(bam1_t)* b);
----
-> hts_pos_t bam_endpos (const(bam1_t)* b);
-1156c1180
-< int bam_str2flag(const(char)* str); /** returns negative value on error */
----
-> int bam_str2flag (const(char)* str); /** returns negative value on error */
-1158c1182
-< char* bam_flag2str(int flag); /** The string must be freed by the user */
----
-> char* bam_flag2str (int flag); /** The string must be freed by the user */
-1165c1189
-< int bam_set_qname(bam1_t* b, const(char)* qname);
----
-> int bam_set_qname (bam1_t* b, const(char)* qname);
-1176c1200
-< ssize_t sam_parse_cigar(
----
-> ssize_t sam_parse_cigar (
-1190c1214
-< ssize_t bam_parse_cigar(const(char)* in_, char** end, bam1_t* b);
----
-> ssize_t bam_parse_cigar (const(char)* in_, char** end, bam1_t* b);
-1201c1225,1230
+1203c1235,1240
 < alias bam_itr_next = sam_itr_next;
 ---
 > 
@@ -258,61 +76,13 @@
 > {
 >     return hts_itr_next(htsfp.fp.bgzf, itr, r, 0);
 > }
-1204a1234
-> pragma(inline, true)
-1209a1240
-> pragma(inline, true)
-1226c1257
-< int sam_idx_init(htsFile* fp, sam_hdr_t* h, int min_shift, const(char)* fnidx);
----
-> int sam_idx_init (htsFile* fp, sam_hdr_t* h, int min_shift, const(char)* fnidx);
-1232c1263
-< int sam_idx_save(htsFile* fp);
----
-> int sam_idx_save (htsFile* fp);
-1241c1272
-< hts_idx_t* sam_index_load(htsFile* fp, const(char)* fn);
----
-> hts_idx_t* sam_index_load (htsFile* fp, const(char)* fn);
-1251c1282
-< hts_idx_t* sam_index_load2(htsFile* fp, const(char)* fn, const(char)* fnidx);
----
-> hts_idx_t* sam_index_load2 (htsFile* fp, const(char)* fn, const(char)* fnidx);
-1271c1302
-< hts_idx_t* sam_index_load3(
----
-> hts_idx_t* sam_index_load3 (
-1284c1315
-< int sam_index_build(const(char)* fn, int min_shift);
----
-> int sam_index_build (const(char)* fn, int min_shift);
-1293c1324
-< int sam_index_build2(const(char)* fn, const(char)* fnidx, int min_shift);
----
-> int sam_index_build2 (const(char)* fn, const(char)* fnidx, int min_shift);
-1303c1334
-< int sam_index_build3(
----
-> int sam_index_build3 (
-1330c1361
-< hts_itr_t* sam_itr_queryi(
----
-> hts_itr_t* sam_itr_queryi (
-1358c1389
-< hts_itr_t* sam_itr_querys(
----
-> hts_itr_t* sam_itr_querys (
-1377c1408
-< hts_itr_t* sam_itr_regions(
----
-> hts_itr_t* sam_itr_regions (
-1407c1438
-< hts_itr_t* sam_itr_regarray(
----
-> hts_itr_t* sam_itr_regarray (
-1419c1450,1464
+1414a1452,1453
+> } /// closing @nogc
+> 
+1421c1460,1477
 < int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r);
 ---
+> pragma(inline,true)
 > int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r) {
 >     if (!htsfp.is_bgzf && !htsfp.is_cram) {
 >         hts_log_error(__FUNCTION__, format("%s not BGZF compressed", htsfp.fn ? htsfp.fn : "File"));
@@ -328,11 +98,9 @@
 >     else
 >         return hts_itr_next(htsfp.is_bgzf ? htsfp.fp.bgzf : null, itr, r, htsfp);
 > }
-1429c1474
-< const(char)* sam_parse_region(
----
-> const(char)* sam_parse_region (
-1441,1449c1486,1487
+> 
+> @nogc nothrow:
+1443,1451c1499,1500
 < extern (D) auto sam_open(T0, T1)(auto ref T0 fn, auto ref T1 mode)
 < {
 <     return hts_open(fn, mode);
@@ -345,207 +113,30 @@
 ---
 > alias sam_open = hts_open;
 > alias sam_open_format = hts_open_format;
-1453c1491
-< int sam_open_mode(char* mode, const(char)* fn, const(char)* format);
+1967,1969c2016,2017
+< // Used as flag parameter in sam_prob_realn.
+< enum htsRealnFlags
+< {
 ---
-> int sam_open_mode (char* mode, const(char)* fn, const(char)* format);
-1458c1496
-< char* sam_open_mode_opts(
+> /// Used as flag parameter in sam_prob_realn.
+> enum htsRealnFlags {
+1975,1980c2023,2028
+<     BAQ_AUTO = 0 << 3,
+<     BAQ_ILLUMINA = 1 << 3,
+<     BAQ_PACBIOCCS = 2 << 3,
+<     BAQ_PACBIO = 3 << 3,
+<     BAQ_ONT = 4 << 3,
+<     BAQ_GENAPSYS = 5 << 3
 ---
-> char* sam_open_mode_opts (
-1463c1501
-< int sam_hdr_change_HD(sam_hdr_t* h, const(char)* key, const(char)* val);
----
-> int sam_hdr_change_HD (sam_hdr_t* h, const(char)* key, const(char)* val);
-1465,1466c1503,1504
-< int sam_parse1(kstring_t* s, sam_hdr_t* h, bam1_t* b);
-< int sam_format1(const(sam_hdr_t)* h, const(bam1_t)* b, kstring_t* str);
----
-> int sam_parse1 (kstring_t* s, sam_hdr_t* h, bam1_t* b);
-> int sam_format1 (const(sam_hdr_t)* h, const(bam1_t)* b, kstring_t* str);
-1474c1512
-< int sam_read1(samFile* fp, sam_hdr_t* h, bam1_t* b);
----
-> int sam_read1 (samFile* fp, sam_hdr_t* h, bam1_t* b);
-1481c1519
-< int sam_write1(samFile* fp, const(sam_hdr_t)* h, const(bam1_t)* b);
----
-> int sam_write1 (samFile* fp, const(sam_hdr_t)* h, const(bam1_t)* b);
-1492c1530
-< int sam_passes_filter(
----
-> int sam_passes_filter (
-1535c1573
-< const(ubyte)* sam_format_aux1(
----
-> const(ubyte)* sam_format_aux1 (
-1551c1589
-< ubyte* bam_aux_get(const(bam1_t)* b, ref const(char)[2] tag);
----
-> ubyte* bam_aux_get (const(bam1_t)* b, ref const(char)[2] tag);
-1562c1600
-< int bam_aux_get_str(const(bam1_t)* b, ref const(char)[2] tag, kstring_t* s);
----
-> int bam_aux_get_str (const(bam1_t)* b, ref const(char)[2] tag, kstring_t* s);
-1570c1608
-< long bam_aux2i(const(ubyte)* s);
----
-> long bam_aux2i (const(ubyte)* s);
-1578c1616
-< double bam_aux2f(const(ubyte)* s);
----
-> double bam_aux2f (const(ubyte)* s);
-1585c1623
-< char bam_aux2A(const(ubyte)* s);
----
-> char bam_aux2A (const(ubyte)* s);
-1592c1630
-< char* bam_aux2Z(const(ubyte)* s);
----
-> char* bam_aux2Z (const(ubyte)* s);
-1599c1637
-< uint bam_auxB_len(const(ubyte)* s);
----
-> uint bam_auxB_len (const(ubyte)* s);
-1609c1647
-< long bam_auxB2i(const(ubyte)* s, uint idx);
----
-> long bam_auxB2i (const(ubyte)* s, uint idx);
-1620c1658
-< double bam_auxB2f(const(ubyte)* s, uint idx);
----
-> double bam_auxB2f (const(ubyte)* s, uint idx);
-1633c1671
-< int bam_aux_append(
----
-> int bam_aux_append (
-1647c1685
-< int bam_aux_del(bam1_t* b, ubyte* s);
----
-> int bam_aux_del (bam1_t* b, ubyte* s);
-1676c1714
-< int bam_aux_update_str(
----
-> int bam_aux_update_str (
-1703c1741
-< int bam_aux_update_int(bam1_t* b, ref const(char)[2] tag, long val);
----
-> int bam_aux_update_int (bam1_t* b, ref const(char)[2] tag, long val);
-1722c1760
-< int bam_aux_update_float(bam1_t* b, ref const(char)[2] tag, float val);
----
-> int bam_aux_update_float (bam1_t* b, ref const(char)[2] tag, float val);
-1760c1798
-< int bam_aux_update_array(
----
-> int bam_aux_update_array (
-1828c1866
-< alias bam_plp_auto_f = int function(void* data, bam1_t* b);
----
-> alias bam_plp_auto_f = int function (void* data, bam1_t* b);
-1845c1883
-< bam_plp_t bam_plp_init(bam_plp_auto_f func, void* data);
----
-> bam_plp_t bam_plp_init (bam_plp_auto_f func, void* data);
-1847c1885
-< void bam_plp_destroy(bam_plp_t iter);
----
-> void bam_plp_destroy (bam_plp_t iter);
-1849c1887
-< int bam_plp_push(bam_plp_t iter, const(bam1_t)* b);
----
-> int bam_plp_push (bam_plp_t iter, const(bam1_t)* b);
-1851c1889
-< const(bam_pileup1_t)* bam_plp_next(
----
-> const(bam_pileup1_t)* bam_plp_next (
-1857c1895
-< const(bam_pileup1_t)* bam_plp_auto(
----
-> const(bam_pileup1_t)* bam_plp_auto (
-1863c1901
-< const(bam_pileup1_t)* bam_plp64_next(
----
-> const(bam_pileup1_t)* bam_plp64_next (
-1869c1907
-< const(bam_pileup1_t)* bam_plp64_auto(
----
-> const(bam_pileup1_t)* bam_plp64_auto (
-1875c1913
-< void bam_plp_set_maxcnt(bam_plp_t iter, int maxcnt);
----
-> void bam_plp_set_maxcnt (bam_plp_t iter, int maxcnt);
-1877c1915
-< void bam_plp_reset(bam_plp_t iter);
----
-> void bam_plp_reset (bam_plp_t iter);
-1887c1925
-< void bam_plp_constructor(
----
-> void bam_plp_constructor (
-1889,1890c1927,1928
-<     int function(void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
-< void bam_plp_destructor(
----
->     int function (void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
-> void bam_plp_destructor (
-1892c1930
-<     int function(void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
----
->     int function (void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
-1907c1945
-< int bam_plp_insertion(const(bam_pileup1_t)* p, kstring_t* ins, int* del_len);
----
-> int bam_plp_insertion (const(bam_pileup1_t)* p, kstring_t* ins, int* del_len);
-1913c1951
-< bam_mplp_t bam_mplp_init(int n, bam_plp_auto_f func, void** data);
----
-> bam_mplp_t bam_mplp_init (int n, bam_plp_auto_f func, void** data);
-1927c1965
-< int bam_mplp_init_overlaps(bam_mplp_t iter);
----
-> int bam_mplp_init_overlaps (bam_mplp_t iter);
-1929c1967
-< void bam_mplp_destroy(bam_mplp_t iter);
----
-> void bam_mplp_destroy (bam_mplp_t iter);
-1931c1969
-< void bam_mplp_set_maxcnt(bam_mplp_t iter, int maxcnt);
----
-> void bam_mplp_set_maxcnt (bam_mplp_t iter, int maxcnt);
-1933c1971
-< int bam_mplp_auto(
----
-> int bam_mplp_auto (
-1940c1978
-< int bam_mplp64_auto(
----
-> int bam_mplp64_auto (
-1947c1985
-< void bam_mplp_reset(bam_mplp_t iter);
----
-> void bam_mplp_reset (bam_mplp_t iter);
-1949c1987
-< void bam_mplp_constructor(
----
-> void bam_mplp_constructor (
-1951c1989
-<     int function(void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
----
->     int function (void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
-1953c1991
-< void bam_mplp_destructor(
----
-> void bam_mplp_destructor (
-1955c1993
-<     int function(void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
----
->     int function (void* data, const(bam1_t)* b, bam_pileup_cd* cd) func);
-1963c2001
-< int sam_cap_mapq(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int thres);
----
-> int sam_cap_mapq (bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int thres);
-2005c2043
-< int sam_prob_realn(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int flag);
----
-> int sam_prob_realn (bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int flag);
+>     BAQ_AUTO = 0<<3,
+>     BAQ_ILLUMINA = 1<<3,
+>     BAQ_PACBIOCCS = 2<<3,
+>     BAQ_PACBIO = 3<<3,
+>     BAQ_ONT = 4<<3,
+>     BAQ_GENAPSYS = 5<<3
+2002a2051
+> 
+2029a2079
+> 
+2034a2085
+> 

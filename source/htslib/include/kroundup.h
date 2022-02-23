@@ -22,49 +22,12 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 */
-module htslib.kroundup;
 
-@system:
-nothrow:
-@nogc:
-
-/// round 32 or 64 bit (u)int x to power of 2 that is equal or greater (JSB)
-/// new impl based on
-/// #define kroundup64(x) ((x) > 0 ?                                        \
-                      //  (--(x),                                          \
-                      //   (x)|=(x)>>(sizeof(x)/8),                        \
-                      //   (x)|=(x)>>(sizeof(x)/4),                        \
-                      //   (x)|=(x)>>(sizeof(x)/2),                        \
-                      //   (x)|=(x)>>(sizeof(x)),                          \
-                      //   (x)|=(x)>>(sizeof(x)*2),                        \
-                      //   (x)|=(x)>>(sizeof(x)*4),                        \
-                      //   (x) += !k_high_bit_set(x),                      \
-                      //   (x))                                            \
-                      //  : 0)
-pragma(inline, true)
-extern (D)
-void kroundup_size_t(T)(ref T x) {
-  if(x > 0){
-    x -= 1;
-    x |= (x >> (T.sizeof/8));
-    x |= (x >> (T.sizeof/4));
-    x |= (x >> (T.sizeof/2));
-    x |= (x >> (T.sizeof));
-    x |= (x >> (T.sizeof*2));
-    x |= (x >> (T.sizeof*4));
-    x += !k_high_bit_set(x);
-  }else{
-    x = 0;
-  }
-}
-
-extern (C):
+#ifndef KROUNDUP_H
+#define KROUNDUP_H
 
 // Value of this macro is 1 if x is a signed type; 0 if unsigned
-extern (D) auto k_signed_type(T)(auto ref T x)
-{
-    return !(-(x * 0 + 1) > 0);
-}
+#define k_signed_type(x) (!(-((x) * 0 + 1) > 0))
 
 /*
   Macro with value 1 if the highest bit in x is set for any integer type
@@ -78,10 +41,7 @@ extern (D) auto k_signed_type(T)(auto ref T x)
 
   See https://developers.redhat.com/blog/2019/03/13/understanding-gcc-warnings-part-2/
 */
-extern (D) auto k_high_bit_set(T)(auto ref T x)
-{
-    return ((x >> (x.sizeof * 8 - 1 - k_signed_type(x))) & 1);
-}
+#define k_high_bit_set(x) ((((x) >> (sizeof(x) * 8 - 1 - k_signed_type(x))) & 1))
 
 /*! @hideinitializer
   @abstract  Round up to next power of two
@@ -91,11 +51,26 @@ extern (D) auto k_high_bit_set(T)(auto ref T x)
   If the next power of two does not fit in the given type, it will set
   the largest value that does.
  */
+#define kroundup64(x) ((x) > 0 ?                                        \
+                       (--(x),                                          \
+                        (x)|=(x)>>(sizeof(x)/8),                        \
+                        (x)|=(x)>>(sizeof(x)/4),                        \
+                        (x)|=(x)>>(sizeof(x)/2),                        \
+                        (x)|=(x)>>(sizeof(x)),                          \
+                        (x)|=(x)>>(sizeof(x)*2),                        \
+                        (x)|=(x)>>(sizeof(x)*4),                        \
+                        (x) += !k_high_bit_set(x),                      \
+                        (x))                                            \
+                       : 0)
 
 // Historic interfaces for 32-bit and size_t values.  The macro above
 // works for both (as long as size_t is no more than 64 bits).
 
-void kroundup64(T)(ref T x) {kroundup_size_t!T(x);}
-void kroundup32(T)(ref T x) {kroundup_size_t!T(x);}
+#ifndef kroundup32
+#define kroundup32(x) kroundup64(x)
+#endif
+#ifndef kroundup_size_t
+#define kroundup_size_t(x) kroundup64(x)
+#endif
 
-
+#endif

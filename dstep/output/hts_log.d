@@ -25,11 +25,17 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+module htslib.hts_log;
+
+import std.string: toStringz;
+
+@system:
+nothrow:
 
 extern (C):
 
 /// Log levels.
-enum htsLogLevel
+enum htsLogLevel // @suppress(dscanner.style.phobos_naming_convention)
 {
     HTS_LOG_OFF = 0, ///< All logging disabled.
     HTS_LOG_ERROR = 1, ///< Logging of errors only.
@@ -62,20 +68,80 @@ extern __gshared int hts_verbose;
 * \param context       Context where the event occurred. Typically set to "__func__".
 * \param format        Format string with placeholders, like printf.
 */
-void hts_log(
+@nogc void hts_log(
     htsLogLevel severity,
     const(char)* context,
     const(char)* format,
     ...);
 
-/*! Logs an event with severity HTS_LOG_ERROR and default context. Parameters: format, ... */
+pragma(inline, true):
+/**! Logs an event with severity HTS_LOG_ERROR and default context. Parameters: format, ... */
+//#define hts_log_error(...) hts_log(HTS_LOG_ERROR, __func__, __VA_ARGS__)
+void hts_log_error(const(char)[] ctx, string msg)
+{
+    string open_error_color = "\x1b[0;31m";
+    string close_color      = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_ERROR, toStringz(ctx), "%.*s%.*s%.*s",
+            cast(int)open_error_color.length, open_error_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
+}
+/**! Logs an event with severity HTS_LOG_WARNING and default context. Parameters: format, ... */
+//#define hts_log_warning(...) hts_log(HTS_LOG_WARNING, __func__, __VA_ARGS__)
+void hts_log_warning(const(char)[] ctx, string msg)
+{
+    string open_warning_color = "\x1b[0;33m";
+    string close_color        = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_WARNING, toStringz(ctx), "%.*s%.*s%.*s",
+            cast(int)open_warning_color.length, open_warning_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
+}
 
-/*! Logs an event with severity HTS_LOG_WARNING and default context. Parameters: format, ... */
+/**! Logs an event with severity HTS_LOG_INFO and default context. Parameters: format, ... */
+//#define hts_log_info(...) hts_log(HTS_LOG_INFO, __func__, __VA_ARGS__)
+void hts_log_info(const(char)[] ctx, string msg)
+{
+    string open_info_color = "\x1b[0;32m";
+    string close_color     = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_INFO, toStringz(ctx), "%.*s%.*s%.*s",
+            cast(int)open_info_color.length, open_info_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
+}
 
-/*! Logs an event with severity HTS_LOG_INFO and default context. Parameters: format, ... */
+/**! Logs an event with severity HTS_LOG_DEBUG and default context. Parameters: format, ... */
+//#define hts_log_debug(...) hts_log(HTS_LOG_DEBUG, __func__, __VA_ARGS__)
+void hts_log_debug(const(char)[] ctx, string msg)
+{
+    string open_debug_color = "\x1b[0;36m";
+    string close_color     = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_DEBUG, toStringz(ctx), "%.*s%.*s%.*s",
+            cast(int)open_debug_color.length, open_debug_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
+}
 
-/*! Logs an event with severity HTS_LOG_DEBUG and default context. Parameters: format, ... */
+/**! Logs an event with severity HTS_LOG_TRACE and default context. Parameters: format, ... */
+//#define hts_log_trace(...) hts_log(HTS_LOG_TRACE, __func__, __VA_ARGS__)
+void hts_log_trace(const(char)[] ctx, string msg)
+{
+    string open_trace_color = "\x1b[1;36m";
+    string close_color     = "\x1b[0m";
+    hts_log(htsLogLevel.HTS_LOG_TRACE, toStringz(ctx), "%.*s%.*s%.*s",
+            cast(int)open_trace_color.length, open_trace_color.ptr,
+            cast(int)msg.length, msg.ptr,
+            cast(int)close_color.length, close_color.ptr);
+}
 
-/*! Logs an event with severity HTS_LOG_TRACE and default context. Parameters: format, ... */
+///
+debug(dhtslib_unittest) unittest
+{
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
 
-// #ifndef HTS_LOG_H
+    hts_log_trace(__FUNCTION__, "Test: trace");
+    hts_log_debug(__FUNCTION__, "Test: debug");
+    hts_log_info(__FUNCTION__,  "Test: info");
+    hts_log_warning(__FUNCTION__,"Test: warning");
+    hts_log_error(__FUNCTION__, "Test: error");
+}

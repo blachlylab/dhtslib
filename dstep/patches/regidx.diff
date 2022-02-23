@@ -1,87 +1,13 @@
-63c63,64
+63d62
 < 
----
-> module htslib.regidx;
+65a65,70
 > import htslib.hts: hts_pos_t;
-73c74
+> 
+> @system:
+> nothrow:
+> @nogc:
+> 
+75c80
 < enum REGIDX_MAX = 1ULL << 35;
 ---
 > enum REGIDX_MAX = 1UL << 35;
-109,110c110,111
-< alias regidx_parse_f = int function(const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end, void* payload, void* usr);
-< alias regidx_free_f = void function(void* payload);
----
-> alias regidx_parse_f = int function (const(char)* line, char** chr_beg, char** chr_end, hts_pos_t* beg, hts_pos_t* end, void* payload, void* usr);
-> alias regidx_free_f = void function (void* payload);
-117c118
-< int regidx_parse_bed(
----
-> int regidx_parse_bed (
-125c126
-< int regidx_parse_tab(
----
-> int regidx_parse_tab (
-133c134
-< int regidx_parse_reg(
----
-> int regidx_parse_reg (
-141c142
-< int regidx_parse_vcf(
----
-> int regidx_parse_vcf (
-168c169
-< regidx_t* regidx_init(
----
-> regidx_t* regidx_init (
-174c175
-< regidx_t* regidx_init_string(
----
-> regidx_t* regidx_init_string (
-184c185
-< void regidx_destroy(regidx_t* idx);
----
-> void regidx_destroy (regidx_t* idx);
-194c195
-< int regidx_overlap(
----
-> int regidx_overlap (
-208,210c209,211
-< int regidx_insert(regidx_t* idx, char* line);
-< int regidx_insert_list(regidx_t* idx, char* line, char delim);
-< int regidx_push(
----
-> int regidx_insert (regidx_t* idx, char* line);
-> int regidx_insert_list (regidx_t* idx, char* line, char delim);
-> int regidx_push (
-221c222
-< char** regidx_seq_names(regidx_t* idx, int* n);
----
-> char** regidx_seq_names (regidx_t* idx, int* n);
-227c228
-< int regidx_seq_nregs(regidx_t* idx, const(char)* seq);
----
-> int regidx_seq_nregs (regidx_t* idx, const(char)* seq);
-229c230
-< int regidx_nregs(regidx_t* idx);
----
-> int regidx_nregs (regidx_t* idx);
-243,245c244,246
-< regitr_t* regitr_init(regidx_t* idx);
-< void regitr_destroy(regitr_t* itr);
-< void regitr_reset(regidx_t* idx, regitr_t* itr);
----
-> regitr_t* regitr_init (regidx_t* idx);
-> void regitr_destroy (regitr_t* itr);
-> void regitr_reset (regidx_t* idx, regitr_t* itr);
-251c252
-< int regitr_overlap(regitr_t* itr);
----
-> int regitr_overlap (regitr_t* itr);
-257c258
-< int regitr_loop(regitr_t* itr);
----
-> int regitr_loop (regitr_t* itr);
-262c263
-< void regitr_copy(regitr_t* dst, regitr_t* src);
----
-> void regitr_copy (regitr_t* dst, regitr_t* src);

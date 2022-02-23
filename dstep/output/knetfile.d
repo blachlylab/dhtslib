@@ -23,15 +23,20 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 */
+module htslib.knetfile;
 
 import core.sys.posix.fcntl;
 import core.sys.posix.sys.types;
 
+@system:
+nothrow:
+@nogc:
+
 extern (C):
 
-alias netread = read;
-alias netwrite = write;
-alias netclose = close;
+// alias netread = read;
+// alias netwrite = write;
+// alias netclose = close;
 
 // FIXME: currently I/O is unbuffered
 

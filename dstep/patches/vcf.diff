@@ -1,16 +1,22 @@
-31a32,33
+32c32
+< 
+---
 > /// Section numbers refer to VCF Specification v4.2: https://samtools.github.io/hts-specs/VCFv4.2.pdf
-> module htslib.vcf;
-32a35,42
+34a35,37
 > import std.bitmanip;
 > import std.string: toStringz;
 > import core.stdc.errno : errno, EINVAL;
+36a40,46
 > import htslib.hts;
 > import htslib.hts_log;
-> import htslib.kstring: kstring_t;
-> import htslib.bgzf: BGZF;
 > import htslib.hts_endian;
-43,53c53,63
+> import htslib.kstring : kstring_t;
+> import htslib.bgzf : BGZF;
+> 
+> @system:
+37a48
+> @nogc nothrow {
+45,55c56,66
 < enum BCF_HL_FLT = 0; // header line
 < enum BCF_HL_INFO = 1;
 < enum BCF_HL_FMT = 2;
@@ -34,7 +40,7 @@
 > enum BCF_HT_INT = 1;  /// header type: INTEGER
 > enum BCF_HT_REAL = 2; /// header type: REAL
 > enum BCF_HT_STR = 3;  /// header type: STRING
-56,60c66,70
+58,62c69,73
 < enum BCF_VL_FIXED = 0; // variable length
 < enum BCF_VL_VAR = 1;
 < enum BCF_VL_A = 2;
@@ -46,7 +52,7 @@
 > enum BCF_VL_A = 2; /// variable length: ?
 > enum BCF_VL_G = 3; /// variable length: ?
 > enum BCF_VL_R = 4; /// variable length: ?
-74,86c84,96
+76,88c87,99
 < enum BCF_DT_ID = 0; // dictionary type
 < enum BCF_DT_CTG = 1;
 < enum BCF_DT_SAMPLE = 2;
@@ -74,9 +80,9 @@
 >     int nkeys; /// Number of structured fields
 >     char** keys; /// The key=value pairs
 >     char** vals; /// The key=value pairs
-88a99
+90a102
 > ///  ID Dictionary entry
-91,118c102,131
+93,120c105,134
 <     ulong[3] info; // stores Number:20, var:4, Type:4, ColType:4 in info[0..2]
 <     // for BCF_HL_FLT,INFO,FMT and contig length in info[0] for BCF_HL_CTG
 <     bcf_hrec_t*[3] hrec;
@@ -136,10 +142,10 @@
 >     ubyte* keep_samples; /// ?
 >     kstring_t mem; /// ?
 >     int[3] m; /// m: allocated size of the dictionary block in use (see n above)
-120a134,135
+122a137,138
 > /// Lookup table used in bcf_record_check
 > /// MAINTAINER: in C header is []
-127,143c142,160
+129,145c145,163
 < enum BCF_BT_NULL = 0;
 < enum BCF_BT_INT8 = 1;
 < enum BCF_BT_INT16 = 2;
@@ -177,18 +183,18 @@
 > /// variant type record embedded in bcf_dec_t
 > /// variant type and the number of bases affected, negative for deletions
 > struct bcf_variant_t // @suppress(dscanner.style.phobos_naming_convention)
-145,146c162,163
+147,148c165,166
 <     int type;
 <     int n; // variant type and the number of bases affected, negative for deletions
 ---
 >     int type;   /// variant type and the number of bases affected, negative for deletions
 >     int n;      /// variant type and the number of bases affected, negative for deletions
-149c166,167
+151c169,170
 < struct bcf_fmt_t
 ---
 > /// FORMAT field data (§1.4.2 Genotype fields)
 > struct bcf_fmt_t // @suppress(dscanner.style.phobos_naming_convention)
-153,157c171,175
+155,159c174,178
 <     int id; // id: numeric tag id, the corresponding string is bcf_hdr_t::id[BCF_DT_ID][$id].key
 <     int n;
 <     int size;
@@ -200,22 +206,22 @@
 >     int size;/// size: number of bytes per-sample; type: one of BCF_BT_* types
 >     int type; /// type: one of BCF_BT_* types
 >     ubyte* p; /// same as vptr and vptr_* in bcf_info_t below
-162c180
+164c183
 <         uint, "p_free", 1));
 ---
 >         bool, "p_free", 1));
-165c183,184
+167c186,187
 < struct bcf_info_t
 ---
 > /// INFO field data (§1.4.1 Fixed fields, (8) INFO)
 > struct bcf_info_t // @suppress(dscanner.style.phobos_naming_convention)
-169,170c188,189
+171,172c191,192
 <     int key; // key: numeric tag id, the corresponding string is bcf_hdr_t::id[BCF_DT_ID][$key].key
 <     int type; // type: one of BCF_BT_* types
 ---
 >     int key; /// key: numeric tag id, the corresponding string is bcf_hdr_t::id[BCF_DT_ID][$key].key
 >     int type; /// type: one of BCF_BT_* types
-172,174c191,193
+174,176c194,196
 <     // integer value
 <     // float value
 <     union _Anonymous_0
@@ -223,24 +229,19 @@
 >     /// integer value
 >     /// float value
 >     union V1
-180,181c199,200
+182,183c202,203
 <     _Anonymous_0 v1; // only set if $len==1; for easier access
 <     ubyte* vptr; // pointer to data array in bcf1_t->shared.s, excluding the size+type and tag id bytes
 ---
 >     V1 v1; /// only set if $len==1; for easier access
 >     ubyte* vptr; /// pointer to data array in bcf1_t->shared.s, excluding the size+type and tag id bytes
-186,196c205,215
+188,193c208,218
 <         uint, "vptr_free", 1)); // length of the vptr block or, when set, of the vptr_mod block, excluding offset
 <     // vptr offset, i.e., the size of the INFO key plus size+type bytes
 <     // indicates that vptr-vptr_off must be freed; set only when modified and the new
 <     //    data block is bigger than the original
 <     int len; // vector length, 1 for scalars
 < }
-< 
-< enum BCF1_DIRTY_ID = 1;
-< enum BCF1_DIRTY_ALS = 2;
-< enum BCF1_DIRTY_FLT = 4;
-< enum BCF1_DIRTY_INF = 8;
 ---
 >         uint, "vptr_free", 1)); /// length of the vptr block or, when set, of the vptr_mod block, excluding offset
 >     /// vptr offset, i.e., the size of the INFO key plus size+type bytes
@@ -253,17 +254,22 @@
 > enum BCF1_DIRTY_ALS = 2; /// Allele(s) was edited
 > enum BCF1_DIRTY_FLT = 4; /// FILTER was edited
 > enum BCF1_DIRTY_INF = 8; /// INFO was edited
-198c217,218
+195,200c220,221
+< enum BCF1_DIRTY_ID = 1;
+< enum BCF1_DIRTY_ALS = 2;
+< enum BCF1_DIRTY_FLT = 4;
+< enum BCF1_DIRTY_INF = 8;
+< 
 < struct bcf_dec_t
 ---
 > /// Variable-length data from a VCF record
 > struct bcf_dec_t // @suppress(dscanner.style.phobos_naming_convention)
-200c220,221
+202c223,224
 <     int m_fmt;
 ---
 >     /// allocated size (high-water mark); do not change 
 >     int m_fmt;          
-205,226c226,247
+207,228c229,250
 <     int m_flt; // allocated size (high-water mark); do not change
 <     int n_flt; // Number of FILTER fields
 <     int* flt; // FILTER keys in the dictionary
@@ -309,11 +315,11 @@
 > enum BCF_ERR_CHAR = 16;/// BCF error: 
 > enum BCF_ERR_CTG_INVALID = 32;/// BCF error: 
 > enum BCF_ERR_TAG_INVALID = 64;/// BCF error: 
-228c249
+230c252
 < /*
 ---
 > /**
-243,245c264,266
+245,247c267,269
 <     hts_pos_t pos; // POS
 <     hts_pos_t rlen; // length of REF
 <     int rid; // CHROM
@@ -321,11 +327,11 @@
 >     hts_pos_t pos; /// POS
 >     hts_pos_t rlen; /// length of REF
 >     int rid; /// CHROM
-252c273
+254c276
 <         uint, "n_sample", 24)); // QUAL
 ---
 >         uint, "n_sample", 24)); /// QUAL
-256,260c277,281
+258,262c280,284
 <     bcf_dec_t d; // lazy evaluation: $d is not generated by bcf_read(), but by explicitly calling bcf_unpack()
 <     int max_unpack; // Set to BCF_UN_STR, BCF_UN_FLT, or BCF_UN_INFO to boost performance of vcf_parse when some of the fields won't be needed
 <     int unpacked; // remember what has been unpacked to allow calling bcf_unpack() repeatedly without redoing the work
@@ -337,281 +343,29 @@
 >     int unpacked; /// remember what has been unpacked to allow calling bcf_unpack() repeatedly without redoing the work
 >     int[3] unpack_size; /// the original block size of ID, REF+ALT and FILTER
 >     int errcode; /// one of BCF_ERR_* codes
-301c322
-< bcf_hdr_t* bcf_hdr_init(const(char)* mode);
----
-> bcf_hdr_t* bcf_hdr_init (const(char)* mode);
-304c325
-< void bcf_hdr_destroy(bcf_hdr_t* h);
----
-> void bcf_hdr_destroy (bcf_hdr_t* h);
-311c332
-< bcf1_t* bcf_init();
----
-> bcf1_t* bcf_init ();
-314c335
-< void bcf_destroy(bcf1_t* v);
----
-> void bcf_destroy (bcf1_t* v);
-320c341
-< void bcf_empty(bcf1_t* v);
----
-> void bcf_empty (bcf1_t* v);
-327c348
-< void bcf_clear(bcf1_t* v);
----
-> void bcf_clear (bcf1_t* v);
-330c351
+332c354
 < alias vcfFile = htsFile_;
 ---
 > alias vcfFile = htsFile;
-344c365
-< bcf_hdr_t* bcf_hdr_read(htsFile* fp);
----
-> bcf_hdr_t* bcf_hdr_read (htsFile* fp);
-368c389
-< int bcf_hdr_set_samples(bcf_hdr_t* hdr, const(char)* samples, int is_file);
----
-> int bcf_hdr_set_samples (bcf_hdr_t* hdr, const(char)* samples, int is_file);
-370c391
-< int bcf_subset_format(const(bcf_hdr_t)* hdr, bcf1_t* rec);
----
-> int bcf_subset_format (const(bcf_hdr_t)* hdr, bcf1_t* rec);
-377c398
-< int bcf_hdr_write(htsFile* fp, bcf_hdr_t* h);
----
-> int bcf_hdr_write (htsFile* fp, bcf_hdr_t* h);
-383c404
-< int vcf_parse(kstring_t* s, const(bcf_hdr_t)* h, bcf1_t* v);
----
-> int vcf_parse (kstring_t* s, const(bcf_hdr_t)* h, bcf1_t* v);
-392c413
-< int vcf_open_mode(char* mode, const(char)* fn, const(char)* format);
----
-> int vcf_open_mode (char* mode, const(char)* fn, const(char)* format);
-395c416
-< int vcf_format(const(bcf_hdr_t)* h, const(bcf1_t)* v, kstring_t* s);
----
-> int vcf_format (const(bcf_hdr_t)* h, const(bcf1_t)* v, kstring_t* s);
-407c428
-< int bcf_read(htsFile* fp, const(bcf_hdr_t)* h, bcf1_t* v);
----
-> int bcf_read (htsFile* fp, const(bcf_hdr_t)* h, bcf1_t* v);
-423c444
-< int bcf_unpack(bcf1_t* b, int which);
----
-> int bcf_unpack (bcf1_t* b, int which);
-435c456
-< bcf1_t* bcf_dup(bcf1_t* src);
----
-> bcf1_t* bcf_dup (bcf1_t* src);
-437c458
-< bcf1_t* bcf_copy(bcf1_t* dst, bcf1_t* src);
----
-> bcf1_t* bcf_copy (bcf1_t* dst, bcf1_t* src);
-445c466
-< int bcf_write(htsFile* fp, bcf_hdr_t* h, bcf1_t* v);
----
-> int bcf_write (htsFile* fp, bcf_hdr_t* h, bcf1_t* v);
-462c483
-< bcf_hdr_t* vcf_hdr_read(htsFile* fp);
----
-> bcf_hdr_t* vcf_hdr_read (htsFile* fp);
-471c492
-< int vcf_hdr_write(htsFile* fp, const(bcf_hdr_t)* h);
----
-> int vcf_hdr_write (htsFile* fp, const(bcf_hdr_t)* h);
-481c502
-< int vcf_read(htsFile* fp, const(bcf_hdr_t)* h, bcf1_t* v);
----
-> int vcf_read (htsFile* fp, const(bcf_hdr_t)* h, bcf1_t* v);
-491c512
-< int vcf_write(htsFile* fp, const(bcf_hdr_t)* h, bcf1_t* v);
----
-> int vcf_write (htsFile* fp, const(bcf_hdr_t)* h, bcf1_t* v);
-494c515
-< int bcf_readrec(
----
-> int bcf_readrec (
-511c532
-< int vcf_write_line(htsFile* fp, kstring_t* line);
----
-> int vcf_write_line (htsFile* fp, kstring_t* line);
-523c544
-< bcf_hdr_t* bcf_hdr_dup(const(bcf_hdr_t)* hdr);
----
-> bcf_hdr_t* bcf_hdr_dup (const(bcf_hdr_t)* hdr);
-531c552,553
-< int bcf_hdr_combine(bcf_hdr_t* dst, const(bcf_hdr_t)* src);
----
+532a555
 > deprecated("Please use bcf_hdr_merge instead")
-> int bcf_hdr_combine (bcf_hdr_t* dst, const(bcf_hdr_t)* src);
-548c570
-< bcf_hdr_t* bcf_hdr_merge(bcf_hdr_t* dst, const(bcf_hdr_t)* src);
----
-> bcf_hdr_t* bcf_hdr_merge (bcf_hdr_t* dst, const(bcf_hdr_t)* src);
-560c582
-< int bcf_hdr_add_sample(bcf_hdr_t* hdr, const(char)* sample);
----
-> int bcf_hdr_add_sample (bcf_hdr_t* hdr, const(char)* sample);
-563c585
-< int bcf_hdr_set(bcf_hdr_t* hdr, const(char)* fname);
----
-> int bcf_hdr_set (bcf_hdr_t* hdr, const(char)* fname);
-570c592
-< int bcf_hdr_format(const(bcf_hdr_t)* hdr, int is_bcf, kstring_t* str);
----
-> int bcf_hdr_format (const(bcf_hdr_t)* hdr, int is_bcf, kstring_t* str);
-577c599,600
-< char* bcf_hdr_fmt_text(const(bcf_hdr_t)* hdr, int is_bcf, int* len);
----
+578a602
 > deprecated("use bcf_hdr_format() instead")
-> char* bcf_hdr_fmt_text (const(bcf_hdr_t)* hdr, int is_bcf, int* len);
-580c603
-< int bcf_hdr_append(bcf_hdr_t* h, const(char)* line);
----
-> int bcf_hdr_append (bcf_hdr_t* h, const(char)* line);
-582c605
-< int bcf_hdr_printf(bcf_hdr_t* h, const(char)* format, ...);
----
-> int bcf_hdr_printf (bcf_hdr_t* h, const(char)* format, ...);
-585c608
-< const(char)* bcf_hdr_get_version(const(bcf_hdr_t)* hdr);
----
-> const(char)* bcf_hdr_get_version (const(bcf_hdr_t)* hdr);
-593c616
-< int bcf_hdr_set_version(bcf_hdr_t* hdr, const(char)* version_);
----
-> int bcf_hdr_set_version (bcf_hdr_t* hdr, const(char)* version_);
-600c623
-< void bcf_hdr_remove(bcf_hdr_t* h, int type, const(char)* key);
----
-> void bcf_hdr_remove (bcf_hdr_t* h, int type, const(char)* key);
-616c639,642
-< bcf_hdr_t* bcf_hdr_subset(
----
+617a642,644
 >  /// NOTE: char *const* samples really exmplifies what I hate about C pointers
 > /// My interpretation of this is it is equivalent to char **samples, but that the outer pointer is const
 > /// which in D would be const(char *)*samples. I don't know what it implies about constancy of *samples or samples.
-> bcf_hdr_t* bcf_hdr_subset (
-619c645
+621c648
 <     char** samples,
 ---
 >     const(char*)* samples,
-623c649
-< const(char*)* bcf_hdr_seqnames(const(bcf_hdr_t)* h, int* nseqs);
----
-> const(char*)* bcf_hdr_seqnames (const(bcf_hdr_t)* h, int* nseqs);
-626c652
+628c655
 < extern (D) auto bcf_hdr_nsamples(T)(auto ref T hdr)
 ---
 > pragma(inline, true) auto bcf_hdr_nsamples (bcf_hdr_t *hdr)
-632c658
-< int bcf_hdr_parse(bcf_hdr_t* hdr, char* htxt);
----
-> int bcf_hdr_parse (bcf_hdr_t* hdr, char* htxt);
-642c668
-< int bcf_hdr_sync(bcf_hdr_t* h);
----
-> int bcf_hdr_sync (bcf_hdr_t* h);
-661c687
-< bcf_hrec_t* bcf_hdr_parse_line(
----
-> bcf_hrec_t* bcf_hdr_parse_line (
-671c697
-< int bcf_hrec_format(const(bcf_hrec_t)* hrec, kstring_t* str);
----
-> int bcf_hrec_format (const(bcf_hrec_t)* hrec, kstring_t* str);
-673c699
-< int bcf_hdr_add_hrec(bcf_hdr_t* hdr, bcf_hrec_t* hrec);
----
-> int bcf_hdr_add_hrec (bcf_hdr_t* hdr, bcf_hrec_t* hrec);
-683c709
-< bcf_hrec_t* bcf_hdr_get_hrec(
----
-> bcf_hrec_t* bcf_hdr_get_hrec (
-697c723
-< bcf_hrec_t* bcf_hrec_dup(bcf_hrec_t* hrec);
----
-> bcf_hrec_t* bcf_hrec_dup (bcf_hrec_t* hrec);
-705c731
-< int bcf_hrec_add_key(bcf_hrec_t* hrec, const(char)* str, size_t len);
----
-> int bcf_hrec_add_key (bcf_hrec_t* hrec, const(char)* str, size_t len);
-715c741
-< int bcf_hrec_set_val(
----
-> int bcf_hrec_set_val (
-722c748,749
-< int bcf_hrec_find_key(bcf_hrec_t* hrec, const(char)* key);
----
+723a751
 > /// Lookup header record by key
-> int bcf_hrec_find_key (bcf_hrec_t* hrec, const(char)* key);
-729c756
-< int hrec_add_idx(bcf_hrec_t* hrec, int idx);
----
-> int hrec_add_idx (bcf_hrec_t* hrec, int idx);
-734c761
-< void bcf_hrec_destroy(bcf_hrec_t* hrec);
----
-> void bcf_hrec_destroy (bcf_hrec_t* hrec);
-741c768
-< int bcf_subset(const(bcf_hdr_t)* h, bcf1_t* v, int n, int* imap);
----
-> int bcf_subset (const(bcf_hdr_t)* h, bcf1_t* v, int n, int* imap);
-750c777
-< int bcf_translate(
----
-> int bcf_translate (
-758c785
-< int bcf_get_variant_types(bcf1_t* rec);
----
-> int bcf_get_variant_types (bcf1_t* rec);
-760c787
-< int bcf_get_variant_type(bcf1_t* rec, int ith_allele);
----
-> int bcf_get_variant_type (bcf1_t* rec, int ith_allele);
-762c789
-< int bcf_is_snp(bcf1_t* v);
----
-> int bcf_is_snp (bcf1_t* v);
-769c796,800
-< int bcf_update_filter(const(bcf_hdr_t)* hdr, bcf1_t* line, int* flt_ids, int n);
----
-> int bcf_update_filter (
->     const(bcf_hdr_t)* hdr,
->     bcf1_t* line,
->     int* flt_ids,
->     int n);
-776c807
-< int bcf_add_filter(const(bcf_hdr_t)* hdr, bcf1_t* line, int flt_id);
----
-> int bcf_add_filter (const(bcf_hdr_t)* hdr, bcf1_t* line, int flt_id);
-782c813
-< int bcf_remove_filter(
----
-> int bcf_remove_filter (
-790c821
-< int bcf_has_filter(const(bcf_hdr_t)* hdr, bcf1_t* line, char* filter);
----
-> int bcf_has_filter (const(bcf_hdr_t)* hdr, bcf1_t* line, char* filter);
-797c828
-< int bcf_update_alleles(
----
-> int bcf_update_alleles (
-803c834
-< int bcf_update_alleles_str(
----
-> int bcf_update_alleles_str (
-812c843
-< int bcf_update_id(const(bcf_hdr_t)* hdr, bcf1_t* line, const(char)* id);
----
-> int bcf_update_id (const(bcf_hdr_t)* hdr, bcf1_t* line, const(char)* id);
-814c845
-< int bcf_add_id(const(bcf_hdr_t)* hdr, bcf1_t* line, const(char)* id);
----
-> int bcf_add_id (const(bcf_hdr_t)* hdr, bcf1_t* line, const(char)* id);
-837,855c868,877
+839,857c867,876
 < extern (D) auto bcf_update_info_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_info(hdr, line, key, values, n, BCF_HT_INT);
@@ -642,11 +396,11 @@
 >     auto bcf_update_info_string(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *key, const(void) *values) // @suppress(dscanner.style.undocumented_declaration)
 >         { return bcf_update_info(hdr, line, key, values, 1, BCF_HT_STR); }
 >     }
-857c879
+859c878
 < int bcf_update_info(
 ---
 > int bcf_update_info (
-881,886c903,909
+883,888c902,908
 < int bcf_update_info_int64(
 <     const(bcf_hdr_t)* hdr,
 <     bcf1_t* line,
@@ -661,21 +415,23 @@
 > {
 >     return bcf_update_info(hdr, line, key, values, n, BCF_HT_LONG);
 > }
-888c911
+890c910
 < /*
 ---
 > /**
-904,916c927,936
+906,909d925
 < extern (D) auto bcf_update_format_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_format(hdr, line, key, values, n, BCF_HT_INT);
 < }
-< 
+911,914c927
 < extern (D) auto bcf_update_format_float(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_format(hdr, line, key, values, n, BCF_HT_REAL);
 < }
-< 
+---
+> }/// closing @nogc nothrow
+916,918c929,938
 < extern (D) auto bcf_update_format_char(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 key, auto ref T3 values, auto ref T4 n)
 < {
 <     return bcf_update_format(hdr, line, key, values, n, BCF_HT_STR);
@@ -690,20 +446,18 @@
 >     auto bcf_update_genotypes(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) **gts, int n) // @suppress(dscanner.style.undocumented_declaration)
 >         { return bcf_update_format(hdr, line, toStringz("GT"c), gts, n, BCF_HT_INT); 
 >     }
-919,924c939
+921,924c941
 < extern (D) auto bcf_update_genotypes(T0, T1, T2, T3)(auto ref T0 hdr, auto ref T1 line, auto ref T2 gts, auto ref T3 n)
 < {
 <     return bcf_update_format(hdr, line, "GT", gts, n, BCF_HT_INT);
 < } // See bcf_gt_ macros below
-< 
+---
+> @nogc nothrow {
+926c943
 < int bcf_update_format_string(
 ---
 > int bcf_update_format_string (
-931c946
-< int bcf_update_format(
----
-> int bcf_update_format (
-939,966c954,967
+941,968c958,971
 < // Macros for setting genotypes correctly, for use with bcf_update_genotypes only; idx corresponds
 < // to VCF's GT (1-based index to ALT or 0 for the reference allele) and val is the opposite, obtained
 < // from bcf_get_genotypes() below.
@@ -747,10 +501,10 @@
 >     auto bcf_gt_is_phased(int idx)  { return ((idx)&1);         }
 >     /// ditto
 >     auto bcf_gt_allele(int val)     { return (((val)>>1)-1);    }
-967a969,970
+969a973,974
 > /// ditto
 >     enum int bcf_gt_missing = 0;
-970,975c973,982
+972,977c977,986
 < extern (D) auto bcf_alleles2gt(T0, T1)(auto ref T0 a, auto ref T1 b)
 < {
 <     return a > b ? (a * (a + 1) / 2 + b) : (b * (b + 1) / 2 + a);
@@ -768,26 +522,7 @@
 >             *b = dk - 1; *a = igt - k + *b;
 >         }
 >     }
-986c993
-< bcf_fmt_t* bcf_get_fmt(const(bcf_hdr_t)* hdr, bcf1_t* line, const(char)* key);
----
-> bcf_fmt_t* bcf_get_fmt (const(bcf_hdr_t)* hdr, bcf1_t* line, const(char)* key);
-988c995,998
-< bcf_info_t* bcf_get_info(const(bcf_hdr_t)* hdr, bcf1_t* line, const(char)* key);
----
-> bcf_info_t* bcf_get_info (
->     const(bcf_hdr_t)* hdr,
->     bcf1_t* line,
->     const(char)* key);
-998c1008
-< bcf_fmt_t* bcf_get_fmt_id(bcf1_t* line, const int id);
----
-> bcf_fmt_t* bcf_get_fmt_id (bcf1_t* line, const int id);
-1000c1010
-< bcf_info_t* bcf_get_info_id(bcf1_t* line, const int id);
----
-> bcf_info_t* bcf_get_info_id (bcf1_t* line, const int id);
-1024,1042c1034,1043
+1026,1044c1035,1044
 < extern (D) auto bcf_get_info_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_INT);
@@ -818,11 +553,11 @@
 >     auto bcf_get_info_flag(const(bcf_hdr_t) *hdr, bcf1_t *line, const(char) *tag, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration)
 >         { return bcf_get_info_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_FLAG); }
 >     }
-1044c1045
+1046c1046
 < int bcf_get_info_values(
 ---
 > int bcf_get_info_values (
-1071,1076c1072,1079
+1073,1078c1073,1080
 < int bcf_get_info_int64(
 <     const(bcf_hdr_t)* hdr,
 <     bcf1_t* line,
@@ -838,17 +573,19 @@
 >     return bcf_get_info_values(hdr, line, tag,
 >                                 cast(void **) dst, ndst, BCF_HT_LONG);
 > }
-1130,1142c1133,1141
+1132,1135d1133
 < extern (D) auto bcf_get_format_int32(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_INT);
 < }
-< 
+1137,1140c1135
 < extern (D) auto bcf_get_format_float(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_REAL);
 < }
-< 
+---
+> }/// closing @nogc nothrow from line 928
+1142,1144c1137,1145
 < extern (D) auto bcf_get_format_char(T0, T1, T2, T3, T4)(auto ref T0 hdr, auto ref T1 line, auto ref T2 tag, auto ref T3 dst, auto ref T4 ndst)
 < {
 <     return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_STR);
@@ -862,24 +599,14 @@
 >         { return bcf_get_format_values(hdr, line, tag, cast(void**) dst, ndst, BCF_HT_STR); }
 >     auto bcf_get_genotypes(const(bcf_hdr_t) *hdr, bcf1_t *line, void **dst, int *ndst) // @suppress(dscanner.style.undocumented_declaration) // @suppress(dscanner.style.long_line)
 >         { return bcf_get_format_values(hdr, line, toStringz("GT"c), cast(void**) dst, ndst, BCF_HT_INT); }
-1145,1150c1144
+1147,1150c1148
 < extern (D) auto bcf_get_genotypes(T0, T1, T2, T3)(auto ref T0 hdr, auto ref T1 line, auto ref T2 dst, auto ref T3 ndst)
 < {
 <     return bcf_get_format_values(hdr, line, "GT", cast(void**) dst, ndst, BCF_HT_INT);
 < }
-< 
-< int bcf_get_format_string(
 ---
-> int bcf_get_format_string (
-1157c1151
-< int bcf_get_format_values(
----
-> int bcf_get_format_values (
-1178c1172
-< int bcf_hdr_id2int(const(bcf_hdr_t)* hdr, int type, const(char)* id);
----
-> int bcf_hdr_id2int (const(bcf_hdr_t)* hdr, int type, const(char)* id);
-1180,1183c1174,1176
+> @nogc nothrow {
+1182,1185c1180,1182
 < extern (D) auto bcf_hdr_int2id(T0, T1, T2)(auto ref T0 hdr, auto ref T1 type, auto ref T2 int_id)
 < {
 <     return hdr.id[type][int_id].key;
@@ -888,7 +615,7 @@
 > pragma(inline, true)
 > auto bcf_hdr_int2id(const(bcf_hdr_t) *hdr, int type, int int_id)
 >     { return hdr.id[type][int_id].key; }
-1189,1191c1182,1186
+1191,1193c1188,1192
 < int bcf_hdr_name2id(const(bcf_hdr_t)* hdr, const(char)* id);
 < const(char)* bcf_hdr_id2name(const(bcf_hdr_t)* hdr, int rid);
 < const(char)* bcf_seqname(const(bcf_hdr_t)* hdr, const(bcf1_t)* rec);
@@ -898,11 +625,7 @@
 >     pragma(inline, true) const(char) *bcf_hdr_id2name(const(bcf_hdr_t) *hdr, int rid) { return hdr.id[BCF_DT_CTG][rid].key; } // @suppress(dscanner.style.long_line)
 >     /// ditto
 >     pragma(inline, true) const(char) *bcf_seqname(const(bcf_hdr_t) *hdr, bcf1_t *rec) { return hdr.id[BCF_DT_CTG][rec.rid].key; } // @suppress(dscanner.style.long_line)
-1200c1195
-< const(char)* bcf_seqname_safe(const(bcf_hdr_t)* hdr, const(bcf1_t)* rec);
----
-> const(char)* bcf_seqname_safe (const(bcf_hdr_t)* hdr, const(bcf1_t)* rec);
-1216,1245c1211,1226
+1218,1247c1217,1232
 < extern (D) auto bcf_hdr_id2length(T0, T1, T2)(auto ref T0 hdr, auto ref T1 type, auto ref T2 int_id)
 < {
 <     return hdr.id[BCF_DT_ID][int_id].val.info[type] >> 8 & 0xf;
@@ -950,38 +673,18 @@
 >         { return ((hdr).id[(dict_type)==BCF_DT_CTG?BCF_DT_CTG:BCF_DT_ID][int_id].val.hrec[(dict_type)==BCF_DT_CTG?0:(col_type)]); // @suppress(dscanner.style.long_line)
 >     }
 > } 
-1255c1236
-< int bcf_fmt_array(kstring_t* s, int n, int type, void* data);
----
-> int bcf_fmt_array (kstring_t* s, int n, int type, void* data);
-1257c1238
-< ubyte* bcf_fmt_sized_array(kstring_t* s, ubyte* ptr);
----
-> ubyte* bcf_fmt_sized_array (kstring_t* s, ubyte* ptr);
-1266c1247
-< int bcf_enc_vchar(kstring_t* s, int l, const(char)* a);
----
-> int bcf_enc_vchar (kstring_t* s, int l, const(char)* a);
-1277c1258
-< int bcf_enc_vint(kstring_t* s, int n, int* a, int wsize);
----
-> int bcf_enc_vint (kstring_t* s, int n, int* a, int wsize);
-1286c1267
-< int bcf_enc_vfloat(kstring_t* s, int n, float* a);
----
-> int bcf_enc_vfloat (kstring_t* s, int n, float* a);
-1298,1308c1279,1299
+1300,1303c1285
 < extern (D) auto bcf_itr_queryi(T0, T1, T2, T3)(auto ref T0 idx, auto ref T1 tid, auto ref T2 beg, auto ref T3 end)
 < {
 <     return hts_itr_query(idx, tid, beg, end, bcf_readrec);
 < }
-< 
+---
+> } /// closing @nogc nothrow from line 1136
+1305,1308c1287,1309
 < extern (D) auto bcf_itr_querys(T0, T1, T2)(auto ref T0 idx, auto ref T1 hdr, auto ref T2 s)
 < {
 <     return hts_itr_querys(idx, s, cast(hts_name2id_f) bcf_hdr_name2id, hdr, hts_itr_query, bcf_readrec);
 < }
-< 
-< int bcf_itr_next(htsFile* htsfp, hts_itr_t* itr, void* r);
 ---
 > pragma(inline, true) {
 >     /// Generate an iterator for an integer-based range query
@@ -1004,14 +707,18 @@
 >         errno = EINVAL;
 >         return -2;
 >     }
-1315,1318c1306
+> 
+> @nogc nothrow:
+1310d1310
+< int bcf_itr_next(htsFile* htsfp, hts_itr_t* itr, void* r);
+1317,1320c1317
 < extern (D) auto bcf_index_load(T)(auto ref T fn)
 < {
 <     return hts_idx_load(fn, HTS_FMT_CSI);
 < }
 ---
 > auto bcf_index_load(const(char) *fn) { return hts_idx_load(fn, HTS_FMT_CSI); }
-1320,1322c1308,1310
+1322,1324c1319,1321
 < extern (D) auto bcf_index_seqnames(T0, T1, T2)(auto ref T0 idx, auto ref T1 hdr, auto ref T2 nptr)
 < {
 <     return hts_idx_seqnames(idx, nptr, cast(hts_id2name_f) bcf_hdr_id2name, hdr);
@@ -1019,39 +726,11 @@
 > /// Get a list (char **) of sequence names from the index -- free only the array, not the values
 > auto bcf_index_seqnames(const(hts_idx_t) *idx, const(bcf_hdr_t) *hdr, int *nptr)
 >     { return hts_idx_seqnames(idx, nptr, cast(hts_id2name_f) &bcf_hdr_id2name, cast(void *) hdr); }
-1332c1320
-< hts_idx_t* bcf_index_load2(const(char)* fn, const(char)* fnidx);
----
-> hts_idx_t* bcf_index_load2 (const(char)* fn, const(char)* fnidx);
-1350c1338
-< hts_idx_t* bcf_index_load3(const(char)* fn, const(char)* fnidx, int flags);
----
-> hts_idx_t* bcf_index_load3 (const(char)* fn, const(char)* fnidx, int flags);
-1370c1358
-< int bcf_index_build(const(char)* fn, int min_shift);
----
-> int bcf_index_build (const(char)* fn, int min_shift);
-1386c1374
-< int bcf_index_build2(const(char)* fn, const(char)* fnidx, int min_shift);
----
-> int bcf_index_build2 (const(char)* fn, const(char)* fnidx, int min_shift);
-1403c1391
-< int bcf_index_build3(
----
-> int bcf_index_build3 (
-1419c1407
-< int bcf_idx_init(htsFile* fp, bcf_hdr_t* h, int min_shift, const(char)* fnidx);
----
-> int bcf_idx_init (htsFile* fp, bcf_hdr_t* h, int min_shift, const(char)* fnidx);
-1425c1413
-< int bcf_idx_save(htsFile* fp);
----
-> int bcf_idx_save (htsFile* fp);
-1431c1419
+1433c1430
 < /*
 ---
 > /**
-1445,1447c1433,1435
+1447,1449c1444,1446
 < enum bcf_int16_vector_end = -32767; /* INT16_MIN + 1 */
 < enum bcf_int32_vector_end = -2147483647; /* INT32_MIN + 1 */
 < enum bcf_int64_vector_end = -9223372036854775807LL; /* INT64_MIN + 1 */
@@ -1059,7 +738,7 @@
 > enum bcf_int16_vector_end = -32_767; /* INT16_MIN + 1 */
 > enum bcf_int32_vector_end = -2_147_483_647; /* INT32_MIN + 1 */
 > enum bcf_int64_vector_end = -9_223_372_036_854_775_807L; /* INT64_MIN + 1 */
-1450,1452c1438,1440
+1452,1454c1449,1451
 < enum bcf_int16_missing = -32767 - 1; /* INT16_MIN */
 < enum bcf_int32_missing = -2147483647 - 1; /* INT32_MIN */
 < enum bcf_int64_missing = -9223372036854775807LL - 1LL; /* INT64_MIN */
@@ -1067,13 +746,13 @@
 > enum bcf_int16_missing = -32_767 - 1; /* INT16_MIN */
 > enum bcf_int32_missing = -2_147_483_647 - 1; /* INT32_MIN */
 > enum bcf_int64_missing = -9_223_372_036_854_775_807L - 1L; /* INT64_MIN */
-1462,1463c1450,1451
+1464,1465c1461,1462
 < enum BCF_MIN_BT_INT16 = -32760; /* INT16_MIN + 8 */
 < enum BCF_MIN_BT_INT32 = -2147483640; /* INT32_MIN + 8 */
 ---
 > enum BCF_MIN_BT_INT16 = -32_760; /* INT16_MIN + 8 */
 > enum BCF_MIN_BT_INT32 = -2_147_483_640; /* INT32_MIN + 8 */
-1467c1455,1520
+1469c1466,1531
 < void bcf_float_set(float* ptr, uint value);
 ---
 > version(LDC) pragma(inline, true):
@@ -1142,19 +821,19 @@
 >         case BCF_BT_NULL:  e |= kputc('.', str) < 0; break;
 >         default: hts_log_error("Unexpected type %d", fmt.type); return -2;
 >     }
-1469,1471c1522
+1471,1473c1533
 < extern (D) auto bcf_float_set_vector_end(T)(auto ref T x)
 < {
 <     return bcf_float_set(&x, bcf_float_vector_end);
 ---
 >     return e == 0 ? 0 : -1;
-1474c1525,1527
+1476c1536,1538
 < extern (D) auto bcf_float_set_missing(T)(auto ref T x)
 ---
 > 
 > pragma(inline, true)
 > int bcf_enc_size(kstring_t *s, int size, int type)
-1476c1529,1547
+1478c1540,1558
 <     return bcf_float_set(&x, bcf_float_missing);
 ---
 >     uint32_t e = 0;
@@ -1176,7 +855,7 @@
 >         }
 >     } else e |= kputc(size<<4|type, s) < 0;
 >     return e == 0 ? 0 : -1;
-1479,1488d1549
+1481,1490d1560
 < int bcf_float_is_missing(float f);
 < int bcf_float_is_vector_end(float f);
 < 
@@ -1187,7 +866,7 @@
 < int bcf_enc_inttype(c_long x);
 < 
 < int bcf_enc_int1(kstring_t* s, int x);
-1489a1551,1584
+1491a1562,1595
 > /// Undocumented Encode integer type?
 > pragma(inline, true)
 > int bcf_enc_inttype(long x)
@@ -1222,7 +901,7 @@
 >     }
 >     return e == 0 ? 0 : -1;
 > }
-1504,1506c1599,1617
+1506,1508c1610,1628
 < 
 < // Invalid type.
 < long bcf_dec_int1(const(ubyte)* p, int type, ubyte** q);
@@ -1246,7 +925,7 @@
 >         return 0;
 >     }
 > }
-1524,1526c1635,1639
+1526,1528c1646,1650
 < long bcf_dec_typed_int1(const(ubyte)* p, ubyte** q);
 < 
 < int bcf_dec_size(const(ubyte)* p, ubyte** q, int* type);
@@ -1256,7 +935,7 @@
 > {
 >     return bcf_dec_int1(p + 1, *p&0xf, q);
 > }
-1527a1641,1649
+1529a1652,1660
 > pragma(inline, true)
 > int bcf_dec_size (const(ubyte)* p, ubyte** q, int* type)
 > {

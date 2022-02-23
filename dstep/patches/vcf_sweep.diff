@@ -1,23 +1,9 @@
-24a25,26
-> module htslib.vcf_sweep;
+25d24
+< 
+26a26,31
+> 
 > import htslib.vcf;
-30c32
-< bcf_sweep_t* bcf_sweep_init(const(char)* fname);
----
-> bcf_sweep_t* bcf_sweep_init (const(char)* fname);
-32c34
-< void bcf_sweep_destroy(bcf_sweep_t* sw);
----
-> void bcf_sweep_destroy (bcf_sweep_t* sw);
-34c36
-< bcf_hdr_t* bcf_sweep_hdr(bcf_sweep_t* sw);
----
-> bcf_hdr_t* bcf_sweep_hdr (bcf_sweep_t* sw);
-36c38
-< bcf1_t* bcf_sweep_fwd(bcf_sweep_t* sw);
----
-> bcf1_t* bcf_sweep_fwd (bcf_sweep_t* sw);
-38c40
-< bcf1_t* bcf_sweep_bwd(bcf_sweep_t* sw);
----
-> bcf1_t* bcf_sweep_bwd (bcf_sweep_t* sw);
+> 
+> @system:
+> nothrow:
+> @nogc:
