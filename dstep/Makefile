@@ -98,6 +98,7 @@ clean:
 
 apply:
 	cp output/* ../source/htslib/
+	cp include/* ../source/htslib/include
 
 vpath %.h include
 vpath %.diff patches
