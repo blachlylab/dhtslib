@@ -94,6 +94,7 @@ changes: $(changePatchFiles)
 clean:
 	rm patches/*
 	rm output/*
+	rm /tmp/dstep/*
 
 apply:
 	cp output/* ../source/htslib/
@@ -103,19 +104,19 @@ vpath %.diff patches
 
 # perform dstep conversion of latest
 # htslib headers in sub-repo
-/tmp/%.d: %.h
-	$(DSTEP) -o /tmp/$(notdir $@) $<
+/tmp/dstep/%.d: %.h
+	$(DSTEP) -o /tmp/dstep/$(notdir $@) $<
 
 # create patch files for patching
 # converted headers to current bindings 
-$(patchFiles): patches/%.diff: /tmp/%.d %.h
+$(patchFiles): patches/%.diff: /tmp/dstep/%.d %.h
 	diff $< ../source/htslib/$*.d > $@; [ $$? -eq 1 ]
 
 
 # create patch files for viewing
 # significant changes by ignoring
 # changes in comment style and whitespace
-$(changePatchFiles): changes/%.diff: /tmp/%.d %.h
+$(changePatchFiles): changes/%.diff: /tmp/dstep/%.d %.h
 	diff -w \
 	<(sed -E 's;///.*;;g; s;//.*;;g; s;/\*\*;/*;g;' $<) \
 	<(sed -E 's;///.*;;g; s;//.*;;g; s;/\*\*;/*;g;' ../source/htslib/$*.d) \
@@ -123,5 +124,5 @@ $(changePatchFiles): changes/%.diff: /tmp/%.d %.h
 
 
 # patch converted to match bindings
-$(outputfiles): output/%.d: /tmp/%.d %.h %.diff
+$(outputfiles): output/%.d: /tmp/dstep/%.d %.h %.diff
 	patch $< -o $@ < patches/$*.diff
