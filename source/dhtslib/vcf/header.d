@@ -283,6 +283,13 @@ struct VCFHeader
         this.hdr = BcfHdr(h);
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.hdr = hdr;
+    }
+
     /// copy this header
     auto dup(){
         return VCFHeader(bcf_hdr_dup(this.hdr));
@@ -314,10 +321,17 @@ struct VCFHeader
     pragma(inline, true)
     @property int nsamples() { return bcf_hdr_nsamples(this.hdr); }
 
+    /// get int index of sample name
     int getSampleId(string sam){
         auto ret = bcf_hdr_id2int(this.hdr, HeaderDictTypes.Sample, toUTFz!(char *)(sam));
         if(ret == -1) hts_log_error(__FUNCTION__, "Couldn't find sample in header: " ~ sam);
         return ret;
+    }
+
+    /// get sample list
+    string[] getSamples(){
+        auto samples = this.hdr.samples[0..this.nsamples];
+        return samples.map!(x => fromStringz(x).idup).array;
     }
 
     // TODO

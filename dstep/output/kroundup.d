@@ -22,6 +22,41 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 */
+module htslib.kroundup;
+
+@system:
+nothrow:
+@nogc:
+
+/// round 32 or 64 bit (u)int x to power of 2 that is equal or greater (JSB)
+/// new impl based on
+/// #define kroundup64(x) ((x) > 0 ?                                        \
+                      //  (--(x),                                          \
+                      //   (x)|=(x)>>(sizeof(x)/8),                        \
+                      //   (x)|=(x)>>(sizeof(x)/4),                        \
+                      //   (x)|=(x)>>(sizeof(x)/2),                        \
+                      //   (x)|=(x)>>(sizeof(x)),                          \
+                      //   (x)|=(x)>>(sizeof(x)*2),                        \
+                      //   (x)|=(x)>>(sizeof(x)*4),                        \
+                      //   (x) += !k_high_bit_set(x),                      \
+                      //   (x))                                            \
+                      //  : 0)
+pragma(inline, true)
+extern (D)
+void kroundup_size_t(T)(ref T x) {
+  if(x > 0){
+    x -= 1;
+    x |= (x >> (T.sizeof/8));
+    x |= (x >> (T.sizeof/4));
+    x |= (x >> (T.sizeof/2));
+    x |= (x >> (T.sizeof));
+    x |= (x >> (T.sizeof*2));
+    x |= (x >> (T.sizeof*4));
+    x += !k_high_bit_set(x);
+  }else{
+    x = 0;
+  }
+}
 
 extern (C):
 
@@ -60,7 +95,7 @@ extern (D) auto k_high_bit_set(T)(auto ref T x)
 // Historic interfaces for 32-bit and size_t values.  The macro above
 // works for both (as long as size_t is no more than 64 bits).
 
-alias kroundup32 = kroundup64;
+void kroundup64(T)(ref T x) {kroundup_size_t!T(x);}
+void kroundup32(T)(ref T x) {kroundup_size_t!T(x);}
 
-alias kroundup_size_t = kroundup64;
 

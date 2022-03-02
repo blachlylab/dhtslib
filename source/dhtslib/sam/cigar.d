@@ -6,8 +6,7 @@ module dhtslib.sam.cigar;
 import std.stdio;
 import std.bitmanip : bitfields;
 import std.array : join;
-import std.algorithm : map;
-import std.algorithm.iteration : each;
+import std.algorithm : map, each, sum;
 import std.conv : to;
 import std.range : array;
 import std.traits : isIntegral;
@@ -18,8 +17,106 @@ import dhtslib.coordinates;
 import dhtslib.memory;
 import htslib.sam : bam_get_cigar;
 
-/// Represents a CIGAR string
-/// https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
+
+/**
+Represents all cigar ops
+as a friendlier alternative to BAM_C htslib enums
+*/
+enum Ops
+{
+    MATCH = 0,
+    INS = 1,
+    DEL = 2,
+    REF_SKIP = 3,
+    SOFT_CLIP = 4,
+    HARD_CLIP = 5,
+    PAD = 6,
+    EQUAL = 7,
+    DIFF = 8,
+    BACK = 9
+}
+
+/**
+string to aid in conversion from CigarOp to string
+*/
+static immutable string CIGAR_STR = "MIDNSHP=XB";
+
+/// Credit to Biod for this code below
+/// https://github.com/biod/BioD from their bam.cigar module
+/** 
+    uint to aid in identifying if a cigar op is query consuming 
+    or reference consuming.
+
+    Each pair of bits has first bit set iff the operation is query consuming,
+    and second bit set iff it is reference consuming.
+                                             X  =  P  H  S  N  D  I  M
+*/                                            
+private static immutable uint CIGAR_TYPE = 0b11_11_00_00_01_10_10_01_11;
+
+/// True iff operation is one of M, =, X, I, S
+bool isQueryConsuming(T)(T op) nothrow @nogc
+{
+    return ((CIGAR_TYPE >> ((op & 0xF) * 2)) & 1) != 0;
+}
+
+/// True iff operation is one of M, =, X, D, N
+bool isReferenceConsuming(T)(T op)nothrow @nogc
+{
+    return ((CIGAR_TYPE >> ((op & 0xF) * 2)) & 2) != 0;
+}
+
+/// True iff operation is one of M, =, X
+bool isMatchOrMismatch(T)(T op) nothrow @nogc
+{
+    return ((CIGAR_TYPE >> ((op & 0xF) * 2)) & 3) == 3;
+}
+
+/// True iff operation is one of 'S', 'H'
+bool isClipping(T)(T op)nothrow @nogc
+{
+    return ((op & 0xF) >> 1) == 2; // 4 or 5
+}
+
+/// Represents a singular cigar operation
+/// as a uint
+union CigarOp
+{
+    /// raw opcode
+    uint raw;
+
+    mixin(bitfields!( //lower 4 bits store op
+            Ops, "op", 4, //higher 28 bits store length
+            uint, "length", 28));
+
+    /// construct Op from raw opcode
+    this(uint raw)
+    {
+        this.raw = raw;
+    }
+
+    /// construct Op from an operator and operand (length)
+    this(uint len, Ops op)
+    {
+        this.op = op;
+        this.length = len;
+    }
+
+    string toString() const
+    {
+        return this.length.to!string ~ CIGAR_STR[this.op];
+    }
+}
+
+/** 
+    Represents a CIGAR string as an array of CigarOps. 
+
+    https://samtools.github.io/hts-specs/SAMv1.pdf §1.4.6
+
+    In many cases will represent a slice or reference to 
+    underlying cigar data in the bam record 
+    UNLESS it is copied with .dup or one of the assignment
+    methods.    
+*/ 
 struct Cigar
 {
     /// array of distinct CIGAR ops 
@@ -46,6 +143,14 @@ struct Cigar
         this.ops = ops;
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this) nothrow
+    {
+        this.b = b;
+        this.ops = ops;   
+    }
+
     /// null CIGAR -- don't read!
     bool is_null()
     {
@@ -53,9 +158,9 @@ struct Cigar
     }
 
     /// Format Cigar struct as CIGAR string in accordance with SAM spec
-    string toString()
+    string toString() const
     {
-        return ops.map!(x => x.length.to!string ~ CIGAR_STR[x.op]).array.join;
+        return ops.map!(x => x.toString).array.join;
     }
 
     /// get length of cigar
@@ -142,23 +247,29 @@ struct Cigar
         return ops[start .. end] = values;
     }
 
+    /// Assign a Cigar with a CigarOp slice
+    /// Note: this is not a deep copy
     auto opAssign(T: CigarOp[])(T value)
     {
         this.ops = value;
         return this;
     }
 
+    /// Assign a Cigar with a Cigar
+    /// Note: this is not a deep copy
     auto opAssign(T: Cigar)(T value)
     {
         this.ops = value.ops;
         return this;
     }
 
+    /// use $ with Cigar slicing
     size_t opDollar()
     {
         return length;
     }
 
+    /// combine Cigars
     auto opBinary(string op)(const Cigar rhs) const
     if(op == "~")
     {
@@ -166,102 +277,6 @@ struct Cigar
     }
 }
 
-// Each pair of bits has first bit set iff the operation is query consuming,
-// and second bit set iff it is reference consuming.
-//                                            X  =  P  H  S  N  D  I  M
-private static immutable uint CIGAR_TYPE = 0b11_11_00_00_01_10_10_01_11;
-
-/// Represents a distinct cigar operation
-union CigarOp
-{
-    /// raw opcode
-    uint raw;
-
-    mixin(bitfields!( //lower 4 bits store op
-            Ops, "op", 4, //higher 28 bits store length
-            uint, "length", 28));
-
-    /// construct Op from raw opcode
-    this(uint raw)
-    {
-        this.raw = raw;
-    }
-
-    /// construct Op from an operator and operand (length)
-    this(uint len, Ops op)
-    {
-        this.op = op;
-        this.length = len;
-    }
-    /// Credit to Biod for this code below
-    /// https://github.com/biod/BioD from their bam.cigar module
-    /// True iff operation is one of M, =, X, I, S
-    bool isQueryConsuming() @property const nothrow @nogc
-    {
-        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 1) != 0;
-    }
-
-    /// True iff operation is one of M, =, X, D, N
-    bool isReferenceConsuming() @property const nothrow @nogc
-    {
-        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 2) != 0;
-    }
-
-    /// True iff operation is one of M, =, X
-    bool isMatchOrMismatch() @property const nothrow @nogc
-    {
-        return ((CIGAR_TYPE >> ((raw & 0xF) * 2)) & 3) == 3;
-    }
-
-    /// True iff operation is one of 'S', 'H'
-    bool isClipping() @property const nothrow @nogc
-    {
-        return ((raw & 0xF) >> 1) == 2; // 4 or 5
-    }
-
-    deprecated("Use camelCase names instead")
-    alias is_query_consuming = isQueryConsuming;
-    deprecated("Use camelCase names instead")
-    alias is_reference_consuming = isReferenceConsuming;
-    deprecated("Use camelCase names instead")
-    alias is_match_or_mismatch = isMatchOrMismatch;
-    deprecated("Use camelCase names instead")
-    alias is_clipping = isClipping;
-
-    string toString(){
-        return this.length.to!string ~ CIGAR_STR[this.op];
-    }
-}
-
-/**
-Represents all ops
-#define BAM_CIGAR_STR   "MIDNSHP=XB"
-#define BAM_CMATCH      0
-#define BAM_CINS        1
-#define BAM_CDEL        2
-#define BAM_CREF_SKIP   3
-#define BAM_CSOFT_CLIP  4
-#define BAM_CHARD_CLIP  5
-#define BAM_CPAD        6
-#define BAM_CEQUAL      7
-#define BAM_CDIFF       8
-#define BAM_CBACK       9
-*/
-string CIGAR_STR = "MIDNSHP=XB";
-/// ditto
-enum Ops
-{
-    MATCH = 0,
-    INS = 1,
-    DEL = 2,
-    REF_SKIP = 3,
-    SOFT_CLIP = 4,
-    HARD_CLIP = 5,
-    PAD = 6,
-    EQUAL = 7,
-    DIFF = 8,
-    BACK = 9
-}
 
 debug (dhtslib_unittest) unittest
 {
@@ -322,8 +337,8 @@ debug (dhtslib_unittest) unittest
     auto cig = cigarFromString(c);
     hts_log_info(__FUNCTION__, "Cigar:" ~ cig.toString());
     assert(cig.toString() == c);
-    assert(cig.ops[0].is_query_consuming && cig.ops[0].is_reference_consuming);
-    assert(!cig.ops[1].is_query_consuming && cig.ops[1].is_reference_consuming);
+    assert(cig.ops[0].op.isQueryConsuming && cig.ops[0].op.isReferenceConsuming);
+    assert(!cig.ops[1].op.isQueryConsuming && cig.ops[1].op.isReferenceConsuming);
 }
 
 /// Range-based iteration of a Cigar string
@@ -334,13 +349,15 @@ debug (dhtslib_unittest) unittest
 struct CigarItr
 {
     Cigar cigar;
+    CigarOp[] ops;
     CigarOp current;
 
     this(Cigar c)
     {
         // Copy the cigar
-        cigar = c.dup;
-        current = cigar[0];
+        cigar = c;
+        ops = cigar[];
+        current = ops[0];
         current.length = current.length - 1;
     }
 
@@ -354,12 +371,12 @@ struct CigarItr
         // import std.stdio;
         // writeln(current);
         // writeln(cigar);
-        if(cigar.length == 1 && current.length == 0)
-            cigar.length = 0;
+        if(ops.length == 1 && current.length == 0)
+            ops = [];
         else if (current.length == 0)
         {
-            cigar = cigar[1 .. $];
-            current = cigar[0];
+            ops = ops[1 .. $];
+            current = ops[0];
             current.length = current.length - 1;
         }
         else if (current.length != 0)
@@ -368,7 +385,7 @@ struct CigarItr
 
     bool empty()
     {
-        return cigar.length == 0;
+        return ops.length == 0;
     }
 }
 

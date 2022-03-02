@@ -2,8 +2,10 @@ module test.samreader;
 
 import std.stdio;
 import std.string;
+import std.array;
 
 import dhtslib.sam;
+import dhtslib.coordinates;
 import htslib.sam;
 import htslib.hts_log;
 
@@ -60,7 +62,7 @@ int main()
         int j;
         //auto qr = sf.query("chr1:1000000-2000000");
         //auto qr = sf.query(0, 1_000_000, 2_000_000);
-        auto qr = sf.query(0, 1_000, 2_000);
+        auto qr = sf.query(0,ZBHO(1_000, 2_000));
         foreach(r; qr) {
             j++;
         }
@@ -70,7 +72,7 @@ int main()
 
     hts_log_info(__FUNCTION__, "Test query with zero expected results");
     int j = 0;
-    auto qr = sf.query(0, 1, 2);
+    auto qr = sf.query(0, ZBHO(1, 2));
     foreach(r; qr) {
         j++;
     }
@@ -87,5 +89,7 @@ int main()
     writefln("%d records", i);
     assert(i == 112);   // confirmed by samtools flagstat
 
+    auto y = sf.all_records.array;
+    assert(y.length == 112);   // confirmed by samtools flagstat
     return 0;
 }

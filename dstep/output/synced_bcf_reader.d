@@ -52,8 +52,18 @@ DEALINGS IN THE SOFTWARE.  */
         if ( sr->errnum ) error("Error: %s\n", bcf_sr_strerror(sr->errnum));
         bcf_sr_destroy(sr);
 */
+module htslib.synced_bcf_reader;
 
 import core.stdc.stddef;
+
+import htslib.hts;
+import htslib.vcf;
+import htslib.kstring : kstring_t;
+import htslib.tbx : tbx_t;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
 
@@ -311,6 +321,9 @@ int bcf_sr_set_samples(bcf_srs_t* readers, const(char)* samples, int is_file);
  *  file are currently not supported.
  *  Targets (but not regions) can be prefixed with "^" to request logical complement,
  *  for example "^X,Y,MT" indicates that sequences X, Y and MT should be skipped.
+ *
+ *  API note: bcf_sr_set_regions/bcf_sr_set_targets MUST be called before the
+ *  first call to bcf_sr_add_reader().
  */
 int bcf_sr_set_targets(
     bcf_srs_t* readers,

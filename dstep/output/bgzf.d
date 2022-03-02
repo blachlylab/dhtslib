@@ -27,7 +27,27 @@
 /* The BGZF library was originally written by Bob Handsaker from the Broad
  * Institute. It was later improved by the SAMtools developers. */
 
+module htslib.bgzf;
+
+import core.stdc.stdio;
 import core.sys.posix.sys.types;
+
+import htslib.hfile : hFILE;
+import htslib.kstring;
+
+@system:
+nothrow:
+@nogc:
+
+// ssize_t doesn't exist in core.sys.posix.sys.types for windows builds
+version(Windows){
+    version(Win32){
+        alias ssize_t = int;
+    }
+    version(Win64){
+        alias ssize_t = long;
+    }
+}
 
 extern (C):
 
@@ -41,11 +61,10 @@ enum BGZF_ERR_MISUSE = 8;
 enum BGZF_ERR_MT = 16; // stream cannot be multi-threaded
 enum BGZF_ERR_CRC = 32;
 
-struct hFILE;
 struct hts_tpool;
-struct kstring_t;
 struct bgzf_mtaux_t;
-struct bgzidx_t;
+struct __bgzidx_t;
+alias bgzidx_t = __bgzidx_t;
 struct bgzf_cache_t;
 struct z_stream_s;
 
@@ -205,6 +224,7 @@ int bgzf_flush(BGZF* fp);
  * call to bgzf_seek can be used to position the file at the same point.
  * Return value is non-negative on success.
  */
+pragma(inline, true)
 extern (D) auto bgzf_tell(T)(auto ref T fp)
 {
     return (fp.block_address << 16) | (fp.block_offset & 0xFFFF);

@@ -52,6 +52,14 @@ struct SAMRecord
         this.h = h;
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.b = b;
+        this.h = h;   
+    }
+
     /* bam1_core_t fields */
 
     /// chromosome ID, defined by sam_hdr_t
@@ -519,10 +527,16 @@ struct SAMRecord
 
     struct AlignedPair(bool refSeq)
     {
-        Coordinate!(Basis.zero) qpos, rpos;
-        Ops cigar_op;
-        char queryBase;
-        static if(refSeq) char refBase;
+        Coordinate!(Basis.zero) qpos= ZB(-1);
+
+        Coordinate!(Basis.zero) rpos= ZB(-1);
+        
+        Ops cigar_op = Ops.MATCH;
+        
+        char queryBase = '-';
+
+        static if(refSeq) 
+            char refBase = '-';
 
         string toString(){
             import std.conv : to;
@@ -530,81 +544,119 @@ struct SAMRecord
             else return rpos.pos.to!string ~ ":" ~ qpos.pos.to!string ~ ":" ~ queryBase;
         }
     }
+    struct AlignedPairs(bool refSeq)
+    {
+        import dhtslib.sam.md : MDItr;
+        import std.range : dropExactly;
 
+        InputRange!AlignedCoordinate coords;
+        static if(refSeq) MDItr mdItr;
+        AlignedPair!refSeq current;
+        Bam1 b;
+        ubyte * seq;
+        
+        this(SAMRecord rec){
+            this.b = rec.b;
+            this.seq = bam_get_seq(this.b);
+            this.coords = rec.getAlignedCoordinates;
+            static if(refSeq){
+                assert(rec["MD"].exists,"MD tag must exist for record");
+                mdItr = MDItr(rec);
+            } 
+            current.qpos = coords.front.qpos;
+            current.rpos = coords.front.rpos;
+            current.cigar_op = coords.front.cigar_op;
+            if(current.cigar_op.isQueryConsuming) 
+                current.queryBase = seq_nt16_str[bam_seqi(seq, current.qpos)];
+            
+            static if(refSeq){
+                if(current.cigar_op.isReferenceConsuming){
+                    if(mdItr.front == '=')
+                        current.refBase = current.queryBase;
+                    else 
+                        current.refBase = mdItr.front;
+                    mdItr.popFront;
+                }
+                
+            }
+        }
+
+        this(SAMRecord rec, long start, long end){
+            assert(start < end);
+            assert(start >= 0);
+            assert(end <= rec.cigar.ref_bases_covered);
+            this.b = rec.b;
+            this.seq = bam_get_seq(this.b);
+            this.coords = rec.getAlignedCoordinates(start, end);
+            static if(refSeq){
+                assert(rec["MD"].exists,"MD tag must exist for record");
+                mdItr = MDItr(rec);
+                mdItr = mdItr.dropExactly(start);
+            } 
+            current.qpos = coords.front.qpos;
+            current.rpos = coords.front.rpos;
+            current.cigar_op = coords.front.cigar_op;
+            if(current.cigar_op.isQueryConsuming) 
+                current.queryBase = seq_nt16_str[bam_seqi(seq, current.qpos)];
+            
+            static if(refSeq){
+                if(current.cigar_op.isReferenceConsuming){
+                    if(mdItr.front == '=')
+                        current.refBase = current.queryBase;
+                    else 
+                        current.refBase = mdItr.front;
+                    mdItr.popFront;
+                }
+                
+            }
+        }
+
+        AlignedPair!refSeq front(){
+            return current;
+        }
+
+        void popFront(){
+            coords.popFront;
+            if(coords.empty) return;
+
+            current = current.init;
+            current.qpos = coords.front.qpos;
+            current.rpos = coords.front.rpos;
+            current.cigar_op = coords.front.cigar_op;
+
+            if(current.cigar_op.isQueryConsuming)
+                current.queryBase = seq_nt16_str[bam_seqi(seq, current.qpos)];
+            
+            static if(refSeq){
+                if(current.cigar_op.isReferenceConsuming){
+                    if(mdItr.front == '=') 
+                        current.refBase = current.queryBase;
+                    else 
+                        current.refBase = mdItr.front;
+                    mdItr.popFront;
+                }
+            }
+
+        }
+
+        bool empty(){
+            return coords.empty;
+        }
+
+    }
     /// get a range of aligned read and reference positions
     /// this is meant to recreate functionality from pysam:
     /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
     /// range is 0-based half open using chromosomal coordinates
     auto  getAlignedPairs(bool withRefSeq)(long start, long end)
     {
-        import dhtslib.sam.md : MDItr;
-        import std.range : dropExactly;
-        struct AlignedPairs(bool refSeq)
-        {
-            InputRange!AlignedCoordinate coords;
-            static if(refSeq) MDItr mdItr;
-            AlignedPair!refSeq current;
-            const(char)[] qseq;
-            
-            this(InputRange!AlignedCoordinate coords, SAMRecord rec, long start, long end){
-                assert(start < end);
-                assert(start >= 0);
-                assert(end <= rec.cigar.ref_bases_covered);
-                this.coords = coords;
-                qseq = rec.sequence;
-                static if(refSeq){
-                    assert(rec["MD"].exists,"MD tag must exist for record");
-                    mdItr = MDItr(rec);
-                    mdItr = mdItr.dropExactly(start);
-                } 
-                current.qpos = coords.front.qpos;
-                current.rpos = coords.front.rpos;
-                current.cigar_op = coords.front.cigar_op;
-                if(!CigarOp(0, current.cigar_op).is_query_consuming) current.queryBase = '-';
-                else current.queryBase = qseq[current.qpos];
-                
-                static if(refSeq){
-                    if(!CigarOp(0, current.cigar_op).is_reference_consuming) current.refBase = '-';
-                    else if(mdItr.front == '=') current.refBase = current.queryBase;
-                    else current.refBase = mdItr.front;
-                }
-            }
-
-            AlignedPair!refSeq front(){
-                return current;
-            }
-
-            void popFront(){
-                coords.popFront;
-                if(coords.empty) return;
-                current.qpos = coords.front.qpos;
-                current.rpos = coords.front.rpos;
-                current.cigar_op = coords.front.cigar_op;
-                if(!CigarOp(0, current.cigar_op).is_query_consuming) current.queryBase = '-';
-                else current.queryBase = qseq[current.qpos];
-                
-                static if(refSeq){
-                    if(CigarOp(0, current.cigar_op).is_reference_consuming) mdItr.popFront;
-                    if(!CigarOp(0, current.cigar_op).is_reference_consuming) current.refBase = '-';
-                    else if(mdItr.front == '=') current.refBase = current.queryBase;
-                    else current.refBase = mdItr.front;
-                }
-
-            }
-
-            bool empty(){
-                return coords.empty;
-            }
-
-        }
-        auto coords = this.getAlignedCoordinates(start, end);
-        return AlignedPairs!withRefSeq(coords,this,start,end).inputRangeObject;
+        return AlignedPairs!withRefSeq(this,start,end).inputRangeObject;
     }
     /// get a range of aligned read and reference positions
     /// this is meant to recreate functionality from pysam:
     /// https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.get_aligned_pairs
     auto getAlignedPairs(bool withRefSeq)(){
-        return getAlignedPairs!withRefSeq(0, this.cigar.ref_bases_covered);
+        return AlignedPairs!withRefSeq(this);
     }
 /+ END CHERRY-PICK +/
 }
@@ -764,9 +816,97 @@ debug(dhtslib_unittest) unittest
     pairs = read.getAlignedPairs!true(77, 77 + 5);
     assert(pairs.map!(x => x.rpos).array == [77,78,79,80,81]);
     pairs = read.getAlignedPairs!true(77, 77 + 5);
-    assert(pairs.map!(x => x.refBase).array == "GAAAA");
+    // assert(pairs.map!(x => x.refBase).array == "GAAAA");
     pairs = read.getAlignedPairs!true(77, 77 + 5);
     assert(pairs.map!(x => x.queryBase).array == "G-AAA");
+}
+
+
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import dhtslib.sam;
+    import dhtslib.sam.md : MDItr;
+    import std.algorithm: map;
+    import std.range : iota;
+    import std.array: array;
+    import std.path:buildPath,dirName;
+    hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
+    SAMHeader h;
+    SAMRecord read = SAMRecord(h);
+    read.queryName = "test";
+    read.sequence = 
+    //6H [4S][                                                                        77M][4I]MD[                22M]SSS 5H
+        "NNNNAGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTCCCCGAAAAAACATTTTTTGGGTTTTTNNN";
+    read.cigar = cigarFromString("6H4S77M4I1M1D22M3S5H");
+    read["MD"] = "48G29^A13C8";
+    
+    long[] rposArr = new long[read.getAlignedCoordinates.array.length];
+    long[] qposArr = new long[read.getAlignedCoordinates.array.length];
+    Ops[] opsArr = new Ops[read.getAlignedCoordinates.array.length];
+
+    rposArr[0..6] = -1; // 6H
+    qposArr[0..6] = -1; // 6H
+    opsArr[0..6] = Ops.HARD_CLIP;
+
+    rposArr[6..10] = -1; // 4S
+    qposArr[6..10] = iota!long(4).array; // 4S
+    opsArr[6..10] = Ops.SOFT_CLIP;
+
+    rposArr[10..87] = iota!long(77).array; // 77M
+    qposArr[10..87] = iota!long(4, 81).array; // 77M
+    opsArr[10..87] = Ops.MATCH;
+
+    rposArr[87..91] = 76; // I4
+    qposArr[87..91] = iota!long(81, 85).array; // I4
+    opsArr[87..91] = Ops.INS;
+
+    rposArr[91] = 77; // 1M
+    qposArr[91] = 85; // 1M
+    opsArr[91] = Ops.MATCH;
+
+    rposArr[92] = 78; // 1D
+    qposArr[92] = 85; // 1D
+    opsArr[92] = Ops.DEL;
+
+    rposArr[93..115] = iota!long(79,101).array; // 22M
+    qposArr[93..115] = iota!long(86,108).array; // 22M
+    opsArr[93..115] = Ops.MATCH;
+
+    rposArr[115..118] = 100; // 3S
+    qposArr[115..118] = iota!long(108, 111).array; // 3S
+    opsArr[115..118] = Ops.SOFT_CLIP;
+
+    rposArr[118..123] = 100; // 5H
+    qposArr[118..123] = 110; // 5H
+    opsArr[118..123] = Ops.HARD_CLIP;
+
+    auto pairs = read.getAlignedPairs!true.array;
+    assert(pairs.map!(x=> x.rpos.pos).array  == rposArr);
+    assert(pairs.map!(x=> x.qpos.pos).array == qposArr);
+    assert(pairs.map!(x=> x.cigar_op).array == opsArr);
+    writeln(pairs.map!(x=> x.refBase).array);
+    writeln(pairs.map!(x=> x.queryBase).array);
+    assert(pairs.map!(x=> x.refBase).array == 
+            // ================================================G============================    =A=============C========
+            //                                                                                  =A=============C========
+    "----------AGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTGCCAAGTTTTTAATGATTTGTTGCATATT----GAAAAAAACATTTTTCGGGTTTTT--------");
+    assert(pairs.map!(x=> x.queryBase).array == 
+    "------NNNNAGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTCCCCG-AAAAAACATTTTTTGGGTTTTTNNN-----");
+            // AGCTAGGGCACTTTTTGTCTGCCCAAATATAGGCAACCAAAAATAATTTCCAAGTTTTTAATGATTTGTTGCATATTCCCCG AAAAAACATTTTTTGGGTTTTT
+    auto pairs2 = read.getAlignedPairs!true(77, 77 + 5).array;
+    assert(pairs2.map!(x => x.rpos).array == rposArr[91..96]);
+    assert(pairs2.map!(x => x.qpos).array == qposArr[91..96]);
+
+    import dhtslib.sam.md;
+    import std.range : dropExactly;
+    auto mdItr = MDItr(read);
+    
+    mdItr = MDItr(read);
+    mdItr = mdItr.dropExactly(77);
+
+    assert(pairs2.map!(x => x.refBase).array == "GAAAA");
+    assert(pairs2.map!(x => x.queryBase).array == "G-AAA");
 }
 
 ///

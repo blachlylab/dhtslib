@@ -31,6 +31,16 @@ struct FastqFile
         popFront;
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.f = f;
+        this.lines = lines;
+        this.rec = rec;
+        this.last = last;
+    }
+
     FastqRecord front()
     {
         return rec;

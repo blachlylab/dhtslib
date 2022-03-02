@@ -22,13 +22,25 @@ THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
+module htslib.hfile;
 
 import core.sys.posix.sys.types;
+import core.stdc.string : memcpy, strlen;
+
+import htslib.kstring : kstring_t;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
 
-struct hFILE_backend;
-struct kstring_t;
+//#include <sys/types.h>
+alias off_t = size_t;
+alias ssize_t = size_t;
+
+/// internal
+struct hFILE_backend; // @suppress(dscanner.style.phobos_naming_convention)
 
 /// Low-level input/output stream handle
 /** The fields of this structure are declared here solely for the benefit
@@ -92,7 +104,7 @@ int hisremote(const(char)* filename);
     @param filename   The filename to be (copied and) adjusted
     @param replace    If non-zero, one extension (if any) is removed first
     @param extension  The extension to be added (e.g. ".csi")
-    @return  The modified filename (i.e., `buffer->s`), or NULL on error.
+    @return  The modified filename (i.e., `buffer.s`), or NULL on error.
     @since   1.10
 
 If _filename_ is an URL, alters extensions at the end of the `hier-part`,
@@ -120,10 +132,18 @@ void hclose_abruptly(hFILE* fp);
 This would be called `herror()` and return true/false to parallel `ferror(3)`,
 but a networking-related `herror(3)` function already exists.
 */
-int herrno(hFILE* fp);
+pragma(inline, true)
+int herrno(hFILE* fp)
+{
+    return fp.has_errno;
+}
 
 /// Clear the stream's error indicator
-void hclearerr(hFILE* fp);
+pragma(inline, true)
+void hclearerr(hFILE* fp)
+{
+    fp.has_errno = 0;
+}
 
 /// Reposition the read/write stream offset
 /** @return  The resulting offset within the stream (as per `lseek(2)`),
@@ -134,12 +154,23 @@ off_t hseek(hFILE* fp, off_t offset, int whence);
 /// Report the current stream offset
 /** @return  The offset within the stream, starting from zero.
 */
-off_t htell(hFILE* fp);
+pragma(inline, true)
+off_t htell(hFILE* fp)
+{
+    return fp.offset + (fp.begin - fp.buffer);
+}
 
 /// Read one character from the stream
 /** @return  The character read, or `EOF` on end-of-file or error.
 */
-int hgetc(hFILE* fp);
+pragma(inline, true)
+int hgetc(hFILE* fp)
+{
+    
+    return (fp.end > fp.begin)? cast(ubyte) *(fp.begin++) : hgetc2(fp);
+}
+
+int hgetc2(hFILE* );
 
 /// Read from the stream until the delimiter, up to a maximum length
 /** @param buffer  The buffer into which bytes will be written
@@ -164,7 +195,11 @@ ssize_t hgetdelim(char* buffer, size_t size, int delim, hFILE* fp);
 
 Specialization of hgetdelim() for a `\n` delimiter.
 */
-ssize_t hgetln(char* buffer, size_t size, hFILE* fp);
+pragma(inline, true)
+ssize_t hgetln(char* buffer, size_t size, hFILE* fp)
+{
+    return hgetdelim(buffer, size, '\n', fp);
+}
 
 /// Read a line from the stream, up to a maximum length
 /** @param buffer  The buffer into which bytes will be written
@@ -197,17 +232,46 @@ ssize_t hpeek(hFILE* fp, void* buffer, size_t nbytes);
 The full _nbytes_ requested will be returned, except as limited by EOF
 or I/O errors.
 */
-ssize_t hread(hFILE* fp, void* buffer, size_t nbytes);
+pragma(inline, true)
+ssize_t hread(hFILE* fp, void* buffer, size_t nbytes)
+{
+    size_t n = fp.end - fp.begin;
+    if (n > nbytes) n = nbytes;
+    memcpy(buffer, fp.begin, n);
+    fp.begin += n;
+    return (n == nbytes || !fp.mobile)? cast(ssize_t) n : hread2(fp, buffer, nbytes, n);
+}
+/// ditto
+ssize_t hread2(hFILE* , void* , size_t, size_t);
 
 /// Write a character to the stream
 /** @return  The character written, or `EOF` if an error occurred.
 */
-int hputc(int c, hFILE* fp);
+pragma(inline, true)
+int hputc(int c, hFILE* fp)
+{
+    if (fp.begin < fp.limit) *(fp.begin++) = cast(char) c;
+    else c = hputc2(c, fp);
+    return c;
+}
+/// ditto
+int hputc2(int, hFILE* );
 
 /// Write a string to the stream
 /** @return  0 if successful, or `EOF` if an error occurred.
 */
-int hputs(const(char)* text, hFILE* fp);
+pragma(inline, true)
+int hputs(const(char)* text, hFILE* fp)
+{
+
+    size_t nbytes = strlen(text), n = fp.limit - fp.begin;
+    if (n > nbytes) n = nbytes;
+    memcpy(fp.begin, text, n);
+    fp.begin += n;
+    return (n == nbytes)? 0 : hputs2(text, nbytes, n, fp);
+}
+/// ditto
+int hputs2(const (char)*, size_t, size_t, hFILE* );
 
 /// Write a block of characters to the file
 /** @return  Either _nbytes_, or negative if an error occurred.
@@ -217,7 +281,34 @@ In the absence of I/O errors, the full _nbytes_ will be written.
 
 // Go straight to hwrite2 if the buffer is empty and the request
 // won't fit.
-ssize_t hwrite(hFILE* fp, const(void)* buffer, size_t nbytes);
+pragma(inline, true)
+ssize_t hwrite(hFILE* fp, const(void)* buffer, size_t nbytes)
+{
+
+    if (!fp.mobile) {
+        size_t n = fp.limit - fp.begin;
+        if (n < nbytes) {
+            hfile_set_blksize(fp, fp.limit - fp.buffer + nbytes);
+            fp.end = fp.limit;
+        }
+    }
+
+    size_t n = fp.limit - fp.begin;
+    if (nbytes >= n && fp.begin == fp.buffer) {
+        // Go straight to hwrite2 if the buffer is empty and the request
+        // won't fit.
+        return hwrite2(fp, buffer, nbytes, 0);
+    }
+
+    if (n > nbytes) n = nbytes;
+    memcpy(fp.begin, buffer, n);
+    fp.begin += n;
+    return (n==nbytes)? cast(ssize_t) n : hwrite2(fp, buffer, nbytes, n);
+}
+/// ditto
+ssize_t hwrite2(hFILE* , const(void)* , size_t, size_t);
+/// set hfile blocksize
+int hfile_set_blksize(hFILE* fp, size_t bufsiz);
 
 /// For writing streams, flush buffered output to the underlying stream
 /** @return  0 if successful, or `EOF` if an error occurred.

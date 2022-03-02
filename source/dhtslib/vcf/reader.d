@@ -3,6 +3,8 @@ module dhtslib.vcf.reader;
 import std.string: fromStringz, toStringz;
 import std.utf: toUTFz;
 import std.traits : ReturnType;
+import std.parallelism : totalCPUs;
+import std.format : format;
 
 import dhtslib.vcf;
 import dhtslib.tabix;
@@ -15,14 +17,16 @@ import htslib.kstring;
 
 alias BCFReader = VCFReader;
 
-auto VCFReader(string fn, UnpackLevel MAX_UNPACK = UnpackLevel.None)
+/** Basic support for reading VCF, BCF files */
+auto VCFReader(string fn, int extra_threads = -1, UnpackLevel MAX_UNPACK = UnpackLevel.None)
 {
-    return VCFReaderImpl!(CoordSystem.zbc, false)(fn, MAX_UNPACK);
+    return VCFReaderImpl!(CoordSystem.zbc, false)(fn, extra_threads, MAX_UNPACK);
 }
 
-auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevel MAX_UNPACK = UnpackLevel.None)
+/** Basic support for reading VCF, BCF files via tabix*/
+auto VCFReader(CoordSystem cs)(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, int extra_threads = -1, UnpackLevel MAX_UNPACK = UnpackLevel.None)
 {
-    return VCFReaderImpl!(cs,true)(tbxFile, chrom, coords, MAX_UNPACK);
+    return VCFReaderImpl!(cs,true)(tbxFile, chrom, coords, extra_threads, MAX_UNPACK);
 }
 
 /** Basic support for reading VCF, BCF files */
@@ -45,7 +49,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
         ReturnType!(this.initializeTabixRange) tbxRange; /// For tabix use
 
         /// TabixIndexedFile and coordinates ctor
-        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, UnpackLevel MAX_UNPACK = UnpackLevel.None)
+        this(TabixIndexedFile tbxFile, string chrom, Interval!cs coords, int extra_threads = -1, UnpackLevel MAX_UNPACK = UnpackLevel.None)
         {
             this.tbx = tbxFile;
             this.tbxRange = initializeTabixRange(chrom, coords);
@@ -69,7 +73,7 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
     }else{
         /// read existing VCF file
         /// MAX_UNPACK: setting alternate value could speed reading
-        this(string fn, UnpackLevel MAX_UNPACK = UnpackLevel.None)
+        this(string fn, int extra_threads = -1, UnpackLevel MAX_UNPACK = UnpackLevel.None)
         {
             import htslib.hts : hts_set_threads;
 
@@ -77,8 +81,27 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
             if (fn == "") throw new Exception("Empty filename passed to VCFReader constructor");
             this.fp = VcfFile(vcf_open(toStringz(fn), "r"c.ptr));
             if (!this.fp) throw new Exception("Could not hts_open file");
-            
-            hts_set_threads(this.fp, 1);    // extra decoding thread
+
+            if (extra_threads == -1)
+            {
+                if ( totalCPUs > 1)
+                {
+                    hts_log_info(__FUNCTION__,
+                            format("%d CPU cores detected; enabling multithreading", totalCPUs));
+                    // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
+                    // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
+                    hts_set_threads(this.fp, totalCPUs);
+                }
+            } else if (extra_threads > 0)
+            {
+                if ((extra_threads + 1) > totalCPUs)
+                    hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
+                hts_set_threads(this.fp, extra_threads);
+            }
+            else if (extra_threads == 0)
+            {
+                hts_log_debug(__FUNCTION__, "Zero extra threads requested");
+            }
 
             this.vcfhdr = VCFHeader(bcf_hdr_read(this.fp));
 
@@ -87,6 +110,16 @@ struct VCFReaderImpl(CoordSystem cs, bool isTabixFile)
             this.MAX_UNPACK = MAX_UNPACK;
             this.empty;
         }
+    }
+
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.fp = fp;
+        this.vcfhdr = vcfhdr;
+        this.b = b;
+        this.MAX_UNPACK = MAX_UNPACK;
     }
 
     invariant
@@ -246,6 +279,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.allelesAsArray == ["C","T"]);
     assert(approxEqual(rec.qual, 59.2));
     assert(rec.filter == "PASS");
+    assert(vcf.vcfhdr.getSamples == ["A", "B"]);
 
     vcf.popFront;
     rec = vcf.front;

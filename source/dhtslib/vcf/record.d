@@ -17,7 +17,7 @@ import std.format: format;
 import std.range;
 import std.string: fromStringz, toStringz;
 import std.utf : toUTFz;
-import std.algorithm : map;
+import std.algorithm : map, filter, count;
 import std.array : array;
 import std.traits;
 import std.meta : staticIndexOf;
@@ -52,6 +52,16 @@ struct InfoField
     {
         this.line = line;
         this(key, info);
+    }
+
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.line = line;
+        this.key = key;
+        this.type = type;
+        this.data = data;
     }
 
     /// string, info field ctor
@@ -97,7 +107,7 @@ struct InfoField
         static if(isIntegral!T){
             /// if we select the correct type just slice and return
             if(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType))
-                return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+                return (cast(T *)this.data.ptr)[0 .. this.len];
             /// if we select type that is too small log error and return
             if(RecordTypeSizes[this.type] > T.sizeof)
             {
@@ -111,13 +121,13 @@ struct InfoField
                     ret = ((cast(byte *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
                 case BcfRecordType.Int16:
-                    ret = ((cast(short *)this.data.ptr)[0 .. short.sizeof * this.len]).to!(T[]);
+                    ret = ((cast(short *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
                 case BcfRecordType.Int32:
-                    ret = ((cast(int *)this.data.ptr)[0 .. int.sizeof * this.len]).to!(T[]);
+                    ret = ((cast(int *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
                 case BcfRecordType.Int64:
-                    ret = ((cast(long *)this.data.ptr)[0 .. long.sizeof * this.len]).to!(T[]);
+                    ret = ((cast(long *)this.data.ptr)[0 .. this.len]).to!(T[]);
                     break;
                 default:
                     hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(this.type, T.stringof));
@@ -131,7 +141,7 @@ struct InfoField
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return [];
             }
-            return (cast(T *)this.data.ptr)[0 .. T.sizeof * this.len];
+            return (cast(T *)this.data.ptr)[0 .. this.len];
         }
     }
 
@@ -210,6 +220,19 @@ struct FormatField
     {
         this.line = line;
         this(key, fmt);
+    }
+
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.line = line;
+        this.key = key;
+        this.type = type;
+        this.nSamples = nSamples;
+        this.n = n;
+        this.size = size;
+        this.data = data;
     }
 
     /// string and format ctor
@@ -292,7 +315,11 @@ struct FormatField
             auto ptr = this.data.ptr;
             for(auto i=0; i < nSamples; i++)
             {
-                ret ~= (cast(char *)ptr)[i*size .. (i+1) * size].idup;
+                auto chrArr = (cast(char *)ptr)[i*size .. (i+1) * size];
+                if(chrArr[$-1])
+                    ret ~= chrArr.idup;
+                else
+                    ret ~= fromStringz(chrArr.ptr).idup;
             }
         }else{
             if(!(this.type == cast(BcfRecordType) staticIndexOf!(T, RecordTypeToDType)))
@@ -300,10 +327,188 @@ struct FormatField
                 hts_log_error(__FUNCTION__, "Cannot convert %s to %s".format(type, T.stringof));
                 return ret.chunks(this.n);
             }
-            ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples * T.sizeof];
+            ret = (cast(T *)this.data.ptr)[0 .. this.n * this.nSamples];
         }
-        return ret.chunks(this.n);
+        static if(isSomeString!T)
+            return ret.chunks(1);
+        else 
+            return ret.chunks(this.n);
+    }
+}
 
+/// Represents individual GT values as encoded in BCF. 
+/// This is described in the VCF 4.2 spec section 6.3.3.
+/// In summary it can be an int, short, or byte and 
+/// encodes an allele value and a phased flag
+/// e.g (allele + 1) << 1 | phased
+union GT(T) 
+{
+    import std.bitmanip : bitfields;
+    T raw;
+    mixin(bitfields!(
+        bool, "phased", 1,
+        T, "allele", (T.sizeof * 8) - 1,
+        ));
+    
+    /// get allele value
+    auto getAllele() const {
+        return this.allele - 1;
+    }
+
+    /// set allele value
+    void setAllele(int val) {
+        this.allele = cast(T)(val + 1);
+    }
+
+    /// check if value is missing
+    bool isMissing() const {
+        return this.allele == 0;
+    }
+
+    /// set value as missing
+    void setMissing() {
+        this.allele = T(0);
+    }
+
+    /// check if value is padding
+    bool isPadding() {
+        static if (is(T == byte)) {
+            return cast(bool)((this.raw & 0xFE) == 0x80);
+        } else static if (is(T == short)) {
+            return cast(bool)((this.raw & 0xFFFE) == 0x8000);
+        } else static if (is(T == int)) {
+            return cast(bool)((this.raw & 0xFFFFFFFE) == 0x80000000);
+        }
+    }
+
+}
+
+/// Struct to represent VCF/BCF genotype data
+struct Genotype
+{
+    /// Type of underlying format data
+    BcfRecordType type;
+    /// Array of encoded genotypes
+    void[] data;
+
+    /// VCFRecord refct
+    Bcf1 line;
+
+    /// ctor from FormatField
+    this(FormatField gt, ulong sampleIdx)
+    {
+        this.line = gt.line;
+        this.type = gt.type;
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                this.data = gt.to!byte()[sampleIdx];
+                break;
+            case BcfRecordType.Int16:
+                this.data = gt.to!short()[sampleIdx];
+                break;
+            case BcfRecordType.Int32:
+                this.data = gt.to!int()[sampleIdx];
+                break;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
+    }
+
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.type = type;
+        this.data = data;
+        this.line = line;
+    }
+    
+    bool isNull()
+    {
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                return (cast(GT!byte[])(this.data)).filter!(x=>!x.isMissing).empty;
+            case BcfRecordType.Int16:
+                return (cast(GT!short[])(this.data)).filter!(x=>!x.isMissing).empty;
+            case BcfRecordType.Int32:
+                return (cast(GT!int[])(this.data)).filter!(x=>!x.isMissing).empty;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
+    }
+
+    auto alleles()
+    {
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                return (cast(GT!byte[])(this.data)).filter!(x=>!x.isPadding).map!(x=>x.getAllele).array;
+            case BcfRecordType.Int16:
+                return (cast(GT!short[])(this.data)).filter!(x=>!x.isPadding).map!(x=>x.getAllele).array;
+            case BcfRecordType.Int32:
+                return (cast(GT!int[])(this.data)).filter!(x=>!x.isPadding).map!(x=>x.getAllele).array;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
+    }
+
+    /// get genotype ploidy
+    auto getPloidy() {
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                return (cast(GT!byte[])(this.data)).filter!(x=>!x.isPadding).count;
+            case BcfRecordType.Int16:
+                return (cast(GT!short[])(this.data)).filter!(x=>!x.isPadding).count;
+            case BcfRecordType.Int32:
+                return (cast(GT!int[])(this.data)).filter!(x=>!x.isPadding).count;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
+    }
+    /// mixin for genotype printing
+    auto toString(T)() const {
+        string ret;
+        foreach(i, gt; cast(GT!T[]) this.data) {
+            if(i)
+                ret ~= ['/','|'][gt.phased];
+            if(gt.isPadding) {
+                ret = ret[0..$-1];
+                break;
+            }
+            if (gt.getAllele() == -1) {
+                ret ~= '.';
+            } else { 
+                ret ~= gt.getAllele().to!string;
+            }
+        }
+        return ret;
+    }
+    /// get string representation
+    auto toString() const {
+        final switch(this.type){
+            case BcfRecordType.Int8:
+                return this.toString!byte;
+            case BcfRecordType.Int16:
+                return this.toString!short;
+            case BcfRecordType.Int32:
+                return this.toString!int;
+            case BcfRecordType.Int64:
+            case BcfRecordType.Float:
+            case BcfRecordType.Char:
+            case BcfRecordType.Null:
+                assert(0);
+        }
     }
 }
 
@@ -409,6 +614,14 @@ struct VCFRecord
         } else {
             ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value
         }
+    }
+
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.line = line;
+        this.vcfheader = vcfheader;
     }
 
     /// ensure that vcf variable length data is unpacked to at least desired level
@@ -995,6 +1208,33 @@ struct VCFRecord
         return fmtMap;
     }
 
+    Genotype getGenotype(int sampleIdx) {
+        Genotype ret;
+        if("GT" in this.getFormats() && sampleIdx < this.vcfheader.nsamples) {
+            ret = Genotype(this.getFormats["GT"], sampleIdx);
+        }else if (sampleIdx >= this.vcfheader.nsamples) {
+            hts_log_error(__FUNCTION__, "sample idx is larger than nsamples");
+        }else{
+            hts_log_error(__FUNCTION__, "GT doesn't exist in FORMAT fields");
+        }
+        return ret;
+    }
+
+    Genotype[] getGenotypes() {
+        Genotype[] ret;
+        FormatField gt;
+        if("GT" in this.getFormats()) {
+            gt = this.getFormats["GT"];
+        }else{
+            hts_log_error(__FUNCTION__, "GT doesn't exist in FORMAT fields");
+        }
+        for(auto i=0; i < this.vcfheader.nsamples; i++)
+        {
+            ret ~= Genotype(gt, i);
+        }
+        return ret;
+    }
+
     /// Return a string representation of the VCFRecord (i.e. as would appear in .vcf)
     ///
     /// As a bonus, there is a kstring_t memory leak
@@ -1029,10 +1269,11 @@ unittest
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
 
 
-    auto vw = VCFWriter("/dev/null");
+    auto vw = VCFWriter("/dev/null", VCFWriterTypes.VCF);
 
     vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
+    vw.addHeaderLineKV("INFO", "<ID=DP2,Number=2,Type=Float,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
     vw.vcfhdr.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
     vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
@@ -1212,6 +1453,9 @@ unittest
 
     rr.addInfo("AF",0.5);
     assert(rr.getInfos["AF"].to!float == 0.5f);
+
+    rr.addInfo("DP2",[0.5f, 0.4f]);
+    assert(rr.getInfos["DP2"].to!(float[]) == [0.5f, 0.4f]);
     
     rr.removeInfo("AF");
 
@@ -1224,7 +1468,7 @@ unittest
     writeln(rr.getFormats["CH"].to!string);
     assert(rr.getFormats["CH"].to!string[0][0] == "test");
 
-    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11\tCH\ttest\n");
+    assert(rr.toString == "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;DP2=0.5,0.4\tCH\ttest\n");
 
     assert(rr.coordinates == ZBHO(17329,17330));
     vw.writeRecord(*r);
@@ -1311,6 +1555,19 @@ debug(dhtslib_unittest) unittest
     rec.addInfo("DP4", [2, 2, 3, 4]);
     assert(rec.getInfos["DP4"].to!(int[]) == [2, 2, 3, 4]);
 
+    rec.addInfo("DP4", [128, 128, 128, 128]);
+    assert(rec.getInfos["DP4"].to!(int[]) == [128, 128, 128, 128]);
+    assert(rec.getInfos["DP4"].to!(byte[]) == []);
+    assert(rec.getInfos["DP4"].to!(short[]) == [128, 128, 128, 128]);
+    assert(rec.getInfos["DP4"].to!(long[]) == [128, 128, 128, 128]);
+
+    rec.addInfo("DP4", [32768, 32768, 32768, 32768]);
+    assert(rec.getInfos["DP4"].to!(int[]) == [32768, 32768, 32768, 32768]);
+    assert(rec.getInfos["DP4"].to!(byte[]) == []);
+    assert(rec.getInfos["DP4"].to!(short[]) == []);
+    assert(rec.getInfos["DP4"].to!(long[]) == [32768, 32768, 32768, 32768]);
+    
+
     assert(rec.getFormats["GQ"].to!int.array == [[409], [409]]);
 
     rec.addFormat("GQ", [32768,32768]);
@@ -1318,6 +1575,8 @@ debug(dhtslib_unittest) unittest
     assert(rec.getFormats["GQ"].to!byte.array == []);
     assert(rec.getFormats["GQ"].to!short.array == []);
     assert(rec.getFormats["GQ"].to!int[0][0] == 32768);
+
+    assert(rec.getFormats["GL"].to!float[1][1] == -5.0);
     
 
     assert(rec.getInfos["STR"].to!string == "test");
@@ -1325,6 +1584,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.getInfos["DP4"].to!string == "");
 
     assert(rec.getFormats["GT"].to!int.array == [[2, 4], [2, 4]]);
+    assert(rec.getGenotypes.map!(x => x.toString).array == ["0/1", "0/1"]);
     
 
     vcf.popFront;
@@ -1333,6 +1593,10 @@ debug(dhtslib_unittest) unittest
     auto fmts = rec.getFormats;
     auto sam = vcf.vcfhdr.getSampleId("A");
     assert(fmts["GT"].to!int[sam] == [2, 4]);
+    assert(rec.getGenotype(sam).toString == "0/1");
+    assert(rec.getGenotype(sam).getPloidy == 2);
     sam = vcf.vcfhdr.getSampleId("B");
     assert(fmts["GT"].to!int[sam] == [6, -127]);
+    assert(rec.getGenotype(sam).toString == "2");
+    assert(rec.getGenotype(sam).getPloidy == 1);
 }

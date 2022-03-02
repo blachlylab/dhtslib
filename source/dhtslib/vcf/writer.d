@@ -5,21 +5,44 @@ import std.string: fromStringz, toStringz;
 import std.traits: isArray, isDynamicArray, isBoolean, isIntegral, isFloatingPoint, isNumeric, isSomeString;
 import std.conv: to, ConvException;
 import std.format: format;
+import std.parallelism : totalCPUs;
 
 import dhtslib.memory;
 import dhtslib.vcf;
 import htslib.vcf;
 import htslib.hts_log;
+import htslib.hfile;
+import htslib.hts;
 
 alias BCFWriter = VCFWriter;
+
+/// VCF/BCF/Compressed VCF/ Uncompressed BCF on-disk format.
+/// `DEDUCE` will attempt to auto-detect from filename or other means
+enum VCFWriterTypes
+{
+    VCF, /// Regular VCF
+    BCF, /// Compressed BCF
+    UBCF, /// Uncompressed BCF
+    CVCF, /// Compressed VCF (vcf.gz)
+    DEDUCE /// Determine based on file extension
+}
 
 /** Basic support for writing VCF, BCF files */
 struct VCFWriter
 {
+    /// filename; as usable from D
+    string filename;
+
+    /// filename \0-terminated C string; reference needed to avoid GC reaping result of toStringz when ctor goes out of scope
+    private const(char)* fn;
+
     // htslib data structures
     VcfFile     fp;    /// rc htsFile wrapper
     VCFHeader   vcfhdr;    /// header wrapper
     Bcf1[]    rows;   /// individual records
+
+    /// hFILE if required
+    private hFILE* f;
 
     @disable this();
     /// open file or network resources for writing
@@ -27,44 +50,97 @@ struct VCFWriter
     /// if mode==w:
     ///     bcf_hdr_init automatically sets version string (##fileformat=VCFv4.2)
     ///     bcf_hdr_init automatically adds the PASS filter
-    this(string fn)
+    this(T)(T f, VCFWriterTypes t=VCFWriterTypes.DEDUCE)
+    if (is(T == string) || is(T == File))
     {
-        if (fn == "") throw new Exception("Empty filename passed to VCFWriter constructor");
-        this.fp = VcfFile(vcf_open(toStringz(fn), toStringz("w"c)));
-        if (!this.fp) throw new Exception("Could not hts_open file");
-
-        this.vcfhdr = VCFHeader( bcf_hdr_init("w\0"c.ptr));
-        addFiledate();
-        bcf_hdr_sync(this.vcfhdr.hdr);
-
-        /+
-        hts_log_trace(__FUNCTION__, "Displaying header at construction");
-        //     int bcf_hdr_format(const(bcf_hdr_t) *hdr, int is_bcf, kstring_t *str);
-        kstring_t ks;
-        bcf_hdr_format(this.vcfhdr.hdr, 0, &ks);
-        char[] hdr;
-        hdr.length = ks.l;
-        import core.stdc.string: memcpy;
-        memcpy(hdr.ptr, ks.s, ks.l);
-        import std.stdio: writeln;
-        writeln(hdr);
-        +/
+        auto hdr = VCFHeader( bcf_hdr_init("w\0"c.ptr));
+        hdr.addFiledate();
+        bcf_hdr_sync(hdr.hdr);
+        this(f, hdr, t);
     }
     /// setup and copy a header from another BCF/VCF as template
-    this(T)(string fn, T other)
-    if(is(T == VCFHeader) || is(T == bcf_hdr_t*))
+    this(T, H)(T f, H header, VCFWriterTypes t=VCFWriterTypes.DEDUCE, int extra_threads = -1)
+    if((is(H == VCFHeader) || is(H == bcf_hdr_t*)) && (is(T == string) || is(T == File)))
     {
-        if (fn == "") throw new Exception("Empty filename passed to VCFWriter constructor");
-        this.fp = vcf_open(toStringz(fn), toStringz("w"c));
-        if (!this.fp) throw new Exception("Could not hts_open file");
 
-        static if(is(T == VCFHeader*)) { this.vcfhdr      = VCFHeader( bcf_hdr_dup(other.hdr) ); }
-        else static if(is(T == bcf_hdr_t*)) { this.vcfhdr = VCFHeader( bcf_hdr_dup(other) ); }
+        char[] mode;
+        if(t == VCFWriterTypes.BCF) mode=['w','b','\0'];
+        else if(t == VCFWriterTypes.UBCF) mode=['w','b','0','\0'];
+        else if(t == VCFWriterTypes.VCF) mode=['w','\0'];
+        else if(t == VCFWriterTypes.CVCF) mode=['w','z','\0'];
+        // open file
+        static if (is(T == string))
+        {
+            if(t == VCFWriterTypes.DEDUCE){
+                import std.path:extension, stripExtension;
+                auto ext=extension(f);
+                if(ext==".bcf") mode=['w','b','\0'];
+                else if(ext==".vcf") mode=['w','\0'];
+                else if(ext==".cram") mode=['w','c','\0'];
+                else if(ext==".gz") {
+                    auto extRemoved = stripExtension(f);
+                    if (extension(extRemoved) == ".vcf") mode=['w','z','\0'];
+                    else {
+                        hts_log_error(__FUNCTION__,"extension "~extension(extRemoved)~ext~" not valid");
+                        throw new Exception("DEDUCE VCFWriterType used with non-valid extension");
+                    }
+                }
+                else {
+                    hts_log_error(__FUNCTION__,"extension "~ext~" not valid");
+                    throw new Exception("DEDUCE VCFWriterType used with non-valid extension");
+                }
+            }
+            this.filename = f;
+            this.fn = toStringz(f);
+
+            if (f == "") throw new Exception("Empty filename passed to VCFWriter constructor");
+            this.fp = vcf_open(toStringz(f), mode.ptr);
+            if (!this.fp) throw new Exception("Could not hts_open file");
+        }
+        else static if (is(T == File))
+        {
+            assert(t!=VCFWriterTypes.DEDUCE);
+            this.filename = f.name();
+            this.fn = toStringz(f.name);
+            this.f = hdopen(f.fileno, cast(immutable(char)*) "w");
+            this.fp = hts_hopen(this.f, this.fn, mode.ptr);
+        }
+        else assert(0);
+
+        if (extra_threads == -1)
+        {
+            if ( totalCPUs > 1)
+            {
+                hts_log_info(__FUNCTION__,
+                        format("%d CPU cores detected; enabling multithreading", totalCPUs));
+                // hts_set_threads adds N _EXTRA_ threads, so totalCPUs - 1 seemed reasonable,
+                // but overcomitting by 1 thread (i.e., passing totalCPUs) buys an extra 3% on my 2-core 2013 Mac
+                hts_set_threads(this.fp, totalCPUs);
+            }
+        } else if (extra_threads > 0)
+        {
+            if ((extra_threads + 1) > totalCPUs)
+                hts_log_warning(__FUNCTION__, "More threads requested than CPU cores detected");
+            hts_set_threads(this.fp, extra_threads);
+        }
+        else if (extra_threads == 0)
+        {
+            hts_log_debug(__FUNCTION__, "Zero extra threads requested");
+        }
+
+        static if(is(H == VCFHeader*)) { this.vcfhdr      = VCFHeader( bcf_hdr_dup(header.hdr) ); }
+        else static if(is(H == VCFHeader)) { this.vcfhdr      = VCFHeader( bcf_hdr_dup(header.hdr)); }
+        else static if(is(H == bcf_hdr_t*)) { this.vcfhdr = VCFHeader( bcf_hdr_dup(header) ); }
+        else assert(0);
     }
 
-    invariant
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
     {
-        assert(this.vcfhdr.hdr != null);
+        this.fp = fp;
+        this.vcfhdr = vcfhdr;
+        this.rows = rows;
     }
 
     VCFHeader getHeader()
@@ -266,7 +342,7 @@ unittest
     hts_set_log_level(htsLogLevel.HTS_LOG_TRACE);
 
 
-    auto vw = VCFWriter("/dev/null");
+    auto vw = VCFWriter("/dev/null", VCFWriterTypes.VCF);
 
     vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
@@ -277,4 +353,174 @@ unittest
 
     assert(vw.getHeader.getHeaderRecord(HeaderRecordType.Filter, "filt2").getDescription == "\"test2\"");
     vw.writeHeader();
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import htslib.hts_log;
+    import std.algorithm : map, count;
+    import std.array : array;
+    import std.path : buildPath, dirName;
+    import std.math : approxEqual;
+    hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+    hts_log_info(__FUNCTION__, "Testing VCFWriterTypes DEDUCE");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    {
+        auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
+        auto vcfw = VCFWriter("/tmp/test_vcf.vcf", vcf.vcfhdr);
+        
+        vcfw.writeHeader;
+        foreach(rec;vcf) {
+            vcfw.writeRecord(rec);
+        }
+        destroy(vcfw);
+    }
+    {
+        auto vcf = VCFReader("/tmp/test_vcf.vcf");
+        assert(vcf.count == 14);
+        vcf = VCFReader("/tmp/test_vcf.vcf");
+
+        VCFRecord rec = vcf.front;
+        assert(rec.chrom == "1");
+        assert(rec.pos == 3000149);
+        assert(rec.refAllele == "C");
+        assert(rec.altAllelesAsArray == ["T"]);
+        assert(rec.allelesAsArray == ["C","T"]);
+        assert(approxEqual(rec.qual,59.2));
+        assert(rec.filter == "PASS");
+    }
+    {
+        auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
+        auto vcfw = VCFWriter("/tmp/test_vcf.bcf", vcf.vcfhdr);
+        
+        vcfw.writeHeader;
+        foreach(rec;vcf) {
+            vcfw.writeRecord(rec);
+        }
+        destroy(vcfw);
+    }
+    {
+        auto vcf = VCFReader("/tmp/test_vcf.bcf");
+        assert(vcf.count == 14);
+        vcf = VCFReader("/tmp/test_vcf.bcf");
+        
+        VCFRecord rec = vcf.front;
+        assert(rec.chrom == "1");
+        assert(rec.pos == 3000149);
+        assert(rec.refAllele == "C");
+        assert(rec.altAllelesAsArray == ["T"]);
+        assert(rec.allelesAsArray == ["C","T"]);
+        assert(approxEqual(rec.qual,59.2));
+        assert(rec.filter == "PASS");
+    }
+    {
+        auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
+        auto vcfw = VCFWriter("/tmp/test_vcf.vcf.gz", vcf.vcfhdr);
+        
+        vcfw.writeHeader;
+        foreach(rec;vcf) {
+            vcfw.writeRecord(rec);
+        }
+        destroy(vcfw);
+    }
+    {
+        auto vcf = VCFReader("/tmp/test_vcf.vcf.gz");
+        assert(vcf.count == 14);
+        vcf = VCFReader("/tmp/test_vcf.vcf.gz");
+        
+        VCFRecord rec = vcf.front;
+        assert(rec.chrom == "1");
+        assert(rec.pos == 3000149);
+        assert(rec.refAllele == "C");
+        assert(rec.altAllelesAsArray == ["T"]);
+        assert(rec.allelesAsArray == ["C","T"]);
+        assert(approxEqual(rec.qual,59.2));
+        assert(rec.filter == "PASS");
+    }
+}
+
+debug(dhtslib_unittest) unittest
+{
+    import std.stdio;
+    import htslib.hts_log;
+    import std.algorithm : map, count;
+    import std.array : array;
+    import std.path : buildPath, dirName;
+    import std.math : approxEqual;
+    hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
+    hts_log_info(__FUNCTION__, "Testing VCFWriterTypes");
+    hts_log_info(__FUNCTION__, "Loading test file");
+    {
+        auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
+        auto vcfw = VCFWriter("/tmp/test_vcf.cvcf", vcf.vcfhdr, VCFWriterTypes.CVCF);
+        
+        vcfw.writeHeader;
+        foreach(rec;vcf) {
+            vcfw.writeRecord(rec);
+        }
+        destroy(vcfw);
+    }
+    {
+        auto vcf = VCFReader("/tmp/test_vcf.cvcf");
+        assert(vcf.count == 14);
+        vcf = VCFReader("/tmp/test_vcf.cvcf");
+
+        VCFRecord rec = vcf.front;
+        assert(rec.chrom == "1");
+        assert(rec.pos == 3000149);
+        assert(rec.refAllele == "C");
+        assert(rec.altAllelesAsArray == ["T"]);
+        assert(rec.allelesAsArray == ["C","T"]);
+        assert(approxEqual(rec.qual,59.2));
+        assert(rec.filter == "PASS");
+    }
+    {
+        auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
+        auto vcfw = VCFWriter("/tmp/test_vcf.ubcf", vcf.vcfhdr, VCFWriterTypes.UBCF);
+        
+        vcfw.writeHeader;
+        foreach(rec;vcf) {
+            vcfw.writeRecord(rec);
+        }
+        destroy(vcfw);
+    }
+    {
+        auto vcf = VCFReader("/tmp/test_vcf.ubcf");
+        assert(vcf.count == 14);
+        vcf = VCFReader("/tmp/test_vcf.ubcf");
+        
+        VCFRecord rec = vcf.front;
+        assert(rec.chrom == "1");
+        assert(rec.pos == 3000149);
+        assert(rec.refAllele == "C");
+        assert(rec.altAllelesAsArray == ["T"]);
+        assert(rec.allelesAsArray == ["C","T"]);
+        assert(approxEqual(rec.qual,59.2));
+        assert(rec.filter == "PASS");
+    }
+    {
+        auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
+        auto vcfw = VCFWriter("/tmp/test_vcf.txt", vcf.vcfhdr, VCFWriterTypes.VCF);
+        
+        vcfw.writeHeader;
+        foreach(rec;vcf) {
+            vcfw.writeRecord(rec);
+        }
+        destroy(vcfw);
+    }
+    {
+        auto vcf = VCFReader("/tmp/test_vcf.txt");
+        assert(vcf.count == 14);
+        vcf = VCFReader("/tmp/test_vcf.txt");
+        
+        VCFRecord rec = vcf.front;
+        assert(rec.chrom == "1");
+        assert(rec.pos == 3000149);
+        assert(rec.refAllele == "C");
+        assert(rec.altAllelesAsArray == ["T"]);
+        assert(rec.allelesAsArray == ["C","T"]);
+        assert(approxEqual(rec.qual,59.2));
+        assert(rec.filter == "PASS");
+    }
 }

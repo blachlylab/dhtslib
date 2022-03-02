@@ -123,6 +123,19 @@ struct SAMReader
         this.idx = HtsIdx(null);
     }
 
+    /// Explicit postblit to avoid 
+    /// https://github.com/blachlylab/dhtslib/issues/122
+    this(this)
+    {
+        this.filename = filename;
+        this.fn = fn;
+        this.f = f;
+        this.header = header;
+        this.header_offset = header_offset;
+        this.idx = idx;
+        this.line = line;
+    }
+
     /// number of reference sequences; from bam_hdr_t
     deprecated("use these properties from SAMHeader")
     @property int nTargets() const
