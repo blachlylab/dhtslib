@@ -1,7 +1,7 @@
 /// @file htslib/sam.h
 /// High-level SAM/BAM/CRAM sequence file operations.
 /*
-    Copyright (C) 2008, 2009, 2013-2020 Genome Research Ltd.
+    Copyright (C) 2008, 2009, 2013-2021 Genome Research Ltd.
     Copyright (C) 2010, 2012, 2013 Broad Institute.
 
     Author: Heng Li <lh3@sanger.ac.uk>
@@ -24,10 +24,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
 
+module htslib.sam;
+
 import core.stdc.stddef;
 import core.stdc.stdlib;
+import std.format: format;
 
+import htslib.hts;
+import htslib.hts_log;
+import htslib.bgzf : BGZF;
+import htslib.kstring : kstring_t, ssize_t;
+
+@system:
 extern (C):
+@nogc nothrow {
 
 /// Highest SAM format version supported by this library
 enum SAM_FORMAT_VERSION = "1.6";
@@ -247,7 +257,7 @@ struct bam1_core_t
     See the bam_cigar_* macros for manipulation.
  4. seq is nibble-encoded according to bam_nt16_table.
     See the bam_seqi macro for retrieving individual bases.
- 5. Per base qualilties are stored in the Phred scale with no +33 offset.
+ 5. Per base qualities are stored in the Phred scale with no +33 offset.
     Ie as per the BAM specification and not the SAM ASCII printable method.
  */
 struct bam1_t
@@ -306,9 +316,9 @@ extern (D) auto bam_get_qname(T)(auto ref T b)
  lower 4 bits gives a CIGAR operation and the higher 28 bits keep the
  length of a CIGAR.
  */
-extern (D) auto bam_get_cigar(T)(auto ref T b)
+extern (D) auto bam_get_cigar(bam1_t * b)
 {
-    return cast(uint*) b.data + b.core.l_qname;
+    return cast(uint*) ((*b).data + (*b).core.l_qname);
 }
 
 /*! @function
@@ -374,6 +384,11 @@ extern (D) auto bam_seqi(T0, T1)(auto ref T0 s, auto ref T1 i)
  @param b   Base in nt16 nomenclature (see seq_nt16_table)
 */
 
+extern (D) void bam_set_seqi(T0, T1, T3)(auto ref T0 s, auto ref T1 i, auto ref T3 b)
+{
+    s[i >> 1] = (s[i >> 1] & (0xf0 >> ((~i & 1) << 2))) | cast(ubyte)(b << ((~i & 1) << 2));
+}
+
 /**************************
  *** Exported functions ***
  **************************/
@@ -435,11 +450,16 @@ sam_hdr_t* sam_hdr_dup(const(sam_hdr_t)* h0);
 /*!
  * @abstract Old names for compatibility with existing code.
  */
-sam_hdr_t* bam_hdr_init();
-void bam_hdr_destroy(sam_hdr_t* h);
-sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0);
+pragma(inline,true) 
+sam_hdr_t* bam_hdr_init() { return sam_hdr_init(); }
 
-alias samFile = htsFile_;
+pragma(inline,true) 
+void bam_hdr_destroy(sam_hdr_t* h) { sam_hdr_destroy(h); }
+
+pragma(inline,true) 
+sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0) { return sam_hdr_dup(h0); }
+
+alias samFile = htsFile;
 
 /// Create a header from existing text.
 /*!
@@ -830,7 +850,8 @@ hts_pos_t sam_hdr_tid2len(const(sam_hdr_t)* h, int tid);
  *             -1 if unknown reference,
  *             -2 if the header could not be parsed
  */
-int bam_name2id(sam_hdr_t* h, const(char)* ref_);
+pragma(inline,true)
+int bam_name2id(sam_hdr_t* h, const(char)* ref_) { return sam_hdr_name2tid(h, ref_); }
 
 /// Generate a unique \@PG ID: value
 /*!
@@ -895,6 +916,13 @@ extern (D) auto sam_hdr_find_tag_hd(T0, T1, T2)(auto ref T0 h, auto ref T1 key, 
 }
 
 /// Adds or updates tags on the header \@HD line
+extern (D) auto sam_hdr_update_hd(T, A...)(auto ref T h, auto ref A a)
+{
+    // NOTE: This macro was dropped by dstep due to variadic args
+    static assert (a.length %2 == 0);   // K-V pairs => even number of variadic args
+    return sam_hdr_update_line(h, "HD", null, null, a, null);
+}
+
 /// Removes the \@HD line tag with the given key
 extern (D) auto sam_hdr_remove_tag_hd(T0, T1)(auto ref T0 h, auto ref T1 key)
 {
@@ -969,7 +997,7 @@ enum BAM_USER_OWNS_DATA = 2;
 
    if (!recs || !buffer) goto cleanup;
    for (nrecs = 0; nrecs < MAX_RECS; nrecs++) {
-      bam_set_mempolicy(BAM_USER_OWNS_STRUCT|BAM_USER_OWNS_DATA);
+      bam_set_mempolicy(&recs[nrecs], BAM_USER_OWNS_STRUCT|BAM_USER_OWNS_DATA);
 
       // Set data pointer to unused part of buffer
       recs[nrecs].data = &buffer[buff_used];
@@ -1009,14 +1037,20 @@ enum BAM_USER_OWNS_DATA = 2;
 
    \endcode
 */
-void bam_set_mempolicy(bam1_t* b, uint policy);
+pragma(inline,true)
+void bam_set_mempolicy(bam1_t* b, uint policy) {
+    b.mempolicy = policy;
+}
 
 /// Get alignment record memory policy
 /** @param b    Alignment record
 
     See bam_set_mempolicy()
  */
-uint bam_get_mempolicy(bam1_t* b);
+pragma(inline,true)
+uint bam_get_mempolicy(bam1_t* b) {
+    return b.mempolicy;
+}
 
 /// Read a BAM format alignment record
 /**
@@ -1198,7 +1232,12 @@ ssize_t bam_parse_cigar(const(char)* in_, char** end, bam1_t* b);
 alias bam_itr_destroy = hts_itr_destroy;
 alias bam_itr_queryi = sam_itr_queryi;
 alias bam_itr_querys = sam_itr_querys;
-alias bam_itr_next = sam_itr_next;
+
+pragma(inline, true)
+extern (D) auto bam_itr_next(T0, T1, T2)(auto ref T0 htsfp, auto ref T1 itr, auto ref T2 r)
+{
+    return hts_itr_next(htsfp.fp.bgzf, itr, r, 0);
+}
 
 // Load/build .csi or .bai BAM index file.  Does not work with CRAM.
 // It is recommended to use the sam_index_* functions below instead.
@@ -1227,7 +1266,7 @@ int sam_idx_init(htsFile* fp, sam_hdr_t* h, int min_shift, const(char)* fnidx);
 
 /// Writes the index initialised with sam_idx_init to disk.
 /** @param fp        File handle for the data file being written.
-    @return          0 on success, <0 on filaure.
+    @return          0 on success, <0 on failure.
 */
 int sam_idx_save(htsFile* fp);
 
@@ -1410,13 +1449,32 @@ hts_itr_t* sam_itr_regarray(
     char** regarray,
     uint regcount);
 
+} /// closing @nogc
+
 /// Get the next read from a SAM/BAM/CRAM iterator
 /** @param htsfp       Htsfile pointer for the input file
     @param itr         Iterator
     @param r           Pointer to a bam1_t struct
     @return >= 0 on success; -1 when there is no more data; < -1 on error
  */
-int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r);
+pragma(inline,true)
+int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r) {
+    if (!htsfp.is_bgzf && !htsfp.is_cram) {
+        hts_log_error(__FUNCTION__, format("%s not BGZF compressed", htsfp.fn ? htsfp.fn : "File"));
+        return -2;
+    }
+    if (!itr) {
+        hts_log_error(__FUNCTION__,"Null iterator");
+        return -2;
+    }
+
+    if (itr.multi)
+        return hts_itr_multi_next(htsfp, itr, r);
+    else
+        return hts_itr_next(htsfp.is_bgzf ? htsfp.fp.bgzf : null, itr, r, htsfp);
+}
+
+@nogc nothrow:
 
 /// Get the next read from a BAM/CRAM multi-iterator
 /** @param htsfp       Htsfile pointer for the input file
@@ -1438,15 +1496,8 @@ const(char)* sam_parse_region(
  *** SAM I/O ***
  ***************/
 
-extern (D) auto sam_open(T0, T1)(auto ref T0 fn, auto ref T1 mode)
-{
-    return hts_open(fn, mode);
-}
-
-extern (D) auto sam_open_format(T0, T1, T2)(auto ref T0 fn, auto ref T1 mode, auto ref T2 fmt)
-{
-    return hts_open_format(fn, mode, fmt);
-}
+alias sam_open = hts_open;
+alias sam_open_format = hts_open_format;
 
 alias sam_close = hts_close;
 
@@ -1505,7 +1556,7 @@ int sam_passes_filter(
  * @param type Single letter type code: ACcSsIifHZB.
  * @param tag  Tag data pointer, in BAM format
  * @param end  Pointer to end of bam record (largest extent of tag)
- * @param ks   Kstring to write the formatted tag to
+ * @param ks   kstring to write the formatted tag to
  *
  * @return pointer to end of tag on success,
  *         NULL on failure.
@@ -1962,6 +2013,21 @@ void bam_mplp_destructor(
 
 int sam_cap_mapq(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int thres);
 
+/// Used as flag parameter in sam_prob_realn.
+enum htsRealnFlags {
+    BAQ_APPLY = 1,
+    BAQ_EXTEND = 2,
+    BAQ_REDO = 4,
+
+    // Platform subfield, in bit position 3 onwards
+    BAQ_AUTO = 0<<3,
+    BAQ_ILLUMINA = 1<<3,
+    BAQ_PACBIOCCS = 2<<3,
+    BAQ_PACBIO = 3<<3,
+    BAQ_ONT = 4<<3,
+    BAQ_GENAPSYS = 5<<3
+}
+
 /// Calculate BAQ scores
 /** @param b   BAM record
     @param ref     Reference sequence
@@ -1976,9 +2042,16 @@ This function calculates base alignment quality (BAQ) values using the method
 described in "Improving SNP discovery by base alignment quality", Heng Li,
 Bioinformatics, Volume 27, Issue 8 (https://doi.org/10.1093/bioinformatics/btr076).
 
+The @param flag value can be generated using the htsRealnFlags enum, but for
+backwards compatibilty reasons is retained as an "int".  An example usage
+of the enum could be this, equivalent to flag 19:
+
+    sam_prob_realn(b, ref, len, BAQ_APPLY | BAQ_EXTEND | BAQ_PACBIOCCS);
+
+
 The following @param flag bits can be used:
 
-Bit 0: Adjust the quality values using the BAQ values
+Bit 0 (BAQ_APPLY): Adjust the quality values using the BAQ values
 
  If set, the data in the BQ:Z tag is used to adjust the quality values, and
  the BQ:Z tag is renamed to ZQ:Z.
@@ -1986,15 +2059,23 @@ Bit 0: Adjust the quality values using the BAQ values
  If clear, and a ZQ:Z tag is present, the quality values are reverted using
  the data in the tag, and the tag is renamed to BQ:Z.
 
-Bit 1: Use "extended" BAQ.
+Bit 1 (BAQ_EXTEND): Use "extended" BAQ.
 
  Changes the BAQ calculation to increase sensitivity at the expense of
  reduced specificity.
 
-Bit 2: Recalculate BAQ, even if a BQ tag is present.
+Bit 2 (BAQ_REDO): Recalculate BAQ, even if a BQ tag is present.
 
  Force BAQ to be recalculated.  Note that a ZQ:Z tag will always disable
  recalculation.
+
+Bits 3-10: Choose parameters tailored to a specific instrument type.
+
+ One of BAQ_AUTO, BAQ_ILLUMINA, BAQ_PACBIOCCS, BAQ_PACBIO, BAQ_ONT and
+ BAQ_GENAPSYS.  The BAQ parameter tuning are still a work in progress and
+ at the time of writing mainly consist of Illumina vs long-read technology
+ adjustments.
+
 
 @bug
 If the input read has both BQ:Z and ZQ:Z tags, the ZQ:Z one will be removed.

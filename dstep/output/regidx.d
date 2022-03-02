@@ -60,6 +60,13 @@
         regidx_destroy(idx);
         regitr_destroy(itr);
 */
+module htslib.regidx;
+
+import htslib.hts: hts_pos_t;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
 
@@ -70,7 +77,7 @@ extern (C):
 // Limit is set to ensure some internal values used by regidx keep within 32
 // bits and to stop the index from getting too big.
 
-enum REGIDX_MAX = 1ULL << 35;
+enum REGIDX_MAX = 1UL << 35;
 
 struct regidx_t;
 

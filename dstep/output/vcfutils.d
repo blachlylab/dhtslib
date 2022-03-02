@@ -22,6 +22,13 @@ THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
+module htslib.vcfutils;
+
+import htslib.vcf;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
 
@@ -106,7 +113,16 @@ enum GT_HAPL_A = 5;
 enum GT_UNKN = 6;
 int bcf_gt_type(bcf_fmt_t* fmt_ptr, int isample, int* ial, int* jal);
 
-int bcf_acgt2int(char c);
+pragma(inline, true)
+int bcf_acgt2int(char c)
+{
+    if ( cast(int)c>96 ) c -= 32;
+    if ( c=='A' ) return 0;
+    if ( c=='C' ) return 1;
+    if ( c=='G' ) return 2;
+    if ( c=='T' ) return 3;
+    return -1;
+}
 
 extern (D) auto bcf_int2acgt(T)(auto ref T i)
 {

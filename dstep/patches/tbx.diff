@@ -1,8 +1,14 @@
-25a26,28
-> module htslib.tbx;
+26d25
+< 
+28a28,34
 > import htslib.hts;
-> import htslib.bgzf: BGZF;
-61,64c64,66
+> import htslib.bgzf : BGZF;
+> 
+> @system:
+> nothrow:
+> @nogc:
+> 
+63,66c69,71
 < extern (D) auto tbx_itr_queryi(T0, T1, T2, T3)(auto ref T0 tbx, auto ref T1 tid, auto ref T2 beg, auto ref T3 end)
 < {
 <     return hts_itr_query(tbx.idx, tid, beg, end, tbx_readrec);
@@ -11,12 +17,12 @@
 > pragma(inline, true)
 > auto tbx_itr_queryi(const tbx_t *tbx, int tid, hts_pos_t beg, hts_pos_t end)
 >     { return hts_itr_query(tbx.idx, tid, beg, end, &tbx_readrec); }
-66c68,69
+68c73,74
 < extern (D) auto tbx_itr_querys(T0, T1)(auto ref T0 tbx, auto ref T1 s)
 ---
 > pragma(inline, true)
 > auto tbx_itr_querys(const tbx_t *tbx, const char *s)
-68c71,75
+70c76,80
 <     return hts_itr_querys(tbx.idx, s, cast(hts_name2id_f) tbx_name2id, tbx, hts_itr_query, tbx_readrec);
 ---
 >     return hts_itr_querys(tbx.idx, s,
@@ -24,7 +30,7 @@
 >         cast(void*)tbx,
 >         &hts_itr_query,
 >         &tbx_readrec);
-71,74c78,80
+73,76c83,85
 < extern (D) auto tbx_itr_next(T0, T1, T2, T3)(auto ref T0 htsfp, auto ref T1 tbx, auto ref T2 itr, auto ref T3 r)
 < {
 <     return hts_itr_next(hts_get_bgzfp(htsfp), itr, r, tbx);
@@ -33,7 +39,7 @@
 > pragma(inline, true)
 > auto tbx_itr_next(htsFile *htsfp, tbx_t *tbx, hts_itr_t *itr, void *r)
 >     { return hts_itr_next(hts_get_bgzfp(htsfp), itr, r, tbx); }
-76,79c82,84
+78,81c87,89
 < extern (D) auto tbx_bgzf_itr_next(T0, T1, T2, T3)(auto ref T0 bgzfp, auto ref T1 tbx, auto ref T2 itr, auto ref T3 r)
 < {
 <     return hts_itr_next(bgzfp, itr, r, tbx);
@@ -42,56 +48,13 @@
 > pragma(inline, true)
 > auto tbx_bgzf_itr_next(BGZF *bgzfp, tbx_t *tbx, hts_itr_t *itr, void *r)
 >     { return hts_itr_next(bgzfp, itr, r, tbx); }
-81c86,87
-< int tbx_name2id(tbx_t* tbx, const(char)* ss);
----
+82a91
 > // contig name to integer id
-> int tbx_name2id (tbx_t* tbx, const(char)* ss);
-83,84c89,90
+85c94
 < /* Internal helper function used by tbx_itr_next() */
-< BGZF* hts_get_bgzfp(htsFile* fp);
 ---
 > /* Internal helper function used by tbx_itr_next() defined in hts.c -- do not use directly*/
-> BGZF* hts_get_bgzfp (htsFile* fp);
-86c92
-< int tbx_readrec(
----
-> int tbx_readrec (
-98c104
-< tbx_t* tbx_index(BGZF* fp, int min_shift, const(tbx_conf_t)* conf);
----
-> tbx_t* tbx_index (BGZF* fp, int min_shift, const(tbx_conf_t)* conf);
-102c108
-< int tbx_index_build(const(char)* fn, int min_shift, const(tbx_conf_t)* conf);
----
-> int tbx_index_build (const(char)* fn, int min_shift, const(tbx_conf_t)* conf);
-104c110
-< int tbx_index_build2(
----
-> int tbx_index_build2 (
-110c116
-< int tbx_index_build3(
----
-> int tbx_index_build3 (
-122c128
-< tbx_t* tbx_index_load(const(char)* fn);
----
-> tbx_t* tbx_index_load (const(char)* fn);
-133c139
-< tbx_t* tbx_index_load2(const(char)* fn, const(char)* fnidx);
----
-> tbx_t* tbx_index_load2 (const(char)* fn, const(char)* fnidx);
-152c158
-< tbx_t* tbx_index_load3(const(char)* fn, const(char)* fnidx, int flags);
----
-> tbx_t* tbx_index_load3 (const(char)* fn, const(char)* fnidx, int flags);
-154c160,161
-< const(char*)* tbx_seqnames(tbx_t* tbx, int* n); // free the array but not the values
----
+155a165
 > /// return C-style array of sequence names (NB: free the array but not the values)
-> const(char*)* tbx_seqnames (tbx_t* tbx, int* n); // free the array but not the values
-156c163,164
-< void tbx_destroy(tbx_t* tbx);
----
+157a168
 > /// destroy/dealloc tabix data
-> void tbx_destroy (tbx_t* tbx);

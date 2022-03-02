@@ -22,9 +22,16 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 */
+module htslib.kbitset;
 
 import core.stdc.config;
 import core.stdc.limits;
+import core.stdc.stdlib;
+import core.stdc.string;
+
+@system:
+nothrow:
+@nogc:
 
 extern (C):
 
@@ -63,7 +70,7 @@ extern (D) auto KBS_ELT(T)(auto ref T i)
 
 extern (D) auto KBS_MASK(T)(auto ref T i)
 {
-    return 1UL << (i % KBS_ELTBITS);
+    return 1U << (i % KBS_ELTBITS);
 }
 
 struct kbitset_t
@@ -73,46 +80,107 @@ struct kbitset_t
     c_ulong[1] b;
 }
 
-// (For internal use only.) Returns a mask (like 00011111) showing
-// which bits are in use in the last slot (for the given ni) set.
-c_ulong kbs_last_mask(size_t ni);
+pragma(inline, true):
+/// (For internal use only.) Returns a mask (like 00011111) showing
+/// which bits are in use in the last slot (for the given ni) set.
+c_ulong kbs_last_mask (size_t ni)
+{
+	uint mask = KBS_MASK(ni) - 1;
+	return mask? mask : ~0UL;
+}
 
-// Initialise a bit set capable of holding ni integers, 0 <= i < ni.
-// The set returned is empty if fill == 0, or all of [0,ni) otherwise.
+/// Initialise a bit set capable of holding ni integers, 0 <= i < ni.
+/// The set returned is empty if fill == 0, or all of [0,ni) otherwise.
 
-// b[n] is always non-zero (a fact used by kbs_next()).
-kbitset_t* kbs_init2(size_t ni, int fill);
+/// b[n] is always non-zero (a fact used by kbs_next()).
+kbitset_t* kbs_init2 (size_t ni, int fill)
+{
+	size_t n = (ni + KBS_ELTBITS-1) / KBS_ELTBITS;
+	kbitset_t *bs =
+		cast(kbitset_t *) malloc(kbitset_t.sizeof + n * uint.sizeof);
+	if (bs == null) return null;
+	bs.n = bs.n_max = n;
+	memset(cast(void*)bs.b, fill? ~0 : 0, n * uint.sizeof);
+	// b[n] is always non-zero (a fact used by kbs_next()).
+	bs.b[n] = kbs_last_mask(ni);
+	if (fill) bs.b[n-1] &= bs.b[n];
+	return bs;
+}
 
-// Initialise an empty bit set capable of holding ni integers, 0 <= i < ni.
-kbitset_t* kbs_init(size_t ni);
+/// Initialise an empty bit set capable of holding ni integers, 0 <= i < ni.
+kbitset_t* kbs_init (size_t ni)
+{
+	return kbs_init2(ni, 0);
+}
 
-// Resize an existing bit set to be capable of holding ni_new integers.
-// Elements in [ni_old,ni_new) are added to the set if fill != 0.
+/// Resize an existing bit set to be capable of holding ni_new integers.
+/// Elements in [ni_old,ni_new) are added to the set if fill != 0.
 
-// Need to clear excess bits when fill!=0 or n_new<n; always is simpler.
-int kbs_resize2(kbitset_t** bsp, size_t ni_new, int fill);
+/// Need to clear excess bits when fill!=0 or n_new<n; always is simpler.
+int kbs_resize2 (kbitset_t** bsp, size_t ni_new, int fill)
+{
+	kbitset_t *bs = *bsp;
+	size_t n = bs? bs.n : 0;
+	size_t n_new = (ni_new + KBS_ELTBITS-1) / KBS_ELTBITS;
+	if (bs == null || n_new > bs.n_max) {
+		bs = cast(kbitset_t *)
+			realloc(*bsp, kbitset_t.sizeof + n_new * uint.sizeof);
+		if (bs == null) return -1;
 
-// Resize an existing bit set to be capable of holding ni_new integers.
-// Returns negative on error.
-int kbs_resize(kbitset_t** bsp, size_t ni_new);
+		bs.n_max = n_new;
+		*bsp = bs;
+	}
 
-// Destroy a bit set.
-void kbs_destroy(kbitset_t* bs);
+	bs.n = n_new;
+	if (n_new >= n)
+		memset(&bs.b[n], fill? ~0 : 0, (n_new - n) * uint.sizeof);
+	bs.b[n_new] = kbs_last_mask(ni_new);
+	// Need to clear excess bits when fill!=0 or n_new<n; always is simpler.
+	bs.b[n_new-1] &= bs.b[n_new];
+	return 0;
+}
+/// Resize an existing bit set to be capable of holding ni_new integers.
+/// Returns negative on error.
+int kbs_resize (kbitset_t** bsp, size_t ni_new)
+{
+	return kbs_resize2(bsp, ni_new, 0);
+}
+/// Destroy a bit set.
+void kbs_destroy (kbitset_t* bs)
+{
+	free(bs);
+}
 
-// Reset the bit set to empty.
-void kbs_clear(kbitset_t* bs);
+/// Reset the bit set to empty.
+void kbs_clear (kbitset_t* bs)
+{
+	memset(cast(void*)bs.b, 0, bs.n * uint.sizeof);
+}
 
-// Reset the bit set to all of [0,ni).
-void kbs_insert_all(kbitset_t* bs);
+/// Reset the bit set to all of [0,ni).
+void kbs_insert_all (kbitset_t* bs)
+{
+	memset(cast(void*)bs.b, ~0, bs.n * uint.sizeof);
+	bs.b[bs.n-1] &= bs.b[bs.n];
+}
 
-// Insert an element into the bit set.
-void kbs_insert(kbitset_t* bs, int i);
+/// Insert an element into the bit set.
+void kbs_insert (kbitset_t* bs, int i)
+{
+	bs.b[KBS_ELT(i)] |= KBS_MASK(i);
+}
 
-// Remove an element from the bit set.
-void kbs_delete(kbitset_t* bs, int i);
+/// Remove an element from the bit set.
+void kbs_delete (kbitset_t* bs, int i)
+{
+	bs.b[KBS_ELT(i)] &= ~KBS_MASK(i);
+}
 
-// Test whether the bit set contains the element.
-int kbs_exists(const(kbitset_t)* bs, int i);
+/// Test whether the bit set contains the element.
+int kbs_exists (const(kbitset_t)* bs, int i)
+{
+	return (bs.b[KBS_ELT(i)] & KBS_MASK(i)) != 0;
+}
 
 struct kbitset_iter_t
 {
@@ -121,9 +189,33 @@ struct kbitset_iter_t
     int i;
 }
 
-// Initialise or reset a bit set iterator.
-void kbs_start(kbitset_iter_t* itr);
+/// Initialise or reset a bit set iterator.
+void kbs_start (kbitset_iter_t* itr)
+{
+	itr.mask = 1;
+	itr.elt = 0;
+	itr.i = 0;
+}
 
-// Return the next element contained in the bit set, or -1 if there are no more.
-int kbs_next(const(kbitset_t)* bs, kbitset_iter_t* itr);
+/// Return the next element contained in the bit set, or -1 if there are no more.
+int kbs_next (const(kbitset_t)* bs, kbitset_iter_t* itr)
+{
+	size_t b = bs.b[itr.elt];
+
+	for (;;) {
+		if (itr.mask == 0) {
+			while ((b = bs.b[++itr.elt]) == 0) itr.i += KBS_ELTBITS;
+			if (itr.elt == bs.n) return -1;
+			itr.mask = 1;
+		}
+
+		if (b & itr.mask) break;
+
+		itr.i++;
+		itr.mask <<= 1;
+	}
+
+	itr.mask <<= 1;
+	return itr.i++;
+}
 

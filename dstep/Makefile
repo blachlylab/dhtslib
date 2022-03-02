@@ -59,35 +59,58 @@ patchFiles = \
 	patches/vcfutils.diff
 
 changePatchFiles = \
-	changes/bgzf.diff \
-	changes/cram.diff \
-	changes/faidx.diff \
-	changes/hfile.diff \
-	changes/hts.diff \
-	changes/hts_endian.diff \
-	changes/hts_expr.diff \
-	changes/hts_log.diff \
-	changes/kbitset.diff \
-	changes/kfunc.diff \
-	changes/knetfile.diff \
-	changes/kroundup.diff \
-	changes/kstring.diff \
-	changes/regidx.diff \
-	changes/sam.diff \
-	changes/synced_bcf_reader.diff \
-	changes/tbx.diff \
-	changes/thread_pool.diff \
-	changes/vcf.diff \
-	changes/vcf_sweep.diff \
-	changes/vcfutils.diff
+	d_changes/bgzf.diff \
+	d_changes/cram.diff \
+	d_changes/faidx.diff \
+	d_changes/hfile.diff \
+	d_changes/hts.diff \
+	d_changes/hts_endian.diff \
+	d_changes/hts_expr.diff \
+	d_changes/hts_log.diff \
+	d_changes/kbitset.diff \
+	d_changes/kfunc.diff \
+	d_changes/knetfile.diff \
+	d_changes/kroundup.diff \
+	d_changes/kstring.diff \
+	d_changes/regidx.diff \
+	d_changes/sam.diff \
+	d_changes/synced_bcf_reader.diff \
+	d_changes/tbx.diff \
+	d_changes/thread_pool.diff \
+	d_changes/vcf.diff \
+	d_changes/vcf_sweep.diff \
+	d_changes/vcfutils.diff
 
-all: $(outputfiles) $(patchFiles)
+headerPatchFiles = \
+	htslib_changes/bgzf.diff \
+	htslib_changes/cram.diff \
+	htslib_changes/faidx.diff \
+	htslib_changes/hfile.diff \
+	htslib_changes/hts.diff \
+	htslib_changes/hts_endian.diff \
+	htslib_changes/hts_expr.diff \
+	htslib_changes/hts_log.diff \
+	htslib_changes/kbitset.diff \
+	htslib_changes/kfunc.diff \
+	htslib_changes/knetfile.diff \
+	htslib_changes/kroundup.diff \
+	htslib_changes/kstring.diff \
+	htslib_changes/regidx.diff \
+	htslib_changes/sam.diff \
+	htslib_changes/synced_bcf_reader.diff \
+	htslib_changes/tbx.diff \
+	htslib_changes/thread_pool.diff \
+	htslib_changes/vcf.diff \
+	htslib_changes/vcf_sweep.diff \
+	htslib_changes/vcfutils.diff
+
+all: $(outputfiles) $(patchFiles) $(headerPatchFiles) $(changePatchFiles)
 .PHONY: all
 
 patches: $(patchFiles)
 .PHONY: patches
 
-changes: $(changePatchFiles)
+changes: $(changePatchFiles) $(headerPatchFiles) 
 .PHONY: changes
 
 # clean out files
@@ -117,11 +140,18 @@ $(patchFiles): patches/%.diff: /tmp/dstep/%.d %.h
 # create patch files for viewing
 # significant changes by ignoring
 # changes in comment style and whitespace
-$(changePatchFiles): changes/%.diff: /tmp/dstep/%.d %.h
+$(changePatchFiles): d_changes/%.diff: /tmp/dstep/%.d %.h
 	diff -w \
 	<(sed -E 's;///.*;;g; s;//.*;;g; s;/\*\*;/*;g;' $<) \
 	<(sed -E 's;///.*;;g; s;//.*;;g; s;/\*\*;/*;g;' ../source/htslib/$*.d) \
 	> $@; [ $$? -eq 1 ]
+
+# create patch files for viewing
+# significant changes by ignoring
+# changes in comment style and whitespace
+$(headerPatchFiles): htslib_changes/%.diff: %.h
+	mkdir -p htslib_changes
+	diff $< ../source/htslib/include/$*.h > $@; [ $$? -eq 1 ]
 
 
 # patch converted to match bindings
