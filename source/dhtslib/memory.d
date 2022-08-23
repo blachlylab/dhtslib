@@ -15,7 +15,7 @@ static if(dip1000Enabled)
 
 pragma(inline, true):
 /**! Logs an event with severity HTS_LOG_ERROR and compile-time context. */
-private void hts_log_errorNoGC(const(char)[] ctx)( string msg) @trusted @nogc nothrow
+void hts_log_errorNoGC(const(char)[] ctx)( string msg) @trusted @nogc nothrow
 {
     string open_error_color = "\x1b[0;31m";
     string close_color      = "\x1b[0m";

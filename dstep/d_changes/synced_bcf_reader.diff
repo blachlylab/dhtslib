@@ -1,6 +1,9 @@
 55d54
 < 
-58a58,66
+58c57,66
+< import core.stdc.stdlib;
+---
+> import core.stdc.stddef;
 > 
 > import htslib.hts;
 > import htslib.vcf;

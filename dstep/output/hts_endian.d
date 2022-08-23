@@ -108,27 +108,27 @@ private struct int8_t
     alias _val this;
 
     pragma(inline, true)
-    this(byte x) @nogc
+    this(byte x) @nogc nothrow
     {
         _val = x;
     }
 
     pragma(inline, true)
-    int8_t opBinary(string op, T)(T other)
+    int8_t opBinary(string op, T)(T other) nothrow
         if ((is(T == int8_t) || is(T == byte) || is(T == ubyte)))
     {
         return mixin("int8_t(cast(byte)(_val " ~ op ~ " cast(byte)other))");
     }
 
     pragma(inline, true)
-    int8_t opBinaryRight(string op, T)(T other)
+    int8_t opBinaryRight(string op, T)(T other) nothrow
         if ((is(T == int8_t) || is(T == byte) || is(T == ubyte)))
     {
         return mixin("int8_t(cast(byte)(_val " ~ op ~ " cast(byte)other))");
     }
 
     pragma(inline, true)
-    int8_t opUnary(string op: "-")()
+    int8_t opUnary(string op: "-")() nothrow
     {
         return (cast(int8_t) _val ^ cast(ubyte) 0xFF) + cast(ubyte) 1;
     }
@@ -149,27 +149,27 @@ private struct int16_t
     alias _val this;
 
     pragma(inline, true)
-    this(short x) @nogc
+    this(short x) @nogc nothrow
     {
         _val = x;
     }
 
     pragma(inline, true)
-    int16_t opBinary(string op, T)(T other)
+    int16_t opBinary(string op, T)(T other) nothrow
         if ((is(T == int16_t) || is(T == short) || is(T == ushort)))
     {
         return mixin("int16_t(cast(short)(_val " ~ op ~ " cast(short)other))");
     }
 
     pragma(inline, true)
-    int16_t opBinaryRight(string op, T)(T other)
+    int16_t opBinaryRight(string op, T)(T other) nothrow
         if ((is(T == int16_t) || is(T == short) || is(T == ushort)))
     {
         return mixin("int16_t(cast(short)(_val " ~ op ~ " cast(short)other))");
     }
 
     pragma(inline, true)
-    int16_t opUnary(string op: "-")()
+    int16_t opUnary(string op: "-")() nothrow
     {
         return (cast(int16_t) _val ^ cast(ushort) 0xFFFF) + cast(ushort) 1;
     }
@@ -183,6 +183,7 @@ unittest
 pragma(inline, true):
 @nogc:
 @system:
+nothrow:
 /// Get a ushort value from an unsigned byte array
 /** @param buf Pointer to source byte, may be unaligned
  *  @return A 16 bit unsigned integer

@@ -12,21 +12,24 @@
 > @system:
 > nothrow:
 > @nogc:
-32,33c38,43
-< struct hFILE_backend;
-< struct kstring_t;
+32,33c38,40
+< // Ensure ssize_t exists within this header. All #includes must precede this,
+< // and ssize_t must be undefined again at the end of this header.
 ---
 > //#include <sys/types.h>
 > alias off_t = size_t;
 > alias ssize_t = size_t;
-> 
+35,36c42,43
+< struct hFILE_backend;
+< struct kstring_t;
+---
 > /// internal
 > struct hFILE_backend; // @suppress(dscanner.style.phobos_naming_convention)
-97c107
+100c107
 <     @return  The modified filename (i.e., `buffer->s`), or NULL on error.
 ---
 >     @return  The modified filename (i.e., `buffer.s`), or NULL on error.
-125c135,139
+128c135,139
 < int herrno(hFILE* fp);
 ---
 > pragma(inline, true)
@@ -34,7 +37,7 @@
 > {
 >     return fp.has_errno;
 > }
-128c142,146
+131c142,146
 < void hclearerr(hFILE* fp);
 ---
 > pragma(inline, true)
@@ -42,7 +45,7 @@
 > {
 >     fp.has_errno = 0;
 > }
-139c157,161
+142c157,161
 < off_t htell(hFILE* fp);
 ---
 > pragma(inline, true)
@@ -50,7 +53,7 @@
 > {
 >     return fp.offset + (fp.begin - fp.buffer);
 > }
-144c166,173
+147c166,173
 < int hgetc(hFILE* fp);
 ---
 > pragma(inline, true)
@@ -61,7 +64,7 @@
 > }
 > 
 > int hgetc2(hFILE* );
-169c198,202
+172c198,202
 < ssize_t hgetln(char* buffer, size_t size, hFILE* fp);
 ---
 > pragma(inline, true)
@@ -69,7 +72,7 @@
 > {
 >     return hgetdelim(buffer, size, '\n', fp);
 > }
-202c235,245
+205c235,245
 < ssize_t hread(hFILE* fp, void* buffer, size_t nbytes);
 ---
 > pragma(inline, true)
@@ -83,7 +86,7 @@
 > }
 > /// ditto
 > ssize_t hread2(hFILE* , void* , size_t, size_t);
-207c250,258
+210c250,258
 < int hputc(int c, hFILE* fp);
 ---
 > pragma(inline, true)
@@ -95,7 +98,7 @@
 > }
 > /// ditto
 > int hputc2(int, hFILE* );
-212c263,274
+215c263,274
 < int hputs(const(char)* text, hFILE* fp);
 ---
 > pragma(inline, true)
@@ -110,7 +113,7 @@
 > }
 > /// ditto
 > int hputs2(const (char)*, size_t, size_t, hFILE* );
-222c284,311
+225c284,311
 < ssize_t hwrite(hFILE* fp, const(void)* buffer, size_t nbytes);
 ---
 > pragma(inline, true)

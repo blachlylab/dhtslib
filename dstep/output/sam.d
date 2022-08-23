@@ -33,7 +33,9 @@ import std.format: format;
 import htslib.hts;
 import htslib.hts_log;
 import htslib.bgzf : BGZF;
-import htslib.kstring : kstring_t, ssize_t;
+import htslib.kstring;
+import htslib.hts_endian;
+import core.stdc.errno : EINVAL, ENOMEM, errno;
 
 @system:
 extern (C):
@@ -1553,9 +1555,9 @@ int sam_passes_filter(
     const(bam1_t)* b,
     hts_filter_t* filt);
 
-/*************************************
- *** Manipulating auxiliary fields ***
- *************************************/
+    /*************************************
+     *** Manipulating auxiliary fields ***
+     *************************************/
 
 /// Converts a BAM aux tag to SAM format
 /*
@@ -1576,27 +1578,179 @@ int sam_passes_filter(
  * of non-BAM formats that encode using a BAM type mechanism
  * (such as the internal CRAM representation).
  */
+pragma(inline, true) const(ubyte)* sam_format_aux1(const ubyte *key,
+                                             const ubyte type,
+                                             const ubyte *tag,
+                                             const ubyte *end,
+                                             kstring_t *ks) {
+    int r = 0;
+    const(ubyte) *s = tag; // brevity and consistency with other code.
+    r |= kputsn_(cast(char*)key, 2, ks) < 0;
+    r |= kputc_(':', ks) < 0;
+    if (type == 'C') {
+        r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+        r |= kputw(*s, ks) < 0;
+        ++s;
+    } else if (type == 'c') {
+        r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+        r |= kputw(*cast(byte*)s, ks) < 0;
+        ++s;
+    } else if (type == 'S') {
+        if (end - s >= 2) {
+            r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+            r |= kputuw(le_to_u16(s), ks) < 0;
+            s += 2;
+        } else goto bad_aux;
+    } else if (type == 's') {
+        if (end - s >= 2) {
+            r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+            r |= kputw(le_to_i16(s), ks) < 0;
+            s += 2;
+        } else goto bad_aux;
+    } else if (type == 'I') {
+        if (end - s >= 4) {
+            r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+            r |= kputuw(le_to_u32(s), ks) < 0;
+            s += 4;
+        } else goto bad_aux;
+    } else if (type == 'i') {
+        if (end - s >= 4) {
+            r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+            r |= kputw(le_to_i32(s), ks) < 0;
+            s += 4;
+        } else goto bad_aux;
+    } else if (type == 'A') {
+        r |= kputsn_(cast(char*)"A:", 2, ks) < 0;
+        r |= kputc_(*s, ks) < 0;
+        ++s;
+    } else if (type == 'f') {
+        if (end - s >= 4) {
+            // cast to avoid triggering -Wdouble-promotion
+            ksprintf(ks, cast(char*)"f:%g", cast(double)le_to_float(s));
+            s += 4;
+        } else goto bad_aux;
 
-// brevity and consistency with other code.
+    } else if (type == 'd') {
+        // NB: "d" is not an official type in the SAM spec.
+        // However for unknown reasons samtools has always supported this.
+        // We believe, HOPE, it is not in general usage and we do not
+        // encourage it.
+        if (end - s >= 8) {
+            ksprintf(ks, "d:%g", le_to_double(s));
+            s += 8;
+        } else goto bad_aux;
+    } else if (type == 'Z' || type == 'H') {
+        r |= kputc_(type, ks) < 0;
+        r |= kputc_(':', ks) < 0;
+        while (s < end && *s) r |= kputc_(*s++, ks) < 0;
+        if (s >= end)
+            goto bad_aux;
+        ++s;
+    } else if (type == 'B') {
+        ubyte sub_type = *(s++);
+        int sub_type_size;
 
-// NB: "d" is not an official type in the SAM spec.
-// However for unknown reasons samtools has always supported this.
-// We believe, HOPE, it is not in general usage and we do not
-// encourage it.
+        // or externalise sam.c's aux_type2size function?
+        switch (sub_type) {
+        case 'A': case 'c': case 'C':
+            sub_type_size = 1;
+            break;
+        case 's': case 'S':
+            sub_type_size = 2;
+            break;
+        case 'i': case 'I': case 'f':
+            sub_type_size = 4;
+            break;
+        default:
+            sub_type_size = 0;
+            break;
+        }
 
-// or externalise sam.c's aux_type2size function?
+        uint i, n;
+        if (sub_type_size == 0 || end - s < 4)
+            goto bad_aux;
+        n = le_to_u32(s);
+        s += 4; // now points to the start of the array
+        if ((end - s) / sub_type_size < n)
+            goto bad_aux;
+        r |= kputsn_(cast(char*)"B:", 2, ks) < 0;
+        r |= kputc(sub_type, ks) < 0; // write the type
+        switch (sub_type) {
+        case 'c':
+            if (ks_expand(ks, n*2) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputw(*cast(byte*)s, ks) < 0;
+                ++s;
+            }
+            break;
+        case 'C':
+            if (ks_expand(ks, n*2) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputuw(*cast(ubyte*)s, ks) < 0;
+                ++s;
+            }
+            break;
+        case 's':
+            if (ks_expand(ks, n*4) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputw(le_to_i16(s), ks) < 0;
+                s += 2;
+            }
+            break;
+        case 'S':
+            if (ks_expand(ks, n*4) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputuw(le_to_u16(s), ks) < 0;
+                s += 2;
+            }
+            break;
+        case 'i':
+            if (ks_expand(ks, n*6) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputw(le_to_i32(s), ks) < 0;
+                s += 4;
+            }
+            break;
+        case 'I':
+            if (ks_expand(ks, n*6) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputuw(le_to_u32(s), ks) < 0;
+                s += 4;
+            }
+            break;
+        case 'f':
+            if (ks_expand(ks, n*8) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                // cast to avoid triggering -Wdouble-promotion
+                r |= kputd(cast(double)le_to_float(s), ks) < 0;
+                s += 4;
+            }
+            break;
+        default:
+            goto bad_aux;
+        }
+    } else { // Unknown type
+        goto bad_aux;
+    }
+    return r ? null : s;
 
-// now points to the start of the array
+ bad_aux:
+    errno = EINVAL;
+    return null;
 
-// write the type
-
-// Unknown type
-const(ubyte)* sam_format_aux1(
-    const(ubyte)* key,
-    const ubyte type,
-    const(ubyte)* tag,
-    const(ubyte)* end,
-    kstring_t* ks);
+ mem_err:
+    import dhtslib.memory: hts_log_errorNoGC;
+    hts_log_errorNoGC!__FUNCTION__("Out of memory");
+    errno = ENOMEM;
+    return null;
+}
 
 /// Return a pointer to an aux record
 /** @param b   Pointer to the bam record
@@ -2090,7 +2244,6 @@ of the enum could be this, equivalent to flag 19:
 
     sam_prob_realn(b, ref, len, BAQ_APPLY | BAQ_EXTEND | BAQ_PACBIOCCS);
 
-
 The following @param flag bits can be used:
 
 Bit 0 (BAQ_APPLY): Adjust the quality values using the BAQ values
@@ -2118,13 +2271,11 @@ Bits 3-10: Choose parameters tailored to a specific instrument type.
  at the time of writing mainly consist of Illumina vs long-read technology
  adjustments.
 
-
 @bug
 If the input read has both BQ:Z and ZQ:Z tags, the ZQ:Z one will be removed.
 Depending on what previous processing happened, this may or may not be the
 correct thing to do.  It would be wise to avoid this situation if possible.
 */
-
 int sam_prob_realn(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int flag);
 
 // ---------------------------

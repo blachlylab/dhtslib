@@ -1,14 +1,20 @@
 26d25
 < 
-31a31,34
+32c31,33
+< extern (C):
+---
 > @system:
 > nothrow:
 > @nogc:
-> 
-34,36c37,39
+34,36c35
 < alias netread = read;
 < alias netwrite = write;
 < alias netclose = close;
+---
+> extern (C):
+38,39c37,39
+< // Ensure ssize_t exists within this header. All #includes must precede this,
+< // and ssize_t must be undefined again at the end of this header.
 ---
 > // alias netread = read;
 > // alias netwrite = write;
