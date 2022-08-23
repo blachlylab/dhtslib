@@ -349,8 +349,8 @@ debug(dhtslib_unittest) unittest
     auto vrange2 = vrange1.dup;
     vrange2.popFront;
 
-    assert(vrange1.count == 13);
-    assert(vrange2.count == 12);
+    assert(vrange1.count == 14);
+    assert(vrange2.count == 13);
 
     fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","bed_file.bed");
     f = HtslibFile(fn);

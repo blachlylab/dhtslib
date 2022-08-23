@@ -35,7 +35,7 @@
 >     alias uint32_u = align(1) uint;
 >     alias uint64_u = align(1) c_ulong;
 > }else{
-77a99,144
+77a99,142
 > }
 > 
 > 
@@ -80,9 +80,12 @@
 > }
 > 
 > 
-> 
-> 
-78a146,186
+80,83d144
+< /* @param buf Pointer to source byte, may be unaligned
+<  *  @return An 8-bit unsigned integer
+<  */
+< ubyte le_to_u8(const(ubyte)* buf);
+84a146,186
 > private struct int16_t
 > {
 >     short _val;
@@ -124,7 +127,7 @@
 > @nogc:
 > @system:
 > nothrow:
-84c192,198
+90c192,198
 < ushort le_to_u16(const(ubyte)* buf);
 ---
 > ushort le_to_u16(const(ubyte)* buf)
@@ -134,7 +137,7 @@
 >     else
 >         return cast(ushort) buf[0] | (cast(ushort) buf[1] << 8);
 > }
-91c205,214
+97c205,214
 < uint le_to_u32(const(ubyte)* buf);
 ---
 > uint le_to_u32(const(ubyte)* buf)
@@ -147,7 +150,7 @@
 >             (cast(uint) buf[2] << 16) |
 >             (cast(uint) buf[3] << 24));
 > }
-98c221,234
+104c221,234
 < ulong le_to_u64(const(ubyte)* buf);
 ---
 > ulong le_to_u64(const(ubyte)* buf)
@@ -164,7 +167,7 @@
 >             (cast(ulong) buf[6] << 48) |
 >             (cast(ulong) buf[7] << 56));
 > }
-104c240,248
+110c240,248
 < void u16_to_le(ushort val, ubyte* buf);
 ---
 > void u16_to_le(ushort val, ubyte* buf)
@@ -176,7 +179,7 @@
 >         buf[1] = (val >> 8) & 0xff;
 >     }
 > }
-110c254,264
+116c254,264
 < void u32_to_le(uint val, ubyte* buf);
 ---
 > void u32_to_le(uint val, ubyte* buf)
@@ -190,7 +193,7 @@
 >         buf[3] = (val >> 24) & 0xff;
 >     }
 > }
-116c270,284
+122c270,284
 < void u64_to_le(ulong val, ubyte* buf);
 ---
 > void u64_to_le(ulong val, ubyte* buf)
@@ -208,14 +211,14 @@
 >         buf[7] = (val >> 56) & 0xff;
 >     }
 > }
-128c296,299
+134c296,299
 < byte le_to_i8(const(ubyte)* buf);
 ---
 > byte le_to_i8(const(ubyte)* buf)
 > {
 >     return *buf < 0x80 ? cast(int8_t) *buf : -((int8_t(cast(byte)0xff) - cast(int8_t)*buf)) - int8_t(1);
 > }
-136c307,311
+142c307,311
 < short le_to_i16(const(ubyte)* buf);
 ---
 > short le_to_i16(const(ubyte)* buf)
@@ -223,7 +226,7 @@
 >     ushort v = le_to_u16(buf);
 >     return v < 0x8000 ? cast(int16_t) v : -((int16_t(cast(short)0xffff) - v)) - cast(int16_t)1;
 > }
-144c319,323
+150c319,323
 < int le_to_i32(const(ubyte)* buf);
 ---
 > int le_to_i32(const(ubyte)* buf)
@@ -231,7 +234,7 @@
 >     uint v = le_to_u32(buf);
 >     return v < 0x80000000U ? cast(int) v : -(cast(int) (0xffffffffU - v)) - 1;
 > }
-152c331,336
+158c331,336
 < long le_to_i64(const(ubyte)* buf);
 ---
 > long le_to_i64(const(ubyte)* buf)
@@ -240,34 +243,34 @@
 >     return (v < 0x8000000000000000UL
 >             ? cast(long) v : -(cast(long) (0xffffffffffffffffUL - v)) - 1);
 > }
-160c344,347
+166c344,347
 < void i16_to_le(short val, ubyte* buf);
 ---
 > void i16_to_le(short val, ubyte* buf)
 > {
 >     u16_to_le(val, buf);
 > }
-166c353,356
+172c353,356
 < void i32_to_le(int val, ubyte* buf);
 ---
 > void i32_to_le(int val, ubyte* buf)
 > {
 >     u32_to_le(val, buf);
 > }
-172c362,365
+178c362,365
 < void i64_to_le(long val, ubyte* buf);
 ---
 > void i64_to_le(long val, ubyte* buf)
 > {
 >     u64_to_le(val, buf);
 > }
-176,177c369,370
+182,183c369,370
 <  *  sizeof(float) == sizeof(uint32_t)
 <  *  sizeof(double) == sizeof(uint64_t)
 ---
 >  *  sizeof(float) == sizeof(uint)
 >  *  sizeof(double) == sizeof(ulong)
-188c381,392
+194c381,392
 < float le_to_float(const(ubyte)* buf);
 ---
 > float le_to_float(const(ubyte)* buf)
@@ -282,7 +285,7 @@
 >     convert.u = le_to_u32(buf);
 >     return convert.f;
 > }
-196c400,410
+202c400,410
 < double le_to_double(const(ubyte)* buf);
 ---
 > double le_to_double(const(ubyte)* buf)
@@ -296,7 +299,7 @@
 >     convert.u = le_to_u64(buf);
 >     return convert.f;
 > }
-202c416,426
+208c416,426
 < void float_to_le(float val, ubyte* buf);
 ---
 > void float_to_le(float val, ubyte* buf)
@@ -310,7 +313,7 @@
 >     convert.f = val;
 >     u32_to_le(convert.u, buf);
 > }
-208c432,442
+214c432,442
 < void double_to_le(double val, ubyte* buf);
 ---
 > void double_to_le(double val, ubyte* buf)

@@ -1,7 +1,7 @@
 /// @file htslib/hts.h
 /// Format-neutral I/O, indexing, and iterator API functions.
 /*
-    Copyright (C) 2012-2020 Genome Research Ltd.
+    Copyright (C) 2012-2022 Genome Research Ltd.
     Copyright (C) 2010, 2012 Broad Institute.
     Portions copyright (C) 2003-2006, 2008-2010 by Heng Li <lh3@live.co.uk>
 
@@ -525,7 +525,7 @@ const(char)* hts_version();
 // Immediately after release, bump ZZ to 90 to distinguish in-development
 // Git repository builds from the release; you may wish to increment this
 // further when significant features are merged.
-enum HTS_VERSION = 101500;
+enum HTS_VERSION = 101600;
 
 /**! @abstract Introspection on the features enabled in htslib
  *
@@ -700,7 +700,7 @@ int hts_set_opt(htsFile* fp, hts_fmt_option opt, ...);
   @param fp         The file handle
   @param delimiter  Unused, but must be '\n' (or KS_SEP_LINE)
   @param str        The line (not including the terminator) is written here
-  @return           Length of the string read;
+  @return           Length of the string read (capped at INT_MAX);
                     -1 on end-of-file; <= -2 on error
 */
 int hts_getline(htsFile* fp, int delimiter, kstring_t* str);

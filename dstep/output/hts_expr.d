@@ -1,6 +1,6 @@
 /*  expr.c -- filter expression parsing and processing.
 
-    Copyright (C) 2020 Genome Research Ltd.
+    Copyright (C) 2020, 2022 Genome Research Ltd.
 
     Author: James Bonfield <jkb@sanger.ac.uk>
 
@@ -33,13 +33,24 @@ extern (C):
 
 /// Holds a filter variable.  This is also used to return the results.
 /**
- * Note we cope with zero-but-true in order to implement a basic
- * "exists(something)" check where "something" may even be zero.
+  * The expression language has 3-states of string, numeric, and unknown.
+ * The unknown state is either a NaN numeric or a null string, with both
+ * internally considered to have the same "unknown" meaning.
  *
- * Eg in the aux tag searching syntax, "[NM]" should return true if
- * NM tag exists even if zero.
- * Take care when negating this. "[NM] != 0" will be true when
- * [NM] is absent, thus consider "[NM] && [NM] != 0".
+* These largely match the IEE 754 semantics for NaN comparisons: <, >, ==,
+ * != all fail, (even NaN == NaN).  Similarly arithmetic (+,-,/,*,%) with
+ * unknown values are still unknown (and false).
+ *
+ * The departure from NaN semantics though is that our unknown/null state is
+ * considered to be false while NaN in C is true.  Similarly the false nature
+ * of our unknown state meants !val becomes true, !!val is once again false,
+ * val && 1 is false, val || 0 is false, and val || 1 is true along with
+ * !val || 0 and !val && 1.
+ *
+ * Note it is possible for empty strings and zero numbers to also be true.
+ * An example of this is the aux string '[NM]' which returns true if the
+ * NM tag is found, regardless of whether it is also zero.  However the
+ * better approach added in 1.16 is 'exists([NM])'.
  */
 struct hts_expr_val_t
 {
@@ -48,6 +59,19 @@ struct hts_expr_val_t
     kstring_t s; // is_str and empty s permitted (eval as false)
     double d; // otherwise this
 }
+
+
+/* An example usage of this is in the SAM expression filter where an
+ * [X0] aux tag will be the value of X0 (string or numeric) if set, or
+ * a false nul-string (not the same as an empty one) when not set.
+ */
+int hts_expr_val_exists(hts_expr_val_t* v);
+
+
+int hts_expr_val_existsT(hts_expr_val_t* v);
+
+
+void hts_expr_val_undef(hts_expr_val_t* v);
 
 /// Frees a hts_expr_val_t type.
 void hts_expr_val_free(hts_expr_val_t* f);
@@ -89,6 +113,26 @@ alias hts_expr_sym_func = int function(
  *  the is_str member.  It can also be explicitly defined to be true even
  *  for a null value.  This may be used to check for the existence of
  *  something, irrespective of whether that something evaluates to zero.
+ *
+ *  @p res must be initialized using HTS_EXPR_VAL_INIT before passing it
+ *  to this function for the first time.
+ */
+int hts_filter_eval2(
+    hts_filter_t* filt,
+    void* data,
+    int function() sym_func,
+    hts_expr_val_t* res);
+
+
+/*
+ *  @copydetails hts_filter_eval2()
+ *
+ *  If calling this function more than once with the same @p res
+ *  parameter, hts_expr_val_free(res) must be used between invocations
+ *  to clear any allocated memory prior to reuse.
+ *
+ *  @deprecated This function has been replaced by hts_filter_eval2(),
+ *              which clears @p res properly itself.
  */
 int hts_filter_eval(
     hts_filter_t* filt,
