@@ -263,7 +263,7 @@ debug(dhtslib_unittest) unittest
     import std.stdio;
     f.seek(0);
     f.loadHeader;
-    assert(f.byRecord!Bcf1.count == 14);
+    assert(f.byRecord!Bcf1.count == 15);
 
     f.loadTabixIndex;
     
