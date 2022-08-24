@@ -343,5 +343,23 @@
 < /*! @typedef
 ---
 > /**! @typedef
-2209d2409
+2210,2211c2411,2412
+< /// Returns data about a specific modification type for the alignment record.
+< /**
+---
+> 
+> /*
+2235,2237c2436,2438
+< /// Returns the list of base modification codes provided for this
+< /// alignment record as an array of character codes (+ve) or ChEBI numbers
+< /// (negative).
+---
+> 
+> 
+> 
+2248,2249c2449
+< int* bam_mods_recorded(hts_base_mod_state* state, int* ntype);
 < 
+---
+> int* bam_mods_recorded(hts_base_mod_state* state, int* ntype);
+\ No newline at end of file

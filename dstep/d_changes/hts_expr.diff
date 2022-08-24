@@ -1,9 +1,9 @@
 24d23
 < 
-25a25,30
-> 
+26a26,31
 > import htslib.kstring: kstring_t;
 > 
 > @system:
 > nothrow:
 > @nogc:
+> 

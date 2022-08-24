@@ -1,7 +1,7 @@
 /// @file htslib/cram.h
 /// CRAM format-specific API functions.
 /*
-    Copyright (C) 2015, 2016, 2018-2020 Genome Research Ltd.
+    Copyright (C) 2015, 2016, 2018-2020, 2022 Genome Research Ltd.
 
     Author: James Bonfield <jkb@sanger.ac.uk>
 
@@ -222,6 +222,44 @@ int cram_transcode_rg(
  *        -1 on failure
  */
 int cram_copy_slice(cram_fd* in_, cram_fd* out_, int num_slice);
+
+/*
+ *-----------------------------------------------------------------------------
+ * cram slice interrogation
+ */
+
+/*
+ * Returns the number of cram blocks within this slice.
+ */
+int cram_slice_hdr_get_num_blocks(cram_block_slice_hdr* hdr);
+
+/*
+ * Returns the block content_id for the block containing an embedded reference
+ * sequence.  If none is present, -1 is returned.
+ */
+int cram_slice_hdr_get_embed_ref_id(cram_block_slice_hdr* h);
+
+/*
+ * Returns slice reference ID, start and span (length) coordinates.
+ * Return parameters may be NULL in which case they are ignored.
+ */
+void cram_slice_hdr_get_coords(
+    cram_block_slice_hdr* h,
+    int* refid,
+    hts_pos_t* start,
+    hts_pos_t* span);
+
+/*
+ * Decodes a slice header from a cram block.
+ * Returns the opaque cram_block_slice_hdr pointer on success,
+ *         NULL on failure.
+ */
+cram_block_slice_hdr* cram_decode_slice_header(cram_fd* fd, cram_block* b);
+
+/*
+ * Frees a cram_block_slice_hdr structure.
+ */
+void cram_free_slice_header(cram_block_slice_hdr* hdr);
 
 /*
  *-----------------------------------------------------------------------------
