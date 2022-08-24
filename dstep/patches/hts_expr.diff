@@ -1,9 +1,35 @@
 24d23
 < 
-25a25,30
-> 
+26a26,31
 > import htslib.kstring: kstring_t;
 > 
 > @system:
 > nothrow:
 > @nogc:
+> 
+31c36
+<  * The expression language has 3-states of string, numeric, and unknown.
+---
+>   * The expression language has 3-states of string, numeric, and unknown.
+35c40
+<  * These largely match the IEE 754 semantics for NaN comparisons: <, >, ==,
+---
+> * These largely match the IEE 754 semantics for NaN comparisons: <, >, ==,
+58c63
+< /// Returns true if an hts_expr_val_t is defined.
+---
+> 
+65c70
+< /// Returns true if an hts_expr_val_t is defined or is undef-but-true
+---
+> 
+68c73
+< /// Set a value to be undefined (nan).
+---
+> 
+121,122c126,127
+< /// Evaluate a filter expression (derecated API)
+< /**
+---
+> 
+> /*

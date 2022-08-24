@@ -1,7 +1,7 @@
 /// @file htslib/sam.h
 /// High-level SAM/BAM/CRAM sequence file operations.
 /*
-    Copyright (C) 2008, 2009, 2013-2021 Genome Research Ltd.
+    Copyright (C) 2008, 2009, 2013-2022 Genome Research Ltd.
     Copyright (C) 2010, 2012, 2013 Broad Institute.
 
     Author: Heng Li <lh3@sanger.ac.uk>
@@ -33,7 +33,9 @@ import std.format: format;
 import htslib.hts;
 import htslib.hts_log;
 import htslib.bgzf : BGZF;
-import htslib.kstring : kstring_t, ssize_t;
+import htslib.kstring;
+import htslib.hts_endian;
+import core.stdc.errno : EINVAL, ENOMEM, errno;
 
 @system:
 extern (C):
@@ -1496,9 +1498,17 @@ const(char)* sam_parse_region(
  *** SAM I/O ***
  ***************/
 
-alias sam_open = hts_open;
-alias sam_open_format = hts_open_format;
+extern (D) auto sam_open(T0, T1)(auto ref T0 fn, auto ref T1 mode)
+{
+    return hts_open(fn, mode);
+}
 
+extern (D) auto sam_open_format(T0, T1, T2)(auto ref T0 fn, auto ref T1 mode, auto ref T2 fmt)
+{
+    return hts_open_format(fn, mode, fmt);
+}
+
+alias sam_flush = hts_flush;
 alias sam_close = hts_close;
 
 int sam_open_mode(char* mode, const(char)* fn, const(char)* format);
@@ -1545,9 +1555,9 @@ int sam_passes_filter(
     const(bam1_t)* b,
     hts_filter_t* filt);
 
-/*************************************
- *** Manipulating auxiliary fields ***
- *************************************/
+    /*************************************
+     *** Manipulating auxiliary fields ***
+     *************************************/
 
 /// Converts a BAM aux tag to SAM format
 /*
@@ -1568,27 +1578,179 @@ int sam_passes_filter(
  * of non-BAM formats that encode using a BAM type mechanism
  * (such as the internal CRAM representation).
  */
+pragma(inline, true) const(ubyte)* sam_format_aux1(const ubyte *key,
+                                             const ubyte type,
+                                             const ubyte *tag,
+                                             const ubyte *end,
+                                             kstring_t *ks) {
+    int r = 0;
+    const(ubyte) *s = tag; // brevity and consistency with other code.
+    r |= kputsn_(cast(char*)key, 2, ks) < 0;
+    r |= kputc_(':', ks) < 0;
+    if (type == 'C') {
+        r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+        r |= kputw(*s, ks) < 0;
+        ++s;
+    } else if (type == 'c') {
+        r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+        r |= kputw(*cast(byte*)s, ks) < 0;
+        ++s;
+    } else if (type == 'S') {
+        if (end - s >= 2) {
+            r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+            r |= kputuw(le_to_u16(s), ks) < 0;
+            s += 2;
+        } else goto bad_aux;
+    } else if (type == 's') {
+        if (end - s >= 2) {
+            r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+            r |= kputw(le_to_i16(s), ks) < 0;
+            s += 2;
+        } else goto bad_aux;
+    } else if (type == 'I') {
+        if (end - s >= 4) {
+            r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+            r |= kputuw(le_to_u32(s), ks) < 0;
+            s += 4;
+        } else goto bad_aux;
+    } else if (type == 'i') {
+        if (end - s >= 4) {
+            r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+            r |= kputw(le_to_i32(s), ks) < 0;
+            s += 4;
+        } else goto bad_aux;
+    } else if (type == 'A') {
+        r |= kputsn_(cast(char*)"A:", 2, ks) < 0;
+        r |= kputc_(*s, ks) < 0;
+        ++s;
+    } else if (type == 'f') {
+        if (end - s >= 4) {
+            // cast to avoid triggering -Wdouble-promotion
+            ksprintf(ks, cast(char*)"f:%g", cast(double)le_to_float(s));
+            s += 4;
+        } else goto bad_aux;
 
-// brevity and consistency with other code.
+    } else if (type == 'd') {
+        // NB: "d" is not an official type in the SAM spec.
+        // However for unknown reasons samtools has always supported this.
+        // We believe, HOPE, it is not in general usage and we do not
+        // encourage it.
+        if (end - s >= 8) {
+            ksprintf(ks, "d:%g", le_to_double(s));
+            s += 8;
+        } else goto bad_aux;
+    } else if (type == 'Z' || type == 'H') {
+        r |= kputc_(type, ks) < 0;
+        r |= kputc_(':', ks) < 0;
+        while (s < end && *s) r |= kputc_(*s++, ks) < 0;
+        if (s >= end)
+            goto bad_aux;
+        ++s;
+    } else if (type == 'B') {
+        ubyte sub_type = *(s++);
+        int sub_type_size;
 
-// NB: "d" is not an official type in the SAM spec.
-// However for unknown reasons samtools has always supported this.
-// We believe, HOPE, it is not in general usage and we do not
-// encourage it.
+        // or externalise sam.c's aux_type2size function?
+        switch (sub_type) {
+        case 'A': case 'c': case 'C':
+            sub_type_size = 1;
+            break;
+        case 's': case 'S':
+            sub_type_size = 2;
+            break;
+        case 'i': case 'I': case 'f':
+            sub_type_size = 4;
+            break;
+        default:
+            sub_type_size = 0;
+            break;
+        }
 
-// or externalise sam.c's aux_type2size function?
+        uint i, n;
+        if (sub_type_size == 0 || end - s < 4)
+            goto bad_aux;
+        n = le_to_u32(s);
+        s += 4; // now points to the start of the array
+        if ((end - s) / sub_type_size < n)
+            goto bad_aux;
+        r |= kputsn_(cast(char*)"B:", 2, ks) < 0;
+        r |= kputc(sub_type, ks) < 0; // write the type
+        switch (sub_type) {
+        case 'c':
+            if (ks_expand(ks, n*2) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputw(*cast(byte*)s, ks) < 0;
+                ++s;
+            }
+            break;
+        case 'C':
+            if (ks_expand(ks, n*2) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputuw(*cast(ubyte*)s, ks) < 0;
+                ++s;
+            }
+            break;
+        case 's':
+            if (ks_expand(ks, n*4) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputw(le_to_i16(s), ks) < 0;
+                s += 2;
+            }
+            break;
+        case 'S':
+            if (ks_expand(ks, n*4) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputuw(le_to_u16(s), ks) < 0;
+                s += 2;
+            }
+            break;
+        case 'i':
+            if (ks_expand(ks, n*6) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputw(le_to_i32(s), ks) < 0;
+                s += 4;
+            }
+            break;
+        case 'I':
+            if (ks_expand(ks, n*6) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                r |= kputuw(le_to_u32(s), ks) < 0;
+                s += 4;
+            }
+            break;
+        case 'f':
+            if (ks_expand(ks, n*8) < 0) goto mem_err;
+            for (i = 0; i < n; ++i) {
+                ks.s[ks.l++] = ',';
+                // cast to avoid triggering -Wdouble-promotion
+                r |= kputd(cast(double)le_to_float(s), ks) < 0;
+                s += 4;
+            }
+            break;
+        default:
+            goto bad_aux;
+        }
+    } else { // Unknown type
+        goto bad_aux;
+    }
+    return r ? null : s;
 
-// now points to the start of the array
+ bad_aux:
+    errno = EINVAL;
+    return null;
 
-// write the type
-
-// Unknown type
-const(ubyte)* sam_format_aux1(
-    const(ubyte)* key,
-    const ubyte type,
-    const(ubyte)* tag,
-    const(ubyte)* end,
-    kstring_t* ks);
+ mem_err:
+    import dhtslib.memory: hts_log_errorNoGC;
+    hts_log_errorNoGC!__FUNCTION__("Out of memory");
+    errno = ENOMEM;
+    return null;
+}
 
 /// Return a pointer to an aux record
 /** @param b   Pointer to the bam record
@@ -1930,10 +2092,13 @@ void bam_plp_reset(bam_plp_t iter);
 /**
  *  bam_plp_constructor() - sets a callback to initialise any per-pileup1_t fields.
  *  @plp:       The bam_plp_t initialised using bam_plp_init.
- *  @func:      The callback function itself.  When called, it is given the
- *              data argument (specified in bam_plp_init), the bam structure and
- *              a pointer to a locally allocated bam_pileup_cd union.  This union
- *              will also be present in each bam_pileup1_t created.
+ *  @func:      The callback function itself.  When called, it is given
+ *              the data argument (specified in bam_plp_init), the bam
+ *              structure and a pointer to a locally allocated
+ *              bam_pileup_cd union.  This union will also be present in
+ *              each bam_pileup1_t created.
+ *              The callback function should have a negative return
+ *              value to indicate an error. (Similarly for destructor.)
  */
 void bam_plp_constructor(
     bam_plp_t plp,
@@ -1956,6 +2121,37 @@ void bam_plp_destructor(
  * any deletion immediately following the insertion, or zero if none.
  */
 int bam_plp_insertion(const(bam_pileup1_t)* p, kstring_t* ins, int* del_len);
+
+/**! @typedef
+ @abstract An opaque type used for caching base modification state between
+ successive calls to bam_mods_* functions.
+*/
+struct hts_base_mod_state;
+
+/// Get pileup padded insertion sequence, including base modifications
+/**
+ * @param p       pileup data
+ * @param m       state data for the base modification finder
+ * @param ins     the kstring where the insertion sequence will be written
+ * @param del_len location for deletion length
+ * @return the number of insertion string on success, with string length
+ *         being accessable via ins->l; -1 on failure.
+ *
+ * Fills out the kstring with the padded insertion sequence for the current
+ * location in 'p'.  If this is not an insertion site, the string is blank.
+ *
+ * The modification state needs to have been previously initialised using
+ * bam_parse_basemod.  It is permitted to be passed in as NULL, in which
+ * case this function outputs identically to bam_plp_insertion.
+ *
+ * If del_len is not NULL, the location pointed to is set to the length of
+ * any deletion immediately following the insertion, or zero if none.
+ */
+int bam_plp_insertion_mod(
+    const(bam_pileup1_t)* p,
+    hts_base_mod_state* m,
+    kstring_t* ins,
+    int* del_len);
 
 /// Create a new bam_mplp_t structure
 /** The struct returned by a successful call should be freed
@@ -2020,12 +2216,12 @@ enum htsRealnFlags {
     BAQ_REDO = 4,
 
     // Platform subfield, in bit position 3 onwards
-    BAQ_AUTO = 0<<3,
-    BAQ_ILLUMINA = 1<<3,
-    BAQ_PACBIOCCS = 2<<3,
-    BAQ_PACBIO = 3<<3,
-    BAQ_ONT = 4<<3,
-    BAQ_GENAPSYS = 5<<3
+    BAQ_AUTO = 0 << 3,
+    BAQ_ILLUMINA = 1 << 3,
+    BAQ_PACBIOCCS = 2 << 3,
+    BAQ_PACBIO = 3 << 3,
+    BAQ_ONT = 4 << 3,
+    BAQ_GENAPSYS = 5 << 3
 }
 
 /// Calculate BAQ scores
@@ -2047,7 +2243,6 @@ backwards compatibilty reasons is retained as an "int".  An example usage
 of the enum could be this, equivalent to flag 19:
 
     sam_prob_realn(b, ref, len, BAQ_APPLY | BAQ_EXTEND | BAQ_PACBIOCCS);
-
 
 The following @param flag bits can be used:
 
@@ -2076,12 +2271,179 @@ Bits 3-10: Choose parameters tailored to a specific instrument type.
  at the time of writing mainly consist of Illumina vs long-read technology
  adjustments.
 
-
 @bug
 If the input read has both BQ:Z and ZQ:Z tags, the ZQ:Z one will be removed.
 Depending on what previous processing happened, this may or may not be the
 correct thing to do.  It would be wise to avoid this situation if possible.
 */
-
 int sam_prob_realn(bam1_t* b, const(char)* ref_, hts_pos_t ref_len, int flag);
 
+// ---------------------------
+// Base modification retrieval
+
+/**! @typedef
+ @abstract Holds a single base modification.
+ @field modified_base     The short base code (m, h, etc) or -ChEBI (negative)
+ @field canonical_base    The canonical base referred to in the MM tag.
+                          One of A, C, G, T or N.  Note this may not be the
+                          explicit base recorded in the SEQ column (esp. if N).
+ @field stran             0 or 1, indicating + or - strand from MM tag.
+ @field qual              Quality code (256*probability), or -1 if unknown
+
+ @discussion
+ Note this doesn't hold any location data or information on which other
+ modifications may be possible at this site.
+*/
+struct hts_base_mod
+{
+    int modified_base;
+    int canonical_base;
+    int strand;
+    int qual;
+}
+
+/// Allocates an hts_base_mode_state.
+/**
+ * @return An hts_base_mode_state pointer on success,
+ *         NULL on failure.
+ *
+ * This just allocates the memory.  The initialisation of the contents is
+ * done using bam_parse_basemod.  Successive calls may be made to that
+ * without the need to free and allocate a new state.
+ *
+ * The state be destroyed using the hts_base_mode_state_free function.
+ */
+hts_base_mod_state* hts_base_mod_state_alloc();
+
+/// Destroys an  hts_base_mode_state.
+/**
+ * @param state    The base modification state pointer.
+ *
+ * The should have previously been created by hts_base_mode_state_alloc.
+ */
+void hts_base_mod_state_free(hts_base_mod_state* state);
+
+/// Parses the Mm and Ml tags out of a bam record.
+/**
+ * @param b        BAM alignment record
+ * @param state    The base modification state pointer.
+ * @return 0 on success,
+ *         -1 on failure.
+ *
+ * This fills out the contents of the modification state, resetting the
+ * iterator location to the first sequence base.
+ */
+int bam_parse_basemod(const(bam1_t)* b, hts_base_mod_state* state);
+
+/// Returns modification status for the next base position in the query seq.
+/**
+ * @param b        BAM alignment record
+ * @param state    The base modification state pointer.
+ * @param mods     A supplied array for returning base modifications
+ * @param n_mods   The size of the mods array
+ * @return The number of modifications found on success,
+ *         -1 on failure.
+ *
+ * This is intended to be used as an iterator, with one call per location
+ * along the query sequence.
+ *
+ * If no modifications are found, the returned value is zero.
+ * If more than n_mods modifications are found, the total found is returned.
+ * Note this means the caller needs to check whether this is higher than
+ * n_mods.
+ */
+int bam_mods_at_next_pos(
+    const(bam1_t)* b,
+    hts_base_mod_state* state,
+    hts_base_mod* mods,
+    int n_mods);
+
+/// Finds the next location containing base modifications and returns them
+/**
+ * @param b        BAM alignment record
+ * @param state    The base modification state pointer.
+ * @param mods     A supplied array for returning base modifications
+ * @param n_mods   The size of the mods array
+ * @return The number of modifications found on success,
+ *         0 if no more modifications are present,
+ *         -1 on failure.
+ *
+ * Unlike bam_mods_at_next_pos this skips ahead to the next site
+ * with modifications.
+ *
+ * If more than n_mods modifications are found, the total found is returned.
+ * Note this means the caller needs to check whether this is higher than
+ * n_mods.
+ */
+int bam_next_basemod(
+    const(bam1_t)* b,
+    hts_base_mod_state* state,
+    hts_base_mod* mods,
+    int n_mods,
+    int* pos);
+
+/// Returns modification status for a specific query position.
+/**
+ * @param b        BAM alignment record
+ * @param state    The base modification state pointer.
+ * @param mods     A supplied array for returning base modifications
+ * @param n_mods   The size of the mods array
+ * @return The number of modifications found on success,
+ *         -1 on failure.
+ *
+ * Note if called multipled times, qpos must be higher than the previous call.
+ * Hence this is suitable for use from a pileup iterator.  If more random
+ * access is required, bam_parse_basemod must be called each time to reset
+ * the state although this has an efficiency cost.
+ *
+ * If no modifications are found, the returned value is zero.
+ * If more than n_mods modifications are found, the total found is returned.
+ * Note this means the caller needs to check whether this is higher than
+ * n_mods.
+ */
+int bam_mods_at_qpos(
+    const(bam1_t)* b,
+    int qpos,
+    hts_base_mod_state* state,
+    hts_base_mod* mods,
+    int n_mods);
+
+
+/*
+ * @param b          BAM alignment record
+ * @param state      The base modification state pointer.
+ * @param code       Modification code.  If positive this is a character code,
+ *                   if negative it is a -ChEBI code.
+ *
+ * @param strand     Boolean for top (0) or bottom (1) strand
+ * @param implicit   Boolean for whether unlisted positions should be
+ *                   implicitly assumed to be unmodified, or require an
+ *                   explicit score and should be considered as unknown.
+ *                   Returned.
+ * @param canonical  Canonical base type associated with this modification
+ *                   Returned.
+ *
+ * @return 0 on success or -1 if not found.  The strand, implicit and canonical
+ * fields are filled out if passed in as non-NULL pointers.
+ */
+int bam_mods_query_type(
+    hts_base_mod_state* state,
+    int code,
+    int* strand,
+    int* implicit,
+    char* canonical);
+
+
+
+
+/*
+ * @param b          BAM alignment record
+ * @param state      The base modification state pointer.
+ * @param ntype      Filled out with the number of array elements returned
+ *
+ * @return the type array, with *ntype filled out with the size.
+ *         The array returned should not be freed.
+ *         It is a valid pointer until the state is freed using
+ *         hts_base_mod_free().
+ */
+int* bam_mods_recorded(hts_base_mod_state* state, int* ntype);

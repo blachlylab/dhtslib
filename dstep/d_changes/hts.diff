@@ -1,7 +1,3 @@
-4c4
-<     Copyright (C) 2012-2021 Genome Research Ltd.
----
->     Copyright (C) 2012-2020 Genome Research Ltd.
 27d26
 < 
 34a34,44
@@ -50,17 +46,17 @@
 >     category_maximum = 32_767
 155a177
 > 
-180c202
+181c203
 <     format_maximum = 32767
 ---
 >     format_maximum = 32_767
-182a205
+183a206
 > 
-191c214
+194c217
 <     compression_maximum = 32767
 ---
 >     compression_maximum = 32_767
-199,205c222,223
+202,208c225,226
 <     struct _Anonymous_0
 <     {
 <         short major;
@@ -71,37 +67,33 @@
 ---
 >     struct Vers { short major, minor; } 
 >     Vers v; 
-241d258
+244d261
 < 
-247,248c264
+250,251c267
 <     union _Anonymous_1
 <     {
 ---
 >     union FP {
-253,254c269
+256,257c272
 < 
 <     _Anonymous_1 fp;
 ---
 >     FP fp;              
-364c379
-<     FASTQ_OPT_BARCODE = 1003
----
->     FASTQ_OPT_BARCODE = 1003,
-379a395
+387a403
 > 
-385,386c401
+393,394c409
 <     union _Anonymous_2
 <     {
 ---
 >     union VAL {         
-390,391c405
+398,399c413
 < 
 <     _Anonymous_2 val;
 ---
 >     VAL val;            
-453d466
+461d474
 < extern __gshared const(ubyte)[256] seq_nt16_table;
-454a468,490
+462a476,498
 > version(Windows){
 >     __gshared const(ubyte)[256] seq_nt16_table = [
 >         15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
@@ -125,50 +117,67 @@
 > }else{
 >     extern __gshared const(ubyte)[256] seq_nt16_table;
 > }
-458c494,496
+466c502,504
 < extern __gshared const(char)[] seq_nt16_str;
 ---
 > 
 > version(Windows) __gshared const(char)[16] seq_nt16_str = ['=','A','C','M','G','R','S','V','T','W','Y','H','K','D','B','N'];
 > else extern __gshared const(char)[16] seq_nt16_str;
-463,464c501,502
+471,472c509,510
 < extern __gshared const(int)[] seq_nt16_int;
 < 
 ---
 > version(Windows) __gshared const(int)[16] seq_nt16_int = [ 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 ];
 > else extern __gshared const(int)[16] seq_nt16_int;
-550,551d587
-<         f  FASTQ format
-<         F  FASTA format
-755a792
+539c577
+< /*!
+---
+> /*History: !
+616,622d653
+<   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file
+<   @param fn       The already-open file handle
+<   @param mode     Open mode, as per hts_open()
+< */
+< htsFile* hts_hopen(hFILE* fp, const(char)* fn, const(char)* mode);
+< 
+< /*!
+630a662,668
+>   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file
+>   @param fn       The already-open file handle
+>   @param mode     Open mode, as per hts_open()
+> */
+> htsFile* hts_hopen(hFILE* fp, const(char)* fn, const(char)* mode);
 > 
-762a800
+> /*!
+789a828
 > 
-847c885
+796a836
+> 
+881c921
 <     struct _Anonymous_3
 ---
 >     struct Bins
-854c892
+888c928
 <     _Anonymous_3 bins;
 ---
 >     Bins bins;
-857c895,899
+891c931,932
 < alias hts_itr_multi_t = hts_itr_t;
 ---
 > struct aux_key_t { 
 >     int key;    
->     
+892a934,937
 >     ulong min_off, max_off;
 > }
-858a901
+> 
 > alias hts_itr_multi_t = hts_itr_t;
-859a903
+893a939
 > pragma(inline, true)
-865c909
+899c945
 < 
 ---
 > pragma(inline, true)
-1033,1035c1077,1081
+1067,1069c1113,1117
 < enum HTS_IDX_SAVE_REMOTE = 1;
 < enum HTS_IDX_SILENT_FAIL = 2;
 < 
@@ -178,7 +187,7 @@
 >     HTS_IDX_SAVE_REMOTE = 1,
 >     HTS_IDX_SILENT_FAIL = 2
 > }
-1107,1111c1153
+1141,1145c1189
 < const(char*)* hts_idx_seqnames(
 <     const(hts_idx_t)* idx,
 <     int* n,
@@ -186,7 +195,7 @@
 <     void* hdr); 
 ---
 > const(char *)* hts_idx_seqnames(const(hts_idx_t)* idx, int* n, hts_id2name_f getid, void* hdr); 
-1122,1124c1164,1169
+1156,1158c1200,1205
 < enum HTS_PARSE_THOUSANDS_SEP = 1; 
 < enum HTS_PARSE_ONE_COORD = 2; 
 < enum HTS_PARSE_LIST = 4; 
@@ -197,35 +206,35 @@
 >     HTS_PARSE_ONE_COORD = 2, 
 >     HTS_PARSE_LIST = 4, 
 > }
-1138c1183
+1188c1235
 < long hts_parse_decimal(const(char)* str, char** strend, int flags);
 ---
 > long hts_parse_decimal(const(char)* str, char** strend, HTS_PARSE_FLAGS flags);
-1140c1185
+1190c1237
 < alias hts_name2id_f = int function(void*, const(char)*);
 ---
 > alias hts_name2id_f = int function(void*, const(char)*) *;
-1231c1276
+1281c1328
 <     int flags);
 ---
 >     HTS_PARSE_FLAGS flags);
-1259c1304
+1309c1356
 <     int function() readrec);
 ---
 >     hts_readrec_func readrec);
-1266c1311
+1316c1363
 < alias hts_itr_query_func = hts_itr_t* function(const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, int function() readrec);
 ---
 > alias hts_itr_query_func = hts_itr_t* function(const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, hts_readrec_func readrec);
-1286,1287c1331,1332
+1336,1337c1383,1384
 <     hts_itr_t* function() itr_query,
 <     int function() readrec);
 ---
 >     hts_itr_query_func itr_query,
 >     hts_readrec_func readrec);
-1297a1343
+1347a1395
 > 
-1327,1330c1373,1376
+1377,1380c1425,1428
 <     int function() itr_specific,
 <     int function() readrec,
 <     int function() seek,
@@ -235,7 +244,7 @@
 >     hts_readrec_func readrec,
 >     hts_seek_func seek,
 >     hts_tell_func tell);
-1487c1533,1540
+1537c1585,1592
 < int hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls);
 ---
 > pragma(inline,true)
@@ -246,7 +255,7 @@
 >         if (beg>>s == end>>s) return t + (beg>>s);
 >     return 0;
 > }
-1490c1543,1548
+1540c1595,1600
 < int hts_bin_level(int bin);
 ---
 > pragma(inline, true)
@@ -255,7 +264,7 @@
 >     for (l = 0, b = bin; b; ++l){ b = hts_bin_parent(b);}
 >     return l;
 > }
-1503c1561,1568
+1553c1613,1620
 < int hts_bin_bot(int bin, int n_lvls);
 ---
 > 
@@ -266,7 +275,7 @@
 >     int l = hts_bin_level(bin);
 >     return (bin - hts_bin_first(l)) << (n_lvls - l) * 3;
 > }
-1508,1515c1573,1614
+1558,1565c1625,1666
 < 
 < int ed_is_big();
 < ushort ed_swap_2(ushort v);

@@ -157,6 +157,9 @@ enum VCF_INDEL = 4;/// INDEL
 enum VCF_OTHER = 8;/// other (e.g. SV)
 enum VCF_BND = 16; // /// breakend
 enum VCF_OVERLAP = 32;/// overlapping deletion, ALT=* 
+enum VCF_INS = 64; 
+enum VCF_DEL = 128; 
+enum VCF_ANY = VCF_SNP | VCF_MNP | VCF_INDEL | VCF_OTHER | VCF_BND | VCF_OVERLAP | VCF_INS | VCF_DEL; 
 
 /// variant type record embedded in bcf_dec_t
 /// variant type and the number of bases affected, negative for deletions
@@ -354,6 +357,7 @@ void bcf_clear(bcf1_t* v);
 alias vcfFile = htsFile;
 alias bcf_open = hts_open;
 alias vcf_open = hts_open;
+alias bcf_flush = hts_flush;
 alias bcf_close = hts_close;
 alias vcf_close = hts_close;
 
@@ -782,12 +786,97 @@ int bcf_translate(
     bcf_hdr_t* src_hdr,
     bcf1_t* src_line);
 
+
 /**
- *  bcf_get_variant_type[s]()  - returns one of VCF_REF, VCF_SNP, etc
+ *  @param rec   BCF/VCF record
+ *  @return Types of variant present
+ *
+ *  The return value will be a bitwise-or of VCF_SNP, VCF_MNP,
+ *  VCF_INDEL, VCF_OTHER, VCF_BND or VCF_OVERLAP.  If will return
+ *  VCF_REF (i.e. 0) if none of the other types is present.
+ *  @deprecated Please use bcf_has_variant_types() instead
  */
 int bcf_get_variant_types(bcf1_t* rec);
 
+
+/*
+ *  @param  rec        BCF/VCF record
+ *  @param  ith_allele Allele to check
+ *  @return Type of variant present
+ *
+ *  The return value will be one of VCF_REF, VCF_SNP, VCF_MNP,
+ *  VCF_INDEL, VCF_OTHER, VCF_BND or VCF_OVERLAP.
+ *  @deprecated Please use bcf_has_variant_type() instead
+ */
 int bcf_get_variant_type(bcf1_t* rec, int ith_allele);
+
+
+enum bcf_variant_match
+{
+    bcf_match_exact = 0, 
+    bcf_match_overlap = 1, 
+    bcf_match_subset = 2 
+}
+
+
+/*
+ *  @param rec      BCF/VCF record
+ *  @param bitmask  Set of variant types to test for
+ *  @param mode     Match mode
+ *  @return >0 if the variant types are present,
+ *           0 if not present,
+ *          -1 on error
+ *
+ *  @p bitmask should be the bitwise-or of the variant types (VCF_SNP,
+ *     VCF_MNP, etc.) to test for.
+ *
+ *  The return value is the bitwise-and of the set of types present
+ *  and @p bitmask.  Callers that want to check for the presence of more
+ *  than one type can avoid function call overhead by passing all the
+ *  types to be checked for in a single call to this function, in
+ *  bcf_match_overlap mode, and then check for them individually in the
+ *  returned value.
+ *
+ *  As VCF_REF is represented by 0 (i.e. the absence of other variants)
+ *  it should be tested for using
+ *    bcf_has_variant_types(rec, VCF_REF, bcf_match_exact)
+ *  which will return 1 if no other variant type is present, otherwise 0.
+ */
+int bcf_has_variant_types(bcf1_t* rec, uint bitmask, bcf_variant_match mode);
+
+
+/*
+ *  @param rec         BCF/VCF record
+ *  @param ith_allele  Allele to check
+ *  @param bitmask     Set of variant types to test for
+ *  @return >0 if one of the variant types is present,
+ *           0 if not present,
+ *          -1 on error
+ *
+ *  @p bitmask should be the bitwise-or of the variant types (VCF_SNP,
+ *     VCF_MNP, etc.) to test for, or VCF_REF on its own.
+ *
+ *  The return value is the bitwise-and of the set of types present
+ *  and @p bitmask.  Callers that want to check for the presence of more
+ *  than one type can avoid function call overhead by passing all the
+ *  types to be checked for in a single call to this function, and then
+ *  check for them individually in the returned value.
+ *
+ *  As a special case, if @p bitmask is VCF_REF (i.e. 0), the function
+ *  tests for an exact match.  The return value will be 1 if the
+ *  variant type calculated for the allele is VCF_REF, otherwise if
+ *  any other type is present it will be 0.
+ */
+int bcf_has_variant_type(bcf1_t* rec, int ith_allele, uint bitmask);
+
+
+/*
+ *  @param rec         BCF/VCF record
+ *  @param ith_allele  Allele index
+ *  @return The number of bases affected (negative for deletions),
+ *          or bcf_int32_missing on error.
+ */
+int bcf_variant_length(bcf1_t* rec, int ith_allele);
 
 int bcf_is_snp(bcf1_t* v);
 

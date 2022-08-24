@@ -5,11 +5,7 @@
 > nothrow:
 > @nogc:
 > 
-34,36c37,39
+34,36d36
 < alias netread = read;
 < alias netwrite = write;
 < alias netclose = close;
----
-> 
-> 
-> 

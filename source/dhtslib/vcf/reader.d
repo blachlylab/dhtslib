@@ -214,7 +214,7 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
 
     auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-    assert(vcf.count == 14);
+    assert(vcf.count == 15);
     vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
     VCFRecord rec = vcf.front;
     assert(rec.chrom == "1");
@@ -247,10 +247,10 @@ debug(dhtslib_unittest) unittest
     vcf.popFront;
     vcf.popFront;
     auto range4 = vcf.save;
-    assert(range1.array.length == 14);
-    assert(range2.array.length == 13);
-    assert(range3.array.length == 11);
-    assert(range4.array.length == 8);
+    assert(range1.array.length == 15);
+    assert(range2.array.length == 14);
+    assert(range3.array.length == 12);
+    assert(range4.array.length == 9);
 }
 
 debug(dhtslib_unittest) unittest

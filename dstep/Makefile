@@ -104,7 +104,7 @@ headerPatchFiles = \
 	htslib_changes/vcf_sweep.diff \
 	htslib_changes/vcfutils.diff
 
-all: $(outputfiles) $(patchFiles) $(headerPatchFiles) $(changePatchFiles)
+all: $(outputfiles) $(patchFiles) $(changePatchFiles)
 .PHONY: all
 
 patches: $(patchFiles)
@@ -118,6 +118,7 @@ clean:
 	rm patches/*
 	rm output/*
 	rm /tmp/dstep/*
+	rm d_changes/*
 
 apply:
 	cp output/* ../source/htslib/
@@ -150,8 +151,7 @@ $(changePatchFiles): d_changes/%.diff: /tmp/dstep/%.d %.h
 # significant changes by ignoring
 # changes in comment style and whitespace
 $(headerPatchFiles): htslib_changes/%.diff: %.h
-	mkdir -p htslib_changes
-	diff $< ../source/htslib/include/$*.h > $@; [ $$? -eq 1 ]
+	diff $< ../source/htslib/include/$*.h > $@; [ $$? -lt 2 ]
 
 
 # patch converted to match bindings

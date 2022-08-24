@@ -2,37 +2,44 @@
 > import core.stdc.stddef;
 29a31
 > import std.format: format;
-30a33,38
+31c33,38
+< extern (C):
+---
 > import htslib.hts;
 > import htslib.hts_log;
 > import htslib.bgzf : BGZF;
-> import htslib.kstring : kstring_t, ssize_t;
-> 
+> import htslib.kstring;
+> import htslib.hts_endian;
+> import core.stdc.errno : EINVAL, ENOMEM, errno;
+33,34c40,42
+< // Ensure ssize_t exists within this header. All #includes must precede this,
+< // and ssize_t must be undefined again at the end of this header.
+---
 > @system:
-31a40
+> extern (C):
 > @nogc nothrow {
-310c319
+313c321
 < extern (D) auto bam_get_cigar(T)(auto ref T b)
 ---
 > extern (D) auto bam_get_cigar(bam1_t * b)
-312c321
+315c323
 <     return cast(uint*) b.data + b.core.l_qname;
 ---
 >     return cast(uint*) ((*b).data + (*b).core.l_qname);
-377a387,391
+380a389,393
 > extern (D) void bam_set_seqi(T0, T1, T3)(auto ref T0 s, auto ref T1 i, auto ref T3 b)
 > {
 >     s[i >> 1] = (s[i >> 1] & (0xf0 >> ((~i & 1) << 2))) | cast(ubyte)(b << ((~i & 1) << 2));
 > }
 > 
-439,441c453,454
+442,444c455,456
 < sam_hdr_t* bam_hdr_init();
 < void bam_hdr_destroy(sam_hdr_t* h);
 < sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0);
 ---
 > pragma(inline,true) 
 > sam_hdr_t* bam_hdr_init() { return sam_hdr_init(); }
-443c456,462
+446c458,464
 < alias samFile = htsFile_;
 ---
 > pragma(inline,true) 
@@ -42,12 +49,12 @@
 > sam_hdr_t* bam_hdr_dup(const(sam_hdr_t)* h0) { return sam_hdr_dup(h0); }
 > 
 > alias samFile = htsFile;
-834c853,854
+837c855,856
 < int bam_name2id(sam_hdr_t* h, const(char)* ref_);
 ---
 > pragma(inline,true)
 > int bam_name2id(sam_hdr_t* h, const(char)* ref_) { return sam_hdr_name2tid(h, ref_); }
-898a919,925
+901a921,927
 > extern (D) auto sam_hdr_update_hd(T, A...)(auto ref T h, auto ref A a)
 > {
 >     // NOTE: This macro was dropped by dstep due to variadic args
@@ -55,21 +62,32 @@
 >     return sam_hdr_update_line(h, "HD", null, null, a, null);
 > }
 > 
-1013c1040,1043
+1009,1013c1035,1036
+<    if (recs) {
+<       for (size_t i = 0; i < nrecs; i++)
+<          bam_destroy1(&recs[i]);
+<       free(recs);
+<    }
+---
+>    for (size_t i = 0; i < nrecs; i++)
+>      bam_destroy1(i);
+1014a1038
+>    free(recs);
+1018c1042,1045
 < void bam_set_mempolicy(bam1_t* b, uint policy);
 ---
 > pragma(inline,true)
 > void bam_set_mempolicy(bam1_t* b, uint policy) {
 >     b.mempolicy = policy;
 > }
-1020c1050,1053
+1025c1052,1055
 < uint bam_get_mempolicy(bam1_t* b);
 ---
 > pragma(inline,true)
 > uint bam_get_mempolicy(bam1_t* b) {
 >     return b.mempolicy;
 > }
-1202c1235,1240
+1207c1237,1242
 < alias bam_itr_next = sam_itr_next;
 ---
 > 
@@ -78,10 +96,10 @@
 > {
 >     return hts_itr_next(htsfp.fp.bgzf, itr, r, 0);
 > }
-1413a1452,1453
+1418a1454,1455
 > } /// closing @nogc
 > 
-1420c1460,1477
+1425c1462,1479
 < int sam_itr_next(htsFile* htsfp, hts_itr_t* itr, bam1_t* r);
 ---
 > pragma(inline,true)
@@ -102,43 +120,246 @@
 > }
 > 
 > @nogc nothrow:
-1442,1450c1499,1500
-< extern (D) auto sam_open(T0, T1)(auto ref T0 fn, auto ref T1 mode)
-< {
-<     return hts_open(fn, mode);
-< }
-< 
-< extern (D) auto sam_open_format(T0, T1, T2)(auto ref T0 fn, auto ref T1 mode, auto ref T2 fmt)
-< {
-<     return hts_open_format(fn, mode, fmt);
-< }
+1504,1506c1558,1560
+< /*************************************
+<  *** Manipulating auxiliary fields ***
+<  *************************************/
 ---
-> alias sam_open = hts_open;
-> alias sam_open_format = hts_open_format;
-1966,1968c2016,2017
+>     /*************************************
+>      *** Manipulating auxiliary fields ***
+>      *************************************/
+1527,1551c1581,1753
+< 
+< // brevity and consistency with other code.
+< 
+< // cast to avoid triggering -Wdouble-promotion
+< 
+< // NB: "d" is not an official type in the SAM spec.
+< // However for unknown reasons samtools has always supported this.
+< // We believe, HOPE, it is not in general usage and we do not
+< // encourage it.
+< 
+< // or externalise sam.c's aux_type2size function?
+< 
+< // now points to the start of the array
+< 
+< // write the type
+< 
+< // cast to avoid triggering -Wdouble-promotion
+< 
+< // Unknown type
+< const(ubyte)* sam_format_aux1(
+<     const(ubyte)* key,
+<     const ubyte type,
+<     const(ubyte)* tag,
+<     const(ubyte)* end,
+<     kstring_t* ks);
+---
+> pragma(inline, true) const(ubyte)* sam_format_aux1(const ubyte *key,
+>                                              const ubyte type,
+>                                              const ubyte *tag,
+>                                              const ubyte *end,
+>                                              kstring_t *ks) {
+>     int r = 0;
+>     const(ubyte) *s = tag; // brevity and consistency with other code.
+>     r |= kputsn_(cast(char*)key, 2, ks) < 0;
+>     r |= kputc_(':', ks) < 0;
+>     if (type == 'C') {
+>         r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+>         r |= kputw(*s, ks) < 0;
+>         ++s;
+>     } else if (type == 'c') {
+>         r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+>         r |= kputw(*cast(byte*)s, ks) < 0;
+>         ++s;
+>     } else if (type == 'S') {
+>         if (end - s >= 2) {
+>             r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+>             r |= kputuw(le_to_u16(s), ks) < 0;
+>             s += 2;
+>         } else goto bad_aux;
+>     } else if (type == 's') {
+>         if (end - s >= 2) {
+>             r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+>             r |= kputw(le_to_i16(s), ks) < 0;
+>             s += 2;
+>         } else goto bad_aux;
+>     } else if (type == 'I') {
+>         if (end - s >= 4) {
+>             r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+>             r |= kputuw(le_to_u32(s), ks) < 0;
+>             s += 4;
+>         } else goto bad_aux;
+>     } else if (type == 'i') {
+>         if (end - s >= 4) {
+>             r |= kputsn_(cast(char*)"i:", 2, ks) < 0;
+>             r |= kputw(le_to_i32(s), ks) < 0;
+>             s += 4;
+>         } else goto bad_aux;
+>     } else if (type == 'A') {
+>         r |= kputsn_(cast(char*)"A:", 2, ks) < 0;
+>         r |= kputc_(*s, ks) < 0;
+>         ++s;
+>     } else if (type == 'f') {
+>         if (end - s >= 4) {
+>             // cast to avoid triggering -Wdouble-promotion
+>             ksprintf(ks, cast(char*)"f:%g", cast(double)le_to_float(s));
+>             s += 4;
+>         } else goto bad_aux;
+> 
+>     } else if (type == 'd') {
+>         // NB: "d" is not an official type in the SAM spec.
+>         // However for unknown reasons samtools has always supported this.
+>         // We believe, HOPE, it is not in general usage and we do not
+>         // encourage it.
+>         if (end - s >= 8) {
+>             ksprintf(ks, "d:%g", le_to_double(s));
+>             s += 8;
+>         } else goto bad_aux;
+>     } else if (type == 'Z' || type == 'H') {
+>         r |= kputc_(type, ks) < 0;
+>         r |= kputc_(':', ks) < 0;
+>         while (s < end && *s) r |= kputc_(*s++, ks) < 0;
+>         if (s >= end)
+>             goto bad_aux;
+>         ++s;
+>     } else if (type == 'B') {
+>         ubyte sub_type = *(s++);
+>         int sub_type_size;
+> 
+>         // or externalise sam.c's aux_type2size function?
+>         switch (sub_type) {
+>         case 'A': case 'c': case 'C':
+>             sub_type_size = 1;
+>             break;
+>         case 's': case 'S':
+>             sub_type_size = 2;
+>             break;
+>         case 'i': case 'I': case 'f':
+>             sub_type_size = 4;
+>             break;
+>         default:
+>             sub_type_size = 0;
+>             break;
+>         }
+> 
+>         uint i, n;
+>         if (sub_type_size == 0 || end - s < 4)
+>             goto bad_aux;
+>         n = le_to_u32(s);
+>         s += 4; // now points to the start of the array
+>         if ((end - s) / sub_type_size < n)
+>             goto bad_aux;
+>         r |= kputsn_(cast(char*)"B:", 2, ks) < 0;
+>         r |= kputc(sub_type, ks) < 0; // write the type
+>         switch (sub_type) {
+>         case 'c':
+>             if (ks_expand(ks, n*2) < 0) goto mem_err;
+>             for (i = 0; i < n; ++i) {
+>                 ks.s[ks.l++] = ',';
+>                 r |= kputw(*cast(byte*)s, ks) < 0;
+>                 ++s;
+>             }
+>             break;
+>         case 'C':
+>             if (ks_expand(ks, n*2) < 0) goto mem_err;
+>             for (i = 0; i < n; ++i) {
+>                 ks.s[ks.l++] = ',';
+>                 r |= kputuw(*cast(ubyte*)s, ks) < 0;
+>                 ++s;
+>             }
+>             break;
+>         case 's':
+>             if (ks_expand(ks, n*4) < 0) goto mem_err;
+>             for (i = 0; i < n; ++i) {
+>                 ks.s[ks.l++] = ',';
+>                 r |= kputw(le_to_i16(s), ks) < 0;
+>                 s += 2;
+>             }
+>             break;
+>         case 'S':
+>             if (ks_expand(ks, n*4) < 0) goto mem_err;
+>             for (i = 0; i < n; ++i) {
+>                 ks.s[ks.l++] = ',';
+>                 r |= kputuw(le_to_u16(s), ks) < 0;
+>                 s += 2;
+>             }
+>             break;
+>         case 'i':
+>             if (ks_expand(ks, n*6) < 0) goto mem_err;
+>             for (i = 0; i < n; ++i) {
+>                 ks.s[ks.l++] = ',';
+>                 r |= kputw(le_to_i32(s), ks) < 0;
+>                 s += 4;
+>             }
+>             break;
+>         case 'I':
+>             if (ks_expand(ks, n*6) < 0) goto mem_err;
+>             for (i = 0; i < n; ++i) {
+>                 ks.s[ks.l++] = ',';
+>                 r |= kputuw(le_to_u32(s), ks) < 0;
+>                 s += 4;
+>             }
+>             break;
+>         case 'f':
+>             if (ks_expand(ks, n*8) < 0) goto mem_err;
+>             for (i = 0; i < n; ++i) {
+>                 ks.s[ks.l++] = ',';
+>                 // cast to avoid triggering -Wdouble-promotion
+>                 r |= kputd(cast(double)le_to_float(s), ks) < 0;
+>                 s += 4;
+>             }
+>             break;
+>         default:
+>             goto bad_aux;
+>         }
+>     } else { // Unknown type
+>         goto bad_aux;
+>     }
+>     return r ? null : s;
+> 
+>  bad_aux:
+>     errno = EINVAL;
+>     return null;
+> 
+>  mem_err:
+>     import dhtslib.memory: hts_log_errorNoGC;
+>     hts_log_errorNoGC!__FUNCTION__("Out of memory");
+>     errno = ENOMEM;
+>     return null;
+> }
+1923c2125
+< /*! @typedef
+---
+> /**! @typedef
+2010,2012c2212,2213
 < // Used as flag parameter in sam_prob_realn.
 < enum htsRealnFlags
 < {
 ---
 > /// Used as flag parameter in sam_prob_realn.
 > enum htsRealnFlags {
-1974,1979c2023,2028
-<     BAQ_AUTO = 0 << 3,
-<     BAQ_ILLUMINA = 1 << 3,
-<     BAQ_PACBIOCCS = 2 << 3,
-<     BAQ_PACBIO = 3 << 3,
-<     BAQ_ONT = 4 << 3,
-<     BAQ_GENAPSYS = 5 << 3
+2083c2284
+< /*! @typedef
 ---
->     BAQ_AUTO = 0<<3,
->     BAQ_ILLUMINA = 1<<3,
->     BAQ_PACBIOCCS = 2<<3,
->     BAQ_PACBIO = 3<<3,
->     BAQ_ONT = 4<<3,
->     BAQ_GENAPSYS = 5<<3
-2001a2051
+> /**! @typedef
+2210,2211c2411,2412
+< /// Returns data about a specific modification type for the alignment record.
+< /**
+---
 > 
-2028a2079
+> /*
+2235,2237c2436,2438
+< /// Returns the list of base modification codes provided for this
+< /// alignment record as an array of character codes (+ve) or ChEBI numbers
+< /// (negative).
+---
 > 
-2033a2085
 > 
+> 
+2248,2249c2449
+< int* bam_mods_recorded(hts_base_mod_state* state, int* ntype);
+< 
+---
+> int* bam_mods_recorded(hts_base_mod_state* state, int* ntype);
+\ No newline at end of file

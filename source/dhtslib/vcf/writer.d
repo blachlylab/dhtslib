@@ -378,7 +378,7 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.vcf");
-        assert(vcf.count == 14);
+        assert(vcf.count == 15);
         vcf = VCFReader("/tmp/test_vcf.vcf");
 
         VCFRecord rec = vcf.front;
@@ -402,7 +402,7 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.bcf");
-        assert(vcf.count == 14);
+        assert(vcf.count == 15);
         vcf = VCFReader("/tmp/test_vcf.bcf");
         
         VCFRecord rec = vcf.front;
@@ -426,7 +426,7 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.vcf.gz");
-        assert(vcf.count == 14);
+        assert(vcf.count == 15);
         vcf = VCFReader("/tmp/test_vcf.vcf.gz");
         
         VCFRecord rec = vcf.front;
@@ -463,7 +463,7 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.cvcf");
-        assert(vcf.count == 14);
+        assert(vcf.count == 15);
         vcf = VCFReader("/tmp/test_vcf.cvcf");
 
         VCFRecord rec = vcf.front;
@@ -487,7 +487,7 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.ubcf");
-        assert(vcf.count == 14);
+        assert(vcf.count == 15);
         vcf = VCFReader("/tmp/test_vcf.ubcf");
         
         VCFRecord rec = vcf.front;
@@ -511,7 +511,7 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.txt");
-        assert(vcf.count == 14);
+        assert(vcf.count == 15);
         vcf = VCFReader("/tmp/test_vcf.txt");
         
         VCFRecord rec = vcf.front;

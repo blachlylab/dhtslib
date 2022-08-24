@@ -1,7 +1,3 @@
-4c4
-<     Copyright (C) 2012-2021 Genome Research Ltd.
----
->     Copyright (C) 2012-2020 Genome Research Ltd.
 27d26
 < 
 34a34,44
@@ -60,20 +56,20 @@
 ---
 > /// Specific format (SAM, BAM, CRAM, BCF, VCF, TBI, BED, etc.)
 > enum htsExactFormat // @suppress(dscanner.style.phobos_naming_convention)
-180c202
+181c203
 <     format_maximum = 32767
 ---
 >     format_maximum = 32_767
-183c205,206
+184c206,207
 < enum htsCompression
 ---
 > /// Compression type
 > enum htsCompression // @suppress(dscanner.style.phobos_naming_convention)
-191c214
+194c217
 <     compression_maximum = 32767
 ---
 >     compression_maximum = 32_767
-196,208c219,226
+199,211c222,229
 <     htsFormatCategory category;
 <     htsExactFormat format;
 < 
@@ -96,11 +92,11 @@
 >     htsCompression compression; /// Compression type
 >     short compression_level;/// currently unused
 >     void *specific;         /// format specific options; see struct hts_opt.
-230c248
+233c251
 < struct htsFile
 ---
 > struct htsFile // @suppress(dscanner.style.phobos_naming_convention)
-241,251c259,267
+244,254c262,270
 < 
 <     long lineno;
 <     kstring_t line;
@@ -122,16 +118,16 @@
 >         BGZF *bgzf;     /// see bgzf.d
 >         cram_fd *cram;  /// see cram.d
 >         hFILE *hfile;   /// see hfile.d
-253,254c269
+256,257c272
 < 
 <     _Anonymous_1 fp;
 ---
 >     FP fp;              /// hFile plus any needed bgzf or CRAM (if applicable) structure data
-256c271
+259c274
 <     htsFormat format;
 ---
 >     htsFormat format;   /// hts file complete file format information
-263,270c278,285
+266,273c281,288
 < // A combined thread pool and queue allocation size.
 < // The pool should already be defined, but qsize may be zero to
 < // indicate an appropriate queue size is taken from the pool.
@@ -149,36 +145,32 @@
 > /// descriptors are in use than threads, so keeping memory low is
 > /// important.
 > struct htsThreadPool // @suppress(dscanner.style.phobos_naming_convention)
-276,277c291,292
+279,280c294,295
 < // REQUIRED_FIELDS
 < enum sam_fields
 ---
 > /// REQUIRED_FIELDS
 > enum sam_fields // @suppress(dscanner.style.phobos_naming_convention)
-294c309
+297c312
 < // Mostly CRAM only, but this could also include other format options
 ---
 > /// Mostly CRAM only, but this could also include other format options
-364c379
-<     FASTQ_OPT_BARCODE = 1003
----
->     FASTQ_OPT_BARCODE = 1003,
-367,368c382,383
+375,376c390,391
 < // Profile options for encoding; primarily used at present in CRAM
 < // but also usable in BAM as a synonym for deflate compression levels.
 ---
 > /// Profile options for encoding; primarily used at present in CRAM
 > /// but also usable in BAM as a synonym for deflate compression levels.
-377c392
+385c400
 < // For backwards compatibility
 ---
 > /// For backwards compatibility
-380c395,396
+388c403,404
 < struct hts_opt
 ---
 > /// Options for cache, (de)compression, threads, CRAM, etc.
 > struct hts_opt // @suppress(dscanner.style.phobos_naming_convention)
-382,388c398,403
+390,396c406,411
 <     char* arg; // string form, strdup()ed
 <     hts_fmt_option opt; // tokenised key
 <     // ... and value
@@ -193,17 +185,13 @@
 >     union VAL {         /// ... and value
 >         int i;          /// int value
 >         char *s;        /// string value
-390,392c405,406
+398,400c413,414
 < 
 <     _Anonymous_2 val;
 <     hts_opt* next;
 ---
 >     VAL val;            /// value
 >     hts_opt *next;      /// next option (linked list)
-404c418
-< /*
----
-> /**
 412c426
 < /*
 ---
@@ -212,17 +200,21 @@
 < /*
 ---
 > /**
-425c439
+428c442
 < /*
 ---
 > /**
-435c449
+433c447
 < /*
 ---
 > /**
-453d466
+443c457
+< /*
+---
+> /**
+461d474
 < extern __gshared const(ubyte)[256] seq_nt16_table;
-455c468,491
+463c476,499
 < /*! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
 ---
 > version(Windows){
@@ -249,16 +241,16 @@
 >     extern __gshared const(ubyte)[256] seq_nt16_table;
 > }
 > /**! @abstract Table for converting a 4-bit encoded nucleotide to an IUPAC
-458d493
+466d501
 < extern __gshared const(char)[] seq_nt16_str;
-460c495,498
+468c503,506
 < /*! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
 ---
 > version(Windows) __gshared const(char)[16] seq_nt16_str = ['=','A','C','M','G','R','S','V','T','W','Y','H','K','D','B','N'];
 > else extern __gshared const(char)[16] seq_nt16_str;
 > 
 > /**! @abstract Table for converting a 4-bit encoded nucleotide to about 2 bits.
-463,465c501,503
+471,473c509,511
 < extern __gshared const(int)[] seq_nt16_int;
 < 
 < /*!
@@ -266,121 +258,140 @@
 > version(Windows) __gshared const(int)[16] seq_nt16_int = [ 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 ];
 > else extern __gshared const(int)[16] seq_nt16_int;
 > /**!
-472c510
+480c518
 < /*!
 ---
 > /**!
-484c522
+492c530
 < /*! @abstract Introspection on the features enabled in htslib
 ---
 > /**! @abstract Introspection on the features enabled in htslib
-492c530
+500c538
 < /*! @abstract Introspection on the features enabled in htslib, string form
 ---
 > /**! @abstract Introspection on the features enabled in htslib, string form
-498c536
+506c544
 < // Whether ./configure was used or vanilla Makefile
 ---
 > /// Whether ./configure was used or vanilla Makefile
-501c539
+509c547
 < // Whether --enable-plugins was used
 ---
 > /// Whether --enable-plugins was used
-504c542
+512c550
 < // Transport specific
 ---
 > /// Transport specific
-509c547
+517c555
 < // Compression options
 ---
 > /// Compression options
-515c553
+523c561
 < // Build params
 ---
 > /// Build params
-521c559
-< /*!
----
-> /**!
 529c567
 < /*!
 ---
 > /**!
-536c574
+539c577
+< /*!
+---
+> /**History: !
+546c584
+< 
+---
+>  
+555c593
 < /*!
 ---
 > /**!
-550,551d587
-<         f  FASTQ format
-<         F  FASTA format
-570c606
+562c600
 < /*!
 ---
 > /**!
-589c625
+596c634
 < /*!
 ---
 > /**!
-596c632
+615,622c653
+< /*!
+<   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file
+<   @param fn       The already-open file handle
+<   @param mode     Open mode, as per hts_open()
+< */
+< htsFile* hts_hopen(hFILE* fp, const(char)* fn, const(char)* mode);
+< 
 < /*!
 ---
 > /**!
-603c639
+630c661,668
 < /*!
 ---
 > /**!
-610c646
+>   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file
+>   @param fn       The already-open file handle
+>   @param mode     Open mode, as per hts_open()
+> */
+> htsFile* hts_hopen(hFILE* fp, const(char)* fn, const(char)* mode);
+> 
+> /**!
+637c675
 < /*!
 ---
 > /**!
-617c653
+644c682
 < /*!
 ---
 > /**!
-626c662
+651c689
 < /*!
 ---
 > /**!
-637c673
+660c698
 < /*!
 ---
 > /**!
-647c683
+671c709
 < /*!
 ---
 > /**!
-657c693
+681c719
 < /*!
 ---
 > /**!
-665c701
+691c729
 < /*!
 ---
 > /**!
-682c718
+699c737
 < /*!
 ---
 > /**!
-690c726
+716c754
 < /*!
 ---
 > /**!
-706c742
+724c762
 < /*!
 ---
 > /**!
-750c786
+740c778
+< /*!
+---
+> /**!
+784c822
 < struct hts_pair64_t
 ---
 > struct hts_pair64_t // @suppress(dscanner.style.phobos_naming_convention)
-756c792,793
+790c828,829
 < struct hts_pair64_max_t
 ---
 > /// 64-bit start, end coordinate pair tracking max (internally used in hts.c)
 > struct hts_pair64_max_t // @suppress(dscanner.style.phobos_naming_convention)
-762a800
+796a836
 > /// Region list used in iterators (NB: apparently confined to single contig/tid)
-765,770c803,808
+799,804c839,844
 <     const(char)* reg;
 <     hts_pair_pos_t* intervals;
 <     int tid;
@@ -394,15 +405,15 @@
 >     uint count;         /// How many intervals
 >     hts_pos_t min_beg;  /// absolute bounds
 >     hts_pos_t max_end;  /// absolute bounds
-816c854
+850c890
 < struct hts_itr_t
 ---
 > struct hts_itr_t // @suppress(dscanner.style.phobos_naming_convention)
-847c885
+881c921
 <     struct _Anonymous_3
 ---
 >     struct Bins
-854c892,898
+888c928,934
 <     _Anonymous_3 bins;
 ---
 >     Bins bins;
@@ -412,15 +423,15 @@
 >     int key;    /// ???
 >     /// ???
 >     ulong min_off, max_off;
-859c903
+893c939
 < /// Compute the first bin on a given level
 ---
 > pragma(inline, true)
-865c909
+899c945
 < /// Compute the parent bin of a given bin
 ---
 > pragma(inline, true)
-1033,1035c1077,1081
+1067,1069c1113,1117
 < enum HTS_IDX_SAVE_REMOTE = 1;
 < enum HTS_IDX_SILENT_FAIL = 2;
 < 
@@ -430,7 +441,7 @@
 >     HTS_IDX_SAVE_REMOTE = 1,
 >     HTS_IDX_SILENT_FAIL = 2
 > }
-1107,1111c1153
+1141,1145c1189
 < const(char*)* hts_idx_seqnames(
 <     const(hts_idx_t)* idx,
 <     int* n,
@@ -438,11 +449,11 @@
 <     void* hdr); // free only the array, not the values
 ---
 > const(char *)* hts_idx_seqnames(const(hts_idx_t)* idx, int* n, hts_id2name_f getid, void* hdr); // free only the array, not the values
-1117c1159
+1151c1195
 < int hts_idx_nseq(const(hts_idx_t)* idx);
 ---
 > int hts_idx_nseq(const(hts_idx_t) *idx);
-1122,1124c1164,1169
+1156,1158c1200,1205
 < enum HTS_PARSE_THOUSANDS_SEP = 1; ///< Ignore ',' separators within numbers
 < enum HTS_PARSE_ONE_COORD = 2; ///< chr:pos means chr:pos-pos and not chr:pos-end
 < enum HTS_PARSE_LIST = 4; ///< Expect a comma separated list of regions. (Disables HTS_PARSE_THOUSANDS_SEP)
@@ -453,35 +464,35 @@
 >     HTS_PARSE_ONE_COORD = 2, ///< chr:pos means chr:pos-pos and not chr:pos-end
 >     HTS_PARSE_LIST = 4, ///< Expect a comma separated list of regions. (Disables HTS_PARSE_THOUSANDS_SEP)
 > }
-1138c1183
+1188c1235
 < long hts_parse_decimal(const(char)* str, char** strend, int flags);
 ---
 > long hts_parse_decimal(const(char)* str, char** strend, HTS_PARSE_FLAGS flags);
-1140c1185
+1190c1237
 < alias hts_name2id_f = int function(void*, const(char)*);
 ---
 > alias hts_name2id_f = int function(void*, const(char)*) *;
-1231c1276
+1281c1328
 <     int flags);
 ---
 >     HTS_PARSE_FLAGS flags);
-1259c1304
+1309c1356
 <     int function() readrec);
 ---
 >     hts_readrec_func readrec);
-1266c1311
+1316c1363
 < alias hts_itr_query_func = hts_itr_t* function(const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, int function() readrec);
 ---
 > alias hts_itr_query_func = hts_itr_t* function(const(hts_idx_t)* idx, int tid, hts_pos_t beg, hts_pos_t end, hts_readrec_func readrec);
-1286,1287c1331,1332
+1336,1337c1383,1384
 <     hts_itr_t* function() itr_query,
 <     int function() readrec);
 ---
 >     hts_itr_query_func itr_query,
 >     hts_readrec_func readrec);
-1297a1343
+1347a1395
 > 
-1327,1330c1373,1376
+1377,1380c1425,1428
 <     int function() itr_specific,
 <     int function() readrec,
 <     int function() seek,
@@ -491,7 +502,7 @@
 >     hts_readrec_func readrec,
 >     hts_seek_func seek,
 >     hts_tell_func tell);
-1487c1533,1540
+1537c1585,1592
 < int hts_reg2bin(hts_pos_t beg, hts_pos_t end, int min_shift, int n_lvls);
 ---
 > pragma(inline,true)
@@ -502,7 +513,7 @@
 >         if (beg>>s == end>>s) return t + (beg>>s);
 >     return 0;
 > }
-1490c1543,1548
+1540c1595,1600
 < int hts_bin_level(int bin);
 ---
 > pragma(inline, true)
@@ -511,7 +522,7 @@
 >     for (l = 0, b = bin; b; ++l){ b = hts_bin_parent(b);}
 >     return l;
 > }
-1503c1561,1568
+1553c1613,1620
 < int hts_bin_bot(int bin, int n_lvls);
 ---
 > 
@@ -522,7 +533,7 @@
 >     int l = hts_bin_level(bin);
 >     return (bin - hts_bin_first(l)) << (n_lvls - l) * 3;
 > }
-1508,1515c1573,1614
+1558,1565c1625,1666
 < 
 < int ed_is_big();
 < ushort ed_swap_2(ushort v);

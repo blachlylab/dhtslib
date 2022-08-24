@@ -1,7 +1,7 @@
 /// @file htslib/synced_bcf_reader.h
 /// Stream through multiple VCF files.
 /*
-    Copyright (C) 2012-2017, 2019-2020 Genome Research Ltd.
+    Copyright (C) 2012-2017, 2019-2021 Genome Research Ltd.
 
     Author: Petr Danecek <pd3@sanger.ac.uk>
 
@@ -99,7 +99,9 @@ enum bcf_sr_opt_t
 {
     BCF_SR_REQUIRE_IDX = 0,
     BCF_SR_PAIR_LOGIC = 1, // combination of the PAIR_* values above
-    BCF_SR_ALLOW_NO_IDX = 2 // allow to proceed even if required index is not present (at the user's risk)
+    BCF_SR_ALLOW_NO_IDX = 2, // allow to proceed even if required index is not present (at the user's risk)
+    BCF_SR_REGIONS_OVERLAP = 3, // include overlapping records with POS outside the regions: 0=no, 1=VCF line overlap, 2=true variant overlap [1]
+    BCF_SR_TARGETS_OVERLAP = 4 // include overlapping records with POS outside the targets: 0=no, 1=VCF line overlap, 2=true variant overlap [0]
 }
 
 struct bcf_sr_region_t;
@@ -136,6 +138,7 @@ struct bcf_sr_regions_t
     int prev_seq;
     hts_pos_t prev_start;
     hts_pos_t prev_end;
+    int overlap; // see BCF_SR_REGIONS_OVERLAP/BCF_SR_TARGETS_OVERLAP
 }
 
 struct bcf_sr_t

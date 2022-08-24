@@ -17,19 +17,23 @@
 > import htslib.kroundup;
 > 
 > alias ssize_t = ptrdiff_t;	// should be defined in core.stdc somewhere but is not :/
-89,90c98,99
+39,41d47
+< // Ensure ssize_t exists within this header. All #includes must precede this,
+< // and ssize_t must be undefined again at the end of this header.
+< 
+92,93c98,99
 < alias kgets_func = char* function(char*, int, void*);
 < int kgetline(kstring_t* s, char* function() fgets_fn, void* fp);
 ---
 > alias kgets_func = char* function(char*, int, void*)*;
 > int kgetline(kstring_t* s, kgets_func fgets_fn, void* fp);
-96,97c105,106
+99,100c105,106
 < alias kgets_func2 = c_long function(char*, size_t, void*);
 < int kgetline2(kstring_t* s, ssize_t function() fgets_fn, void* fp);
 ---
 > alias kgets_func2 = c_long function(char*, size_t, void*)*;
 > int kgetline2(kstring_t* s, kgets_func2 fgets_fn, void* fp);
-107c116,120
+110c116,120
 < void ks_initialize(kstring_t* s);
 ---
 > void ks_initialize(kstring_t* s)
@@ -37,7 +41,7 @@
 >     s.l = s.m = 0;
 >     s.s = null;
 > }
-110c123,135
+113c123,135
 < int ks_resize(kstring_t* s, size_t size);
 ---
 > int ks_resize(kstring_t* s, size_t size)
@@ -53,11 +57,11 @@
 > 	}
 > 	return 0;
 > }
-112a138,140
+115a138,140
 > int ks_expand(kstring_t* s, size_t expansion)
 > {
 >     size_t new_size = s.l + expansion;
-114,115c142,145
+117,118c142,145
 < // Overflow check
 < int ks_expand(kstring_t* s, size_t expansion);
 ---
@@ -65,28 +69,28 @@
 >         return -1;
 >     return ks_resize(s, new_size);
 > }
-118c148,151
+121c148,151
 < char* ks_str(kstring_t* s);
 ---
 > char* ks_str(kstring_t* s)
 > {
 > 	return s.s;
 > }
-126c159,162
+129c159,162
 < const(char)* ks_c_str(kstring_t* s);
 ---
 > const(char)* ks_c_str(kstring_t* s)
 > {
 >     return s.l && s.s ? s.s : "";
 > }
-128c164,167
+131c164,167
 < size_t ks_len(kstring_t* s);
 ---
 > size_t ks_len(kstring_t* s)
 > {
 > 	return s.l;
 > }
-136c175,179
+139c175,179
 < kstring_t* ks_clear(kstring_t* s);
 ---
 > kstring_t* ks_clear(kstring_t* s)
@@ -94,7 +98,7 @@
 >     s.l = 0;
 >     return s;
 > }
-142c185,191
+145c185,191
 < char* ks_release(kstring_t* s);
 ---
 > char* ks_release(kstring_t* s)
@@ -104,7 +108,7 @@
 > 	s.s = null;
 > 	return ss;
 > }
-145,153c194,200
+148,156c194,200
 < void ks_free(kstring_t* s);
 < 
 < int kputsn(const(char)* p, size_t l, kstring_t* s);
@@ -122,7 +126,7 @@
 >         ks_initialize(s);
 >     }
 > }
-155c202,211
+158c202,211
 < int kputsn_(const(void)* p, size_t l, kstring_t* s);
 ---
 > int kputsn(const(char)* p, size_t l, kstring_t* s)
@@ -135,14 +139,14 @@
 > 	s.s[s.l] = 0;
 > 	return cast(int)l;	// no implicit down casting
 > }
-157c213,216
+160c213,216
 < // Trivial case - also prevents __builtin_clz(0), which is undefined
 ---
 > int kputs(const(char)* p, kstring_t* s)
 > {
 > 	return kputsn(p, strlen(p), s);
 > }
-159c218,225
+162c218,225
 < // Find out how many digits are to be printed.
 ---
 > int kputc(int c, kstring_t* s)
@@ -153,7 +157,7 @@
 > 	s.s[s.l] = 0;
 > 	return cast(ubyte)c;
 > }
-161,168c227,233
+164,171c227,233
 < /*
 <  * Table method - should be quick if clz can be done in hardware.
 <  * Find the most significant bit of the value to print and look
@@ -170,7 +174,7 @@
 > 	s.s[s.l++] = cast(char)c;	// no implicit down casting
 > 	return 1;
 > }
-170c235,243
+173c235,243
 < // Fallback for when clz is not available
 ---
 > int kputsn_(const(void)* p, size_t l, kstring_t* s)
@@ -182,7 +186,7 @@
 > 	s.l += l;
 > 	return cast(int)l;	// no implicit down casting
 > }
-172c245,332
+175c245,332
 < // Add digits two at a time
 ---
 > // htslib 1.10 replaced this function with a higher performance
@@ -273,7 +277,7 @@
 >     s.s[s.l] = 0;
 >     return 0;
 > }
-174,175c334,342
+177,178c334,342
 < // Last one (if necessary).  We know that x < 10 by now.
 < int kputuw(uint x, kstring_t* s);
 ---
@@ -286,12 +290,12 @@
 >             return EOF;
 >         s.s[s.l++] = '-';
 >     }
-177c344,345
+180c344,345
 < int kputw(int c, kstring_t* s);
 ---
 >     return kputuw(x, s);
 > }
-179c347,360
+182c347,360
 < int kputll(long c, kstring_t* s);
 ---
 > int kputll(long c, kstring_t* s)
@@ -308,13 +312,13 @@
 > 	s.s[s.l] = 0;
 > 	return 0;
 > }
-181c362,364
+184c362,364
 < int kputl(c_long c, kstring_t* s);
 ---
 > int kputl(c_long c, kstring_t* s) {
 >     return kputll(c, s);
 > }
-187,188c370,376
+190,191c370,376
 < int* ksplit(kstring_t* s, int delimiter, int* n);
 < 
 ---

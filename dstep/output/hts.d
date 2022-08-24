@@ -1,7 +1,7 @@
 /// @file htslib/hts.h
 /// Format-neutral I/O, indexing, and iterator API functions.
 /*
-    Copyright (C) 2012-2020 Genome Research Ltd.
+    Copyright (C) 2012-2022 Genome Research Ltd.
     Copyright (C) 2010, 2012 Broad Institute.
     Portions copyright (C) 2003-2006, 2008-2010 by Heng Li <lh3@live.co.uk>
 
@@ -199,6 +199,7 @@ enum htsExactFormat // @suppress(dscanner.style.phobos_naming_convention)
     fai_format = 18,
     fqi_format = 19,
     hts_crypt4gh_format = 20,
+    d4_format = 21,
     format_maximum = 32_767
 }
 
@@ -211,6 +212,8 @@ enum htsCompression // @suppress(dscanner.style.phobos_naming_convention)
     custom = 3,
     bzip2_compression = 4,
     razf_compression = 5,
+    xz_compression = 6,
+    zstd_compression = 7,
     compression_maximum = 32_767
 }
 
@@ -377,6 +380,11 @@ enum hts_fmt_option
     // Two character string.
     // Barcode aux tag for CASAVA; defaults to "BC".
     FASTQ_OPT_BARCODE = 1003,
+
+    // Process SRA and ENA read names which pointlessly move the original
+    // name to the second field and insert a constructed <run>.<number>
+    // name in its place.
+    FASTQ_OPT_NAME2 = 1004
 }
 
 /// Profile options for encoding; primarily used at present in CRAM
@@ -517,7 +525,7 @@ const(char)* hts_version();
 // Immediately after release, bump ZZ to 90 to distinguish in-development
 // Git repository builds from the release; you may wish to increment this
 // further when significant features are merged.
-enum HTS_VERSION = 101300;
+enum HTS_VERSION = 101600;
 
 /**! @abstract Introspection on the features enabled in htslib
  *
@@ -561,8 +569,26 @@ enum HTS_FEATURE_LDFLAGS = 1u << 30;
   @param fp    File opened for reading, positioned at the beginning
   @param fmt   Format structure that will be filled out on return
   @return      0 for success, or negative if an error occurred.
+
+  Equivalent to hts_detect_format2(fp, NULL, fmt).
 */
 int hts_detect_format(hFILE* fp, htsFormat* fmt);
+
+/**History: !
+  @abstract    Determine format primarily by peeking at the start of a file
+  @param fp    File opened for reading, positioned at the beginning
+  @param fname Name of the file, or NULL if not available
+  @param fmt   Format structure that will be filled out on return
+  @return      0 for success, or negative if an error occurred.
+  @since       1.15
+ 
+Some formats are only recognised if the filename is available and has the
+expected extension, as otherwise more generic files may be misrecognised.
+In particular:
+ - FASTA/Q indexes must have .fai/.fqi extensions; without this requirement,
+   some similar BED files would be misrecognised as indexes.
+*/
+int hts_detect_format2(hFILE* fp, const(char)* fname, htsFormat* fmt);
 
 /**!
   @abstract    Get a human-readable description of the file format
@@ -585,6 +611,8 @@ char* hts_format_description(const(htsFormat)* format);
       specifier letters:
         b  binary format (BAM, BCF, etc) rather than text (SAM, VCF, etc)
         c  CRAM format
+        f  FASTQ format
+        F  FASTA format
         g  gzip compressed
         u  uncompressed
         z  bgzf compressed
@@ -621,6 +649,14 @@ htsFile* hts_open_format(
     const(char)* fn,
     const(char)* mode,
     const(htsFormat)* fmt);
+
+/**!
+  @abstract  For output streams, flush any buffered data
+  @param fp  The file handle to be flushed
+  @return    0 for success, or negative if an error occurred.
+  @since     1.14
+*/
+int hts_flush(htsFile* fp);
 
 /**!
   @abstract       Open an existing stream as a SAM/BAM/CRAM/VCF/BCF/etc file
@@ -664,7 +700,7 @@ int hts_set_opt(htsFile* fp, hts_fmt_option opt, ...);
   @param fp         The file handle
   @param delimiter  Unused, but must be '\n' (or KS_SEP_LINE)
   @param str        The line (not including the terminator) is written here
-  @return           Length of the string read;
+  @return           Length of the string read (capped at INT_MAX);
                     -1 on end-of-file; <= -2 on error
 */
 int hts_getline(htsFile* fp, int delimiter, kstring_t* str);
@@ -1175,10 +1211,26 @@ enum HTS_PARSE_FLAGS : int
     @param strend  If non-NULL, set on return to point to the first character
                    in @a str after those forming the parsed number
     @param flags   Or'ed-together combination of HTS_PARSE_* flags
-    @return  Converted value of the parsed number.
+    @return  Integer value of the parsed number, or 0 if no valid number
 
-    When @a strend is NULL, a warning will be printed (if hts_verbose is HTS_LOG_WARNING
-    or more) if there are any trailing characters after the number.
+    The input string is parsed as: optional whitespace; an optional '+' or
+    '-' sign; decimal digits possibly including ',' characters (if @a flags
+    includes HTS_PARSE_THOUSANDS_SEP) and a '.' decimal point; and an optional
+    case-insensitive suffix, which may be either 'k', 'M', 'G', or scientific
+    notation consisting of 'e'/'E' followed by an optional '+' or '-' sign and
+    decimal digits. To be considered a valid numeric value, the main part (not
+    including any suffix or scientific notation) must contain at least one
+    digit (either before or after the decimal point).
+
+    When @a strend is NULL, @a str is expected to contain only (optional
+    whitespace followed by) the numeric value. A warning will be printed
+    (if hts_verbose is HTS_LOG_WARNING or more) if no valid parsable number
+    is found or if there are any unused characters after the number.
+
+    When @a strend is non-NULL, @a str starts with (optional whitespace
+    followed by) the numeric value. On return, @a strend is set to point
+    to the first unused character after the numeric value, or to @a str
+    if no valid parsable number is found.
 */
 long hts_parse_decimal(const(char)* str, char** strend, HTS_PARSE_FLAGS flags);
 
