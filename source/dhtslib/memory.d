@@ -30,7 +30,7 @@ void hts_log_errorNoGC(const(char)[] ctx)( string msg) @trusted @nogc nothrow
 /// pointer and reference counts it and then
 /// destroys with destroyFun when it goes 
 /// truly out of scope
-struct SafeHtslibPtr(T, alias destroyFun)
+struct SafeHtslibPtr(T, alias destroyFun, alias dupFun = void)
 if(!isPointer!T && isSomeFunction!destroyFun)
 {
     @safe @nogc nothrow:
@@ -77,6 +77,12 @@ if(!isPointer!T && isSomeFunction!destroyFun)
         return ptr;
     }
 
+    static if(isSomeFunction!dupFun) {
+        auto dup() @trusted return scope {
+            return typeof(this)(dupFun(this.ptr));
+        }
+    }
+
     /// dtor that respects scope
     ~this() @trusted return scope
     {
@@ -106,19 +112,19 @@ if(!isPointer!T && isSomeFunction!destroyFun)
 
 /// reference counted bam1_t wrapper
 /// can be used directly as a bam1_t *
-alias Bam1 = SafeHtslibPtr!(bam1_t, bam_destroy1);
+alias Bam1 = SafeHtslibPtr!(bam1_t, bam_destroy1, bam_dup1);
 
 /// reference counted bam_hdr_t wrapper
 /// can be used directly as a bam_hdr_t *
-alias BamHdr = SafeHtslibPtr!(bam_hdr_t, bam_hdr_destroy);
+alias BamHdr = SafeHtslibPtr!(bam_hdr_t, bam_hdr_destroy, bam_hdr_dup);
 
 /// reference counted bcf1_t wrapper
 /// can be used directly as a bcf1_t *
-alias Bcf1 = SafeHtslibPtr!(bcf1_t, bcf_destroy);
+alias Bcf1 = SafeHtslibPtr!(bcf1_t, bcf_destroy, bcf_dup);
 
 /// reference counted bcf_hdr_t wrapper
 /// can be used directly as a bcf_hdr_t *
-alias BcfHdr = SafeHtslibPtr!(bcf_hdr_t, bcf_hdr_destroy);
+alias BcfHdr = SafeHtslibPtr!(bcf_hdr_t, bcf_hdr_destroy, bcf_hdr_dup);
 
 /// reference counted htsFile wrapper
 /// can be used directly as a htsFile *
@@ -150,9 +156,17 @@ alias Faidx = SafeHtslibPtr!(faidx_t, fai_destroy);
 
 /// reference counted Kstring wrapper
 /// can be used directly as a kstring_t *
-alias Kstring = SafeHtslibPtr!(kstring_t, ks_free);
+alias Kstring = SafeHtslibPtr!(kstring_t, ks_free, ks_dup);
 
 alias HtsItrMulti = HtsItr;
+
+/// reference counted hts_tpool wrapper
+/// can be used directly as a hts_tpool *
+alias HtsTPool = SafeHtslibPtr!(hts_tpool, hts_tpool_destroy);
+
+/// reference counted hts_tpool_process wrapper
+/// can be used directly as a hts_tpool_process *
+alias HtsProcess = SafeHtslibPtr!(hts_tpool_process, hts_tpool_process_destroy);
 
 debug(dhtslib_unittest) unittest 
 {

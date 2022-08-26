@@ -199,6 +199,13 @@ void ks_free(kstring_t* s)
     }
 }
 
+kstring_t* ks_dup(kstring_t* s) {
+	kstring_t* n = cast(kstring_t*) malloc(kstring_t.sizeof);
+	ks_initialize(n);
+	auto ret = kputs(ks_str(s), n);
+	return n;
+}
+
 int kputsn(const(char)* p, size_t l, kstring_t* s)
 {
 	size_t new_sz = s.l + l + 2;
