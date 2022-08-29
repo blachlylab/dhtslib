@@ -23,7 +23,7 @@ __gshared ThreadPool globalPool;
 /// just making sure the thread pool is initialized
 void enforceGlobalThreadPool(int threads = -2) @trusted nothrow @nogc 
 {
-    if(globalPool.tpool && (globalPool.threads == threads || threads == -2)) {
+    if(globalPool.tpool && (globalPool.threads == threads || threads == -2 || (threads == -1 && globalPool.threads == totalCPUs))) {
         return;
     } else
         globalPool = ThreadPool(threads, true);   
@@ -59,6 +59,9 @@ struct ThreadPool
     /// ctor for thread pool
     /// threads == -1 indicates to set number of threads equal to number of cpu cores
     this(int threads, bool global = false) {
+        import htslib.hts_log;
+        import std.format;
+
         this.threads = threads;
         if (threads == -1)
         {

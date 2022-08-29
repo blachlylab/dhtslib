@@ -52,6 +52,13 @@ struct SAMRecord
         this.h = h;
     }
 
+    /// Construct SAMRecord from supplied Bam1 and sam_hdr_type
+    this(Bam1 b, SAMHeader h)
+    {
+        this.b = b;
+        this.h = h;
+    }
+
     /// Explicit postblit to avoid 
     /// https://github.com/blachlylab/dhtslib/issues/122
     this(this)

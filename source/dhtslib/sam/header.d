@@ -44,6 +44,12 @@ struct SAMHeader
         this.h = BamHdr(h);
     }
 
+    /// Construct from SafeHtslibPtr
+    this(BamHdr h)
+    {
+        this.h = h;
+    }
+
     /// Explicit postblit to avoid 
     /// https://github.com/blachlylab/dhtslib/issues/122
     this(this)
