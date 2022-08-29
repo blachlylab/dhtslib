@@ -34,6 +34,7 @@ import core.sys.posix.sys.types;
 
 import htslib.hfile : hFILE;
 import htslib.kstring;
+import htslib.thread_pool : hts_tpool;
 
 @system:
 nothrow:
@@ -61,7 +62,6 @@ enum BGZF_ERR_MISUSE = 8;
 enum BGZF_ERR_MT = 16; // stream cannot be multi-threaded
 enum BGZF_ERR_CRC = 32;
 
-struct hts_tpool;
 struct bgzf_mtaux_t;
 struct __bgzidx_t;
 alias bgzidx_t = __bgzidx_t;

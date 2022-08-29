@@ -142,7 +142,7 @@ if(is(T == Bam1) || is(T == Bcf1) || is(T == Kstring))
     /// If you keep the result around it should be duplicated
     T front()
     {
-        return rec;
+        return rec.dup;
     }
 
     /// popFront to move range forward

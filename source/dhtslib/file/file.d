@@ -12,6 +12,7 @@ import std.array : array;
 import dhtslib.memory;
 import dhtslib.file.iterator;
 import dhtslib : initKstring;
+import dhtslib.threadpool;
 import htslib;
 
 enum HtslibFileFormatMode
@@ -108,6 +109,8 @@ struct HtslibFile
     /// if it has been loaded 
     off_t headerOffset = -1;
 
+    ThreadPool pool;
+
     /// allow HtslibFile to be used as 
     /// underlying ptr type
     alias getFilePtr this;
@@ -172,10 +175,19 @@ struct HtslibFile
         return newFile;
     }
 
-    /// set extra multithreading
-    void setExtraThreads(int extra)
+    /// sets number of threads via global thread pool
+    /// if number is -1 sets to number of CPUs
+    void setThreads(int threads)
     {
-        hts_set_threads(this.fp, extra);
+        enforceGlobalThreadPool(threads);        
+        this.setThreadPool(globalPool);
+    }
+
+    /// set multithreading pool
+    void setThreadPool(ThreadPool pool)
+    {
+        this.pool = pool;
+        hts_set_thread_pool(this.fp, &this.pool.htsPool);
     }
 
     /// get file offset
@@ -577,6 +589,7 @@ debug(dhtslib_unittest) unittest
 
         auto f = HtslibFile("/tmp/htslibfile.test.sam");
         f.loadHeader;
+        f.setThreads(4);
         auto h = f.bamHdr;
         auto read = f.readRecord!Bam1();
         assert(fromStringz(bam_get_qname(read)) == "HS18_09653:4:1315:19857:61712");
@@ -613,32 +626,39 @@ debug(dhtslib_unittest) unittest
     import std.path:buildPath,dirName;
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
     {
+        ThreadPool pool = ThreadPool(8);
         auto f = HtslibFile(fn);
         f.loadHeader;
+        f.setThreadPool(pool);
         auto h = f.bcfHdr;
         auto read = f.readRecord!Bcf1();
 
         f = HtslibFile("/tmp/htslibfile.test.vcf", HtslibFileWriteMode.Vcf);
+        f.setThreadPool(pool);
         f.setHeader(h);
         f.writeHeader;
         f.write(read);
         
         f = HtslibFile("/tmp/htslibfile.test.bcf", HtslibFileWriteMode.Bcf);
+        f.setThreadPool(pool);
         f.setHeader(h);
         f.writeHeader;
         f.write(read);
 
         f = HtslibFile("/tmp/htslibfile.test.ubcf", HtslibFileWriteMode.UncompressedBcf);
+        f.setThreadPool(pool);
         f.setHeader(h);
         f.writeHeader;
         f.write(read);
 
         f = HtslibFile("/tmp/htslibfile.test.vcf.gz", HtslibFileWriteMode.GzippedVcf);
+        f.setThreadPool(pool);
         f.setHeader(h);
         f.writeHeader;
         f.write(read);
 
         f = HtslibFile("/tmp/htslibfile.test.vcf.bgz", HtslibFileWriteMode.BgzippedVcf);
+        f.setThreadPool(pool);
         f.setHeader(h);
         f.writeHeader;
         f.write(read);
@@ -676,4 +696,44 @@ debug(dhtslib_unittest) unittest
         read = f.readRecord!Bcf1();
         assert(read.pos == 3000149);
     }
+}
+
+debug(dhtslib_unittest) unittest
+{
+    hts_log_info(__FUNCTION__, "Testing HtslibFile parallel processing");
+    import std.path:buildPath,dirName;
+    auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
+    {
+        
+        ThreadPool pool = ThreadPool(8);
+        auto rdr = HtslibFile(fn);
+        rdr.setThreadPool(pool);
+        rdr.loadHeader;
+        auto h = rdr.bcfHdr;
+
+        auto wtr = HtslibFile("/tmp/htslibfile.test_parallel.vcf", HtslibFileWriteMode.Vcf);
+        wtr.setThreadPool(pool);
+        wtr.setHeader(h);
+        wtr.writeHeader;
+        
+        foreach(x; rdr.byRecord!Bcf1().parallelMap!((x) { x.pos++; return x;})(&pool)) {
+            wtr.write(x);
+        }
+    }
+
+    {
+        auto f = HtslibFile(fn);
+        f.loadHeader;
+        auto h = f.bcfHdr;
+        auto read = f.readRecord!Bcf1();
+        assert(read.pos == 3000149);
+
+        auto f2 = HtslibFile("/tmp/htslibfile.test_parallel.vcf");
+        f2.loadHeader;
+        h = f2.bcfHdr;
+        auto read2 = f2.readRecord!Bcf1();
+        assert(read2.pos == 3000150);
+        
+    }
+    
 }
