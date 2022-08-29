@@ -406,6 +406,9 @@ struct Process(alias fun, R)
         this.proc = HtsProcess(hts_tpool_process_init(this.pool.tpool, cast(int)this.pool.threads * 2, 0));
         frontVal = frontVal.init;
         auto qsize =  hts_tpool_process_qsize(this.proc);
+        if(this.range.empty) {
+            this.empty = true;
+        }
         for(auto i = 0; i < qsize; i++) {
             if(this.range.empty) {
                 break;
@@ -477,6 +480,27 @@ debug(dhtslib_unittest) unittest {
     alias x = (x) => a + 1;
     enforceGlobalThreadPool(4);
     auto res = input.parallelMap!( x => x + 1).array;
+
+    assert(res == result);
+}
+
+debug(dhtslib_unittest) unittest {
+    int[] input;
+
+    int[] result;
+
+    /// test empty range
+    alias x = (x) => a + 1;
+    enforceGlobalThreadPool(4);
+    auto res = input.parallelMap!( x => x + 1).array;
+
+    assert(res == result);
+
+    /// test range smaller than pool queue size
+    input = [1, 2, 3];
+    result = [2, 3, 4];
+    
+    res = input.parallelMap!( x => x + 1).array;
 
     assert(res == result);
 }
