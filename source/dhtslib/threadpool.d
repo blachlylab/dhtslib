@@ -19,7 +19,8 @@ import core.atomic : atomicOp;
 __gshared ThreadPool globalPool;
 
 /// ensure global pool is initialized
-/// NOTE: only sets threads if the global pool is not already initialized
+/// threads == -2 indicates that we are not setting any threads, 
+/// just making sure the thread pool is initialized
 void enforceGlobalThreadPool(int threads = -2) @trusted nothrow @nogc 
 {
     if(globalPool.tpool && (globalPool.threads == threads || threads == -2)) {
@@ -54,6 +55,9 @@ struct ThreadPool
     bool isGlobal;
     bool owned;
     @nogc @trusted nothrow: 
+
+    /// ctor for thread pool
+    /// threads == -1 indicates to set number of threads equal to number of cpu cores
     this(int threads, bool global = false) {
         this.threads = threads;
         if (threads == -1)
@@ -67,10 +71,12 @@ struct ThreadPool
         this.owned = true;
     }
 
+    /// postblit
     this(this) {
         if(this.owned) this._tpool = _tpool;
     }
 
+    /// easier tpool access
     @property tpool() {
         return this.htsPool.pool;
     }
