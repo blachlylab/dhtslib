@@ -34,7 +34,7 @@ import core.sys.posix.sys.types;
 
 import htslib.hfile : hFILE;
 import htslib.kstring;
-import htslib.thread_pool;
+import htslib.thread_pool : hts_tpool;
 
 @system:
 nothrow:
