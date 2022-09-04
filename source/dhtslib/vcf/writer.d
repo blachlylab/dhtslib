@@ -368,20 +368,20 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.vcf", vcf.vcfhdr);
+        auto vcfw = VCFWriter("/tmp/test_vcf.vcf", vcf.header);
         
         vcfw.writeHeader;
-        foreach(rec;vcf) {
+        foreach(rec;vcf.allRecords) {
             vcfw.writeRecord(rec);
         }
         destroy(vcfw);
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.vcf");
-        assert(vcf.count == 15);
+        assert(vcf.allRecords.count == 15);
         vcf = VCFReader("/tmp/test_vcf.vcf");
 
-        VCFRecord rec = vcf.front;
+        VCFRecord rec = vcf.allRecords.front;
         assert(rec.chrom == "1");
         assert(rec.pos == 3000149);
         assert(rec.refAllele == "C");
@@ -392,20 +392,20 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.bcf", vcf.vcfhdr);
+        auto vcfw = VCFWriter("/tmp/test_vcf.bcf", vcf.header);
         
         vcfw.writeHeader;
-        foreach(rec;vcf) {
+        foreach(rec;vcf.allRecords) {
             vcfw.writeRecord(rec);
         }
         destroy(vcfw);
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.bcf");
-        assert(vcf.count == 15);
+        assert(vcf.allRecords.count == 15);
         vcf = VCFReader("/tmp/test_vcf.bcf");
         
-        VCFRecord rec = vcf.front;
+        VCFRecord rec = vcf.allRecords.front;
         assert(rec.chrom == "1");
         assert(rec.pos == 3000149);
         assert(rec.refAllele == "C");
@@ -416,20 +416,20 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.vcf.gz", vcf.vcfhdr);
+        auto vcfw = VCFWriter("/tmp/test_vcf.vcf.gz", vcf.header);
         
         vcfw.writeHeader;
-        foreach(rec;vcf) {
+        foreach(rec;vcf.allRecords) {
             vcfw.writeRecord(rec);
         }
         destroy(vcfw);
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.vcf.gz");
-        assert(vcf.count == 15);
+        assert(vcf.allRecords.count == 15);
         vcf = VCFReader("/tmp/test_vcf.vcf.gz");
         
-        VCFRecord rec = vcf.front;
+        VCFRecord rec = vcf.allRecords.front;
         assert(rec.chrom == "1");
         assert(rec.pos == 3000149);
         assert(rec.refAllele == "C");
@@ -453,20 +453,20 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Loading test file");
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.cvcf", vcf.vcfhdr, VCFWriterTypes.CVCF);
+        auto vcfw = VCFWriter("/tmp/test_vcf.cvcf", vcf.header, VCFWriterTypes.CVCF);
         
         vcfw.writeHeader;
-        foreach(rec;vcf) {
+        foreach(rec;vcf.allRecords) {
             vcfw.writeRecord(rec);
         }
         destroy(vcfw);
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.cvcf");
-        assert(vcf.count == 15);
+        assert(vcf.allRecords.count == 15);
         vcf = VCFReader("/tmp/test_vcf.cvcf");
 
-        VCFRecord rec = vcf.front;
+        VCFRecord rec = vcf.allRecords.front;
         assert(rec.chrom == "1");
         assert(rec.pos == 3000149);
         assert(rec.refAllele == "C");
@@ -477,20 +477,20 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.ubcf", vcf.vcfhdr, VCFWriterTypes.UBCF);
+        auto vcfw = VCFWriter("/tmp/test_vcf.ubcf", vcf.header, VCFWriterTypes.UBCF);
         
         vcfw.writeHeader;
-        foreach(rec;vcf) {
+        foreach(rec;vcf.allRecords) {
             vcfw.writeRecord(rec);
         }
         destroy(vcfw);
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.ubcf");
-        assert(vcf.count == 15);
+        assert(vcf.allRecords.count == 15);
         vcf = VCFReader("/tmp/test_vcf.ubcf");
         
-        VCFRecord rec = vcf.front;
+        VCFRecord rec = vcf.allRecords.front;
         assert(rec.chrom == "1");
         assert(rec.pos == 3000149);
         assert(rec.refAllele == "C");
@@ -501,20 +501,20 @@ debug(dhtslib_unittest) unittest
     }
     {
         auto vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
-        auto vcfw = VCFWriter("/tmp/test_vcf.txt", vcf.vcfhdr, VCFWriterTypes.VCF);
+        auto vcfw = VCFWriter("/tmp/test_vcf.txt", vcf.header, VCFWriterTypes.VCF);
         
         vcfw.writeHeader;
-        foreach(rec;vcf) {
+        foreach(rec;vcf.allRecords) {
             vcfw.writeRecord(rec);
         }
         destroy(vcfw);
     }
     {
         auto vcf = VCFReader("/tmp/test_vcf.txt");
-        assert(vcf.count == 15);
+        assert(vcf.allRecords.count == 15);
         vcf = VCFReader("/tmp/test_vcf.txt");
         
-        VCFRecord rec = vcf.front;
+        VCFRecord rec = vcf.allRecords.front;
         assert(rec.chrom == "1");
         assert(rec.pos == 3000149);
         assert(rec.refAllele == "C");

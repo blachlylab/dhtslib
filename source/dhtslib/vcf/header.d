@@ -283,6 +283,12 @@ struct VCFHeader
         this.hdr = BcfHdr(h);
     }
 
+    /// pointer ctor
+    this(BcfHdr h)
+    {
+        this.hdr = h;
+    }
+
     /// Explicit postblit to avoid 
     /// https://github.com/blachlylab/dhtslib/issues/122
     this(this)
@@ -315,6 +321,18 @@ struct VCFHeader
 
         free(cast(void*)ary);
         return ret;        
+    }
+
+    /// reference contig name to integer id
+    int targetId(string name)
+    {
+        return bcf_hdr_name2id(this.hdr, toStringz(name));
+    }
+
+    /// reference contig name to integer id
+    const(char)[] targetName(int tid)
+    {
+        return fromStringz(bcf_hdr_id2name(this.hdr, tid));
     }
 
     /// Number of samples in the header

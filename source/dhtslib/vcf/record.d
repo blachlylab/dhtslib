@@ -578,6 +578,21 @@ struct VCFRecord
         immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
     }
     /// ditto
+    this(T)(T h, Bcf1 b, UnpackLevel MAX_UNPACK = UnpackLevel.None)
+    if(is(T == VCFHeader) || is(T == bcf_hdr_t *))
+    {
+        static if (is(T == VCFHeader)) this.vcfheader = h;
+        else static if (is(T == bcf_hdr_t *)) this.vcfheader = VCFHeader(Bcf_hdr_t(h)); // double free() bug if we don't own bcf_hdr_t h
+        else static if (is(T == bcf_hdr_t)) assert(0);  // ferret out situations that will lead to free() crashes
+        else assert(0);
+
+        this.line = b;
+
+        // Now it must be UNPACKed
+        // Protip: specifying alternate MAX_UNPACK can speed it tremendously
+        immutable int ret = bcf_unpack(this.line, MAX_UNPACK);    // unsure what to do c̄ return value // @suppress(dscanner.suspicious.unused_variable)
+    }
+    /// ditto
     this(SS)(VCFHeader vcfhdr, string chrom, int pos, string id, string _ref, string alt, float qual, SS filter, )
     if (isSomeString!SS || is(SS == string[]))
     {
@@ -1496,12 +1511,11 @@ debug(dhtslib_unittest) unittest
     hts_log_info(__FUNCTION__, "Testing VCFReader");
     hts_log_info(__FUNCTION__, "Loading test file");
     auto fn = buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf.gz");
-    auto tbx = TabixIndexedFile(fn);
     auto reg = getIntervalFromString("1:3000151-3062916");
-    auto vcf = VCFReader(tbx, reg.contig, reg.interval);
-    assert(!vcf.empty);
-
-    VCFRecord rec = vcf.front;
+    auto vcf = VCFReader(fn);
+    assert(!vcf.query(reg.contig, reg.interval).empty);
+    auto recs = vcf.query(reg.contig, reg.interval);
+    VCFRecord rec = recs.front;
     assert(rec.getInfos["AN"].to!int == 4);
     rec.addInfo("AN", rec.getInfos["AN"].to!int + 1);
     assert(rec.getInfos["AN"].to!int == 5);
@@ -1536,8 +1550,8 @@ debug(dhtslib_unittest) unittest
     // assert(rec.getInfos["AN"].to!short == 0);
     // assert(rec.getInfos["AN"].to!long == 2147483648);
 
-    vcf.popFront;
-    rec = vcf.front;
+    recs.popFront;
+    rec = recs.front;
     assert(rec.refAllele == "GTTT");
     assert(rec.getInfos["INDEL"].to!bool == true);
 
@@ -1587,15 +1601,15 @@ debug(dhtslib_unittest) unittest
     assert(rec.getGenotypes.map!(x => x.toString).array == ["0/1", "0/1"]);
     
 
-    vcf.popFront;
-    rec = vcf.front;
+    recs.popFront;
+    rec = recs.front;
 
     auto fmts = rec.getFormats;
-    auto sam = vcf.vcfhdr.getSampleId("A");
+    auto sam = vcf.header.getSampleId("A");
     assert(fmts["GT"].to!int[sam] == [2, 4]);
     assert(rec.getGenotype(sam).toString == "0/1");
     assert(rec.getGenotype(sam).getPloidy == 2);
-    sam = vcf.vcfhdr.getSampleId("B");
+    sam = vcf.header.getSampleId("B");
     assert(fmts["GT"].to!int[sam] == [6, -127]);
     assert(rec.getGenotype(sam).toString == "2");
     assert(rec.getGenotype(sam).getPloidy == 1);
