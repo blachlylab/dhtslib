@@ -1290,7 +1290,7 @@ unittest
     vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     vw.addHeaderLineKV("INFO", "<ID=DP2,Number=2,Type=Float,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-    vw.vcfhdr.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
+    vw.header.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
     vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
     vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
     HeaderRecord hrec;
@@ -1299,19 +1299,19 @@ unittest
     hrec.setLength(HeaderLengths.OnePerAltAllele);
     hrec.setValueType(HeaderTypes.Float);
     hrec.setDescription("Allele Freq");
-    vw.vcfhdr.addHeaderRecord(hrec);
+    vw.header.addHeaderRecord(hrec);
     
-    assert(vw.vcfhdr.getHeaderRecord(HeaderRecordType.Format, "ID","AF")["ID"] == "AF");
+    assert(vw.header.getHeaderRecord(HeaderRecordType.Format, "ID","AF")["ID"] == "AF");
     vw.addHeaderLineRaw("##FORMAT=<ID=CH,Number=3,Type=String,Description=\"test\">");
 
     // Exercise header
-    assert(vw.vcfhdr.nsamples == 0);
+    assert(vw.header.nsamples == 0);
     vw.addSample("NA12878");
-    assert(vw.vcfhdr.nsamples == 1);
+    assert(vw.header.nsamples == 1);
 
     vw.writeHeader();
 
-    auto r = new VCFRecord(vw.vcfhdr, bcf_init1());
+    auto r = new VCFRecord(vw.header, bcf_init1());
     
     r.chrom = "20";
     assert(r.chrom == "20");
@@ -1427,7 +1427,7 @@ unittest
     // now test setting qual without UnpackLeveling
     // TODO: see https://forum.dlang.org/post/hebouvswxlslqhovzaia@forum.dlang.org, once resolved (or once factory function written),
     //  add template value param UnpackLevel.ALT
-    auto rr = new VCFRecord(vw.vcfhdr, "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0.017\n"); // @suppress(dscanner.style.long_line)
+    auto rr = new VCFRecord(vw.header, "20\t17330\t.\tT\tA\t3\t.\tNS=3;DP=11;AF=0.017\n"); // @suppress(dscanner.style.long_line)
     rr.qual = 3.0;
     assert(rr.qual == 3.0);
 
@@ -1487,7 +1487,7 @@ unittest
 
     assert(rr.coordinates == ZBHO(17329,17330));
     vw.writeRecord(*r);
-    vw.writeRecord(vw.vcfhdr.hdr, r.line);
+    vw.writeRecord(vw.header.hdr, r.line);
 
 
     // Finally, print the records:

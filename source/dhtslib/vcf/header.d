@@ -298,7 +298,7 @@ struct VCFHeader
 
     /// copy this header
     auto dup(){
-        return VCFHeader(bcf_hdr_dup(this.hdr));
+        return VCFHeader(this.hdr.dup);
     }
 
     /// List of contigs in the header
