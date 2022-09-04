@@ -664,7 +664,7 @@ unittest
 
     assert(hdr.sequences == ["test"]);
     hdr.removeHeaderLines(HeaderRecordType.Generic, "source");
-    hdr.addFilter("test","test");
+    hdr.addHeaderLine!(HeaderRecordType.Filter)("test", "test");
     expected = "##fileformat=VCFv4.2\n" ~ 
         "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n"~
         "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n"~

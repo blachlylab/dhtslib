@@ -943,7 +943,7 @@ debug(dhtslib_unittest) unittest
     writeln(hdr_str);
     hdr = sam_hdr_parse(cast(int) hdr_str.length, toUTFz!(char*)(hdr_str));
     hts_log_info(__FUNCTION__, "Read status:" ~ parseSam(range.front, hdr, b).to!string);
-    auto r = new SAMRecord(b);
+    auto r = SAMRecord(b, SAMHeader(hdr));
     hts_log_info(__FUNCTION__, "Cigar" ~ r.cigar.toString);
     assert(r.cigar.toString == "6M1D117M5D28M");
 }

@@ -1286,13 +1286,13 @@ unittest
 
     auto vw = VCFWriter("/dev/null", VCFWriterTypes.VCF);
 
-    vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
-    vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
-    vw.addHeaderLineKV("INFO", "<ID=DP2,Number=2,Type=Float,Description=\"Total Depth\">");
+    vw.header.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
+    vw.header.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
+    vw.header.addHeaderLineKV("INFO", "<ID=DP2,Number=2,Type=Float,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
     vw.header.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
-    vw.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
-    vw.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
+    vw.header.addHeaderLineRaw("##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species=\"Homo sapiens\",taxonomy=x>"); // @suppress(dscanner.style.long_line)
+    vw.header.addHeaderLineRaw("##FILTER=<ID=q10,Description=\"Quality below 10\">");
     HeaderRecord hrec;
     hrec.setHeaderRecordType(HeaderRecordType.Format);
     hrec.setID("AF");
@@ -1302,11 +1302,12 @@ unittest
     vw.header.addHeaderRecord(hrec);
     
     assert(vw.header.getHeaderRecord(HeaderRecordType.Format, "ID","AF")["ID"] == "AF");
-    vw.addHeaderLineRaw("##FORMAT=<ID=CH,Number=3,Type=String,Description=\"test\">");
+    vw.header.addHeaderLineRaw("##FORMAT=<ID=CH,Number=3,Type=String,Description=\"test\">");
 
     // Exercise header
     assert(vw.header.nsamples == 0);
-    vw.addSample("NA12878");
+
+    vw.header.addSample("NA12878");
     assert(vw.header.nsamples == 1);
 
     vw.writeHeader();

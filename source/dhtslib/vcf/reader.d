@@ -253,7 +253,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map, count;
     import std.array : array;
     import std.path : buildPath, dirName;
-    import std.math : approxEqual;
+    import std.math : isClose;
     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
     hts_log_info(__FUNCTION__, "Testing VCFReader (Tabix)");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -269,7 +269,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.refAllele == "C");
     assert(rec.altAllelesAsArray == ["T"]);
     assert(rec.allelesAsArray == ["C","T"]);
-    assert(approxEqual(rec.qual,59.2));
+    assert(isClose(rec.qual,59.2));
     assert(rec.filter == "PASS");
     
     recs.popFront;
@@ -280,7 +280,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.refAllele == "C");
     assert(rec.altAllelesAsArray == ["T"]);
     assert(rec.allelesAsArray == ["C","T"]);
-    assert(approxEqual(rec.qual,59.2));
+    assert(isClose(rec.qual,59.2));
     assert(rec.filter == "PASS");
     
     vcf = VCFReader(buildPath(dirName(dirName(dirName(dirName(__FILE__)))),"htslib","test","tabix","vcf_file.vcf"));
@@ -309,7 +309,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map, count;
     import std.array : array;
     import std.path : buildPath, dirName;
-    import std.math : approxEqual;
+    import std.math : isClose;
     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
     hts_log_info(__FUNCTION__, "Testing VCFReader");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -326,7 +326,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.refAllele == "C");
     assert(rec.altAllelesAsArray == ["T"]);
     assert(rec.allelesAsArray == ["C","T"]);
-    assert(approxEqual(rec.qual, 59.2));
+    assert(isClose(rec.qual, 59.2));
     assert(rec.filter == "PASS");
     assert(vcf.header.getSamples == ["A", "B"]);
 
@@ -338,7 +338,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.refAllele == "GTTT");
     assert(rec.altAllelesAsArray == ["G"]);
     assert(rec.allelesAsArray == ["GTTT","G"]);
-    assert(approxEqual(rec.qual,12.9));
+    assert(isClose(rec.qual,12.9));
     assert(rec.filter == "q10");
     // assert(rec. == ["C","T"]);
 
@@ -364,7 +364,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map, count;
     import std.array : array;
     import std.path : buildPath, dirName;
-    import std.math : approxEqual;
+    import std.math : isClose;
     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
     hts_log_info(__FUNCTION__, "Testing bcf1_t Unpacking");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -381,7 +381,7 @@ debug(dhtslib_unittest) unittest
     assert(rec.chrom == "1");
     assert(rec.pos == 3000150);
 
-    assert(approxEqual(rec.qual, 59.2));
+    assert(isClose(rec.qual, 59.2));
     assert(rec.line.unpacked == UnpackLevel.None);
 
     assert(rec.id == ".");

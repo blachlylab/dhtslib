@@ -323,12 +323,12 @@ unittest
 
     auto vw = VCFWriter("/dev/null", VCFWriterTypes.VCF);
 
-    vw.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
-    vw.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
+    vw.header.addHeaderLineRaw("##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">");
+    vw.header.addHeaderLineKV("INFO", "<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     // ##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-    vw.addTag!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
-    vw.addTag!(HeaderRecordType.Filter)("filt","test");
-    vw.addFilterTag("filt2","test2");
+    vw.header.addHeaderLine!(HeaderRecordType.Info)("AF", HeaderLengths.OnePerAltAllele, HeaderTypes.Integer, "Number of Samples With Data");
+    vw.header.addHeaderLine!(HeaderRecordType.Filter)("filt","test");
+    vw.header.addHeaderLine!(HeaderRecordType.Filter)("filt2","test2");
 
     assert(vw.getHeader.getHeaderRecord(HeaderRecordType.Filter, "filt2").getDescription == "\"test2\"");
     vw.writeHeader();
@@ -341,7 +341,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map, count;
     import std.array : array;
     import std.path : buildPath, dirName;
-    import std.math : approxEqual;
+    import std.math : isClose;
     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
     hts_log_info(__FUNCTION__, "Testing VCFWriterTypes DEDUCE");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -366,7 +366,7 @@ debug(dhtslib_unittest) unittest
         assert(rec.refAllele == "C");
         assert(rec.altAllelesAsArray == ["T"]);
         assert(rec.allelesAsArray == ["C","T"]);
-        assert(approxEqual(rec.qual,59.2));
+        assert(isClose(rec.qual,59.2));
         assert(rec.filter == "PASS");
     }
     {
@@ -390,7 +390,7 @@ debug(dhtslib_unittest) unittest
         assert(rec.refAllele == "C");
         assert(rec.altAllelesAsArray == ["T"]);
         assert(rec.allelesAsArray == ["C","T"]);
-        assert(approxEqual(rec.qual,59.2));
+        assert(isClose(rec.qual,59.2));
         assert(rec.filter == "PASS");
     }
     {
@@ -414,7 +414,7 @@ debug(dhtslib_unittest) unittest
         assert(rec.refAllele == "C");
         assert(rec.altAllelesAsArray == ["T"]);
         assert(rec.allelesAsArray == ["C","T"]);
-        assert(approxEqual(rec.qual,59.2));
+        assert(isClose(rec.qual,59.2));
         assert(rec.filter == "PASS");
     }
 }
@@ -426,7 +426,7 @@ debug(dhtslib_unittest) unittest
     import std.algorithm : map, count;
     import std.array : array;
     import std.path : buildPath, dirName;
-    import std.math : approxEqual;
+    import std.math : isClose;
     hts_set_log_level(htsLogLevel.HTS_LOG_INFO);
     hts_log_info(__FUNCTION__, "Testing VCFWriterTypes");
     hts_log_info(__FUNCTION__, "Loading test file");
@@ -451,7 +451,7 @@ debug(dhtslib_unittest) unittest
         assert(rec.refAllele == "C");
         assert(rec.altAllelesAsArray == ["T"]);
         assert(rec.allelesAsArray == ["C","T"]);
-        assert(approxEqual(rec.qual,59.2));
+        assert(isClose(rec.qual,59.2));
         assert(rec.filter == "PASS");
     }
     {
@@ -475,7 +475,7 @@ debug(dhtslib_unittest) unittest
         assert(rec.refAllele == "C");
         assert(rec.altAllelesAsArray == ["T"]);
         assert(rec.allelesAsArray == ["C","T"]);
-        assert(approxEqual(rec.qual,59.2));
+        assert(isClose(rec.qual,59.2));
         assert(rec.filter == "PASS");
     }
     {
@@ -499,7 +499,7 @@ debug(dhtslib_unittest) unittest
         assert(rec.refAllele == "C");
         assert(rec.altAllelesAsArray == ["T"]);
         assert(rec.allelesAsArray == ["C","T"]);
-        assert(approxEqual(rec.qual,59.2));
+        assert(isClose(rec.qual,59.2));
         assert(rec.filter == "PASS");
     }
 }

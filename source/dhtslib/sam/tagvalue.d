@@ -12,7 +12,7 @@ import htslib.sam : bam_aux_get, bam1_t, bam_aux2i;
 import htslib.hts_log;
 import std.conv : to;
 import std.exception : enforce, assertThrown;
-import std.math : approxEqual;
+import std.math : isClose;
 import dhtslib.memory;
 
 alias Types = AliasSeq!(byte, ubyte, short, ushort, int, uint, float, string, char);
@@ -412,9 +412,9 @@ debug (dhtslib_unittest) unittest
 
     hts_log_info(__FUNCTION__, "Testing float toString");
 
-    assert(approxEqual(read["F0"].toString.to!float, -1.0));
-    assert(approxEqual(read["F1"].toString.to!float, 0.0));
-    assert(approxEqual(read["F2"].toString.to!float, 1.0));
+    assert(isClose(read["F0"].toString.to!float, -1.0));
+    assert(isClose(read["F1"].toString.to!float, 0.0));
+    assert(isClose(read["F2"].toString.to!float, 1.0));
 
     hts_log_info(__FUNCTION__, "Running tag checking");
     assert(read["I0"].check!ubyte == true);
